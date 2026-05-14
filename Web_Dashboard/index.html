@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Anti-Gravity 戰情室 | AI Stock Scanner Dashboard</title>
+    <meta name="description" content="Professional buy-side real-time AI stock scanner dashboard">
+    <link rel="stylesheet" href="style.css?v=2">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.production.js"></script>
+</head>
+<body>
+    <div class="app-container">
+        <!-- ===== 側邊欄 ===== -->
+        <aside class="sidebar">
+            <div class="logo">
+                <div class="glow-orb"></div>
+                <h1>Anti-Gravity</h1>
+            </div>
+            <nav>
+                <a href="#" class="nav-link active" data-view="dashboard">
+                    <span class="nav-icon">📡</span> 即時儀表板
+                </a>
+                <a href="#" class="nav-link" data-view="heatmap">
+                    <span class="nav-icon">🧊</span> TD9 陣列熱力圖
+                </a>
+                <a href="#" class="nav-link" data-view="alerts-history">
+                    <span class="nav-icon">🔔</span> 系統警報紀錄
+                </a>
+                <a href="#" class="nav-link" data-view="settings">
+                    <span class="nav-icon">⚙️</span> 參數設定
+                </a>
+            </nav>
+            <div class="sidebar-footer">
+                <div class="engine-status" id="engine-status">
+                    <div class="status-dot offline"></div>
+                    <span>等待 Python 引擎...</span>
+                </div>
+                <div class="last-update" id="last-update">尚未同步</div>
+            </div>
+        </aside>
+
+        <!-- ===== 主畫面 ===== -->
+        <main class="main-content">
+
+            <!-- 頂部狀態列 (全域可見) -->
+            <header class="top-bar">
+                <div class="top-left">
+                    <h2 id="view-title">市場監控中心</h2>
+                    <span class="market-badge" id="market-badge">休市中</span>
+                </div>
+                <div class="top-right">
+                    <div class="qqq-ticker" id="qqq-ticker">
+                        <span class="qqq-label">QQQ</span>
+                        <span class="qqq-price" id="qqq-price">--</span>
+                        <span class="qqq-change" id="qqq-change">--</span>
+                    </div>
+                    <div class="scanner-counts">
+                        <div class="count-chip" id="count-buy" title="TD 買進訊號">🟢 <span>0</span></div>
+                        <div class="count-chip" id="count-sell" title="TD 賣出訊號">🔴 <span>0</span></div>
+                        <div class="count-chip" id="count-ma" title="均線回測">🔵 <span>0</span></div>
+                        <div class="count-chip" id="count-alerts" title="即時警報">🔥 <span>0</span></div>
+                    </div>
+                </div>
+            </header>
+
+            <!-- ========== VIEW 1: 即時儀表板 ========== -->
+            <div class="view-panel active" id="view-dashboard">
+                <div class="grid-layout">
+                    <section class="chart-section glass-panel">
+                        <div class="section-header">
+                            <h3 id="chart-title">個股分析圖表 — <span class="highlight">NVDA</span></h3>
+                            <div class="chart-controls">
+                                <select id="stock-selector"></select>
+                                <div style="display:flex; align-items:center; gap:4px; margin-left:8px;">
+                                    <input type="text" id="quick-search" placeholder="搜尋代碼..." style="width:100px; padding:4px 8px; background:var(--bg-card); border:1px solid var(--border-glow); border-radius:6px; color:var(--text-primary); font-size:12px; font-family:var(--font-mono);">
+                                    <button class="btn-tf" id="btn-quick-search" title="搜尋任意股票" style="padding:4px 8px;">🔍</button>
+                                    <button class="btn-tf" id="btn-add-watchlist" title="加入追蹤清單" style="padding:4px 6px; background:rgba(16,185,129,0.15); border-color:rgba(16,185,129,0.3); font-size:14px;">+</button>
+                                    <button class="btn-tf" id="btn-remove-watchlist" title="從追蹤清單移除" style="padding:4px 6px; background:rgba(239,68,68,0.15); border-color:rgba(239,68,68,0.3); font-size:14px;">−</button>
+                                </div>
+                                <button class="btn-tf active" data-tf="3m">3分K</button>
+                                <button class="btn-tf" data-tf="1d">日線</button>
+                                <button class="btn-tf" id="btn-refresh-charts" title="手動刷新 K 線數據" style="margin-left:8px; background:rgba(59,130,246,0.15); border-color:rgba(59,130,246,0.3);">🔄 刷新</button>
+                                <span id="chart-refresh-time" style="font-size:10px; color:var(--text-muted); margin-left:6px; font-family:var(--font-mono);">--</span>
+                            </div>
+                        </div>
+                        <div class="chart-wrapper">
+                            <div id="tvchart" class="tvchart-main tv-container"></div>
+                            <div style="display:flex; justify-content:space-between; align-items:center; padding: 0 4px; margin-top: -2px; margin-bottom: -2px;">
+                                <span style="font-size: 11px; color: var(--text-muted); font-weight: 600;">大盤基準 (QQQ)</span>
+                                <div style="font-size: 11px; font-family: var(--font-mono); color: var(--text-muted); display:flex; gap:12px;">
+                                    <span style="color: #f59e0b;">5MA: <span id="ma5-val">--</span></span>
+                                    <span style="color: #3b82f6;">10MA: <span id="ma10-val">--</span></span>
+                                    <span style="color: #8b5cf6;">20MA: <span id="ma20-val">--</span></span>
+                                </div>
+                            </div>
+                            <div id="qqqchart" class="tvchart-secondary tv-container"></div>
+                        </div>
+                    </section>
+                    <section class="alerts-section glass-panel">
+                        <div class="section-header">
+                            <h3>即時戰情</h3>
+                            <span class="badge-count" id="alert-total-badge">0 筆</span>
+                        </div>
+                        <!-- 大盤狀態 -->
+                        <div class="qqq-live-status" id="qqq-live-status">
+                            <div class="qqq-state-badge" id="qqq-state-badge">等待資料</div>
+                        </div>
+                        <!-- 當日強弱排名 -->
+                        <div class="rs-section">
+                            <h4>🏆 當日強弱排名 <span class="subtitle">依漲跌幅排序</span></h4>
+                            <div class="rs-list" id="rs-strength-list" style="max-height:360px; overflow-y:auto;"></div>
+                        </div>
+
+                        <!-- 警報 -->
+                        <div class="alerts-divider" style="display: flex; justify-content: space-between; align-items: center;">
+                            <h4>⚡ 即時警報</h4>
+                            <button id="btn-send-line" class="btn-tf" style="padding: 4px 8px; font-size: 11px;">傳送 LINE 📲</button>
+                        </div>
+                        <div class="alerts-feed" id="alerts-feed"></div>
+                    </section>
+                    <!-- 訊號績效回測面板 -->
+                    <section class="backtest-section glass-panel" id="backtest-section">
+                        <div class="section-header">
+                            <h3>訊號績效回測 — <span class="highlight" id="bt-ticker">NVDA</span>
+                                <span class="subtitle">過去 1 年歷史觸發後表現</span>
+                            </h3>
+                        </div>
+                        <div class="bt-cards" id="bt-cards">
+                            <div class="bt-loading">選擇個股後載入回測資料...</div>
+                        </div>
+                        <div class="bt-history-wrapper">
+                            <h4>歷史觸發紀錄 <span class="subtitle" id="bt-signal-label">TD9 賣出竭盡</span></h4>
+                            <div class="bt-tabs" id="bt-tabs">
+                                <button class="bt-tab active" data-sig="td9_sell">TD9 賣</button>
+                                <button class="bt-tab" data-sig="td9_buy">TD9 買</button>
+                                <button class="bt-tab" data-sig="td8_sell">TD8 賣</button>
+                                <button class="bt-tab" data-sig="td8_buy">TD8 買</button>
+                                <button class="bt-tab" data-sig="ma_pullback">均線回測</button>
+                            </div>
+                            <div class="bt-table-wrap">
+                                <table class="bt-table" id="bt-table">
+                                    <thead>
+                                        <tr>
+                                            <th>觸發日</th>
+                                            <th>價格</th>
+                                            <th>1D</th>
+                                            <th>3D</th>
+                                            <th>5D</th>
+                                            <th>10D</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="bt-tbody"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- ===== 基本面分析面板 ===== -->
+                    <section class="fundamentals-section glass-panel" id="fundamentals-section">
+                        <div class="section-header">
+                            <h3>💼 基本面分析 — <span class="highlight" id="fund-ticker">NVDA</span>
+                                <span class="subtitle" id="fund-name">--</span>
+                            </h3>
+                            <div style="display:flex; align-items:center; gap:10px;">
+                                <span class="fund-sector-badge" id="fund-sector">--</span>
+                                <span class="fund-update-time subtitle" id="fund-update">--</span>
+                            </div>
+                        </div>
+
+                        <!-- 核心估值指標卡片 -->
+                        <div class="fund-category-label">📐 估值面 Valuation</div>
+                        <div class="fund-metrics-grid" id="fund-valuation-grid"></div>
+
+                        <div class="fund-category-label">💰 獲利能力 Profitability</div>
+                        <div class="fund-metrics-grid" id="fund-profit-grid"></div>
+
+                        <div class="fund-category-label">🚀 成長性 & 財務體質</div>
+                        <div class="fund-metrics-grid" id="fund-growth-grid"></div>
+
+                        <div class="fund-category-label">🌐 市場概況 & 分析師共識</div>
+                        <div class="fund-metrics-grid" id="fund-market-grid"></div>
+
+                        <!-- 季度趨勢圖 -->
+                        <div class="fund-trends-row">
+                            <div class="fund-trend-card glass-panel">
+                                <h4>📊 季度營收趨勢 <span class="subtitle">Revenue (USD)</span></h4>
+                                <div class="fund-bar-chart" id="fund-rev-chart"></div>
+                            </div>
+                            <div class="fund-trend-card glass-panel">
+                                <h4>💵 季度 EPS 趨勢 <span class="subtitle">Earnings Per Share</span></h4>
+                                <div class="fund-bar-chart" id="fund-eps-chart"></div>
+                            </div>
+                            <div class="fund-trend-card glass-panel">
+                                <h4>📐 季度毛利率趨勢 <span class="subtitle">Gross Margin %</span></h4>
+                                <div class="fund-bar-chart" id="fund-gm-chart"></div>
+                            </div>
+                        </div>
+
+                        <!-- 分析師目標價 & 52W 區間 -->
+                        <div class="fund-bottom-row">
+                            <div class="fund-range-card glass-panel">
+                                <h4>🎯 分析師目標價區間</h4>
+                                <div id="fund-target-bar"></div>
+                            </div>
+                            <div class="fund-range-card glass-panel">
+                                <h4>📏 52 週價格區間</h4>
+                                <div id="fund-52w-bar"></div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- ===== 籌碼面分析面板 ===== -->
+                    <section class="institutional-section glass-panel" id="institutional-section">
+                        <div class="section-header">
+                            <h3>🏦 籌碼面分析 — <span class="highlight" id="inst-ticker">NVDA</span>
+                                <span class="subtitle" id="inst-name">--</span>
+                            </h3>
+                            <span class="fund-update-time subtitle" id="inst-update">--</span>
+                        </div>
+
+                        <div class="inst-grid">
+                            <!-- 持股結構 -->
+                            <div class="inst-card glass-panel">
+                                <h4>📊 持股結構</h4>
+                                <div class="inst-pie-wrapper" id="inst-ownership"></div>
+                            </div>
+
+                            <!-- 空頭指標 -->
+                            <div class="inst-card glass-panel">
+                                <h4>📉 空頭指標 & 軋空風險</h4>
+                                <div id="inst-short"></div>
+                            </div>
+
+                            <!-- 內部人買賣統計 -->
+                            <div class="inst-card glass-panel">
+                                <h4>🕵️ 內部人交易摘要 <span class="subtitle">近期</span></h4>
+                                <div id="inst-insider-summary"></div>
+                            </div>
+                        </div>
+
+                        <!-- 前十大機構持股人 -->
+                        <div class="inst-wide-card glass-panel">
+                            <h4>🏛️ 前 10 大機構持股人</h4>
+                            <div class="inst-table-wrap" id="inst-holders-table"></div>
+                        </div>
+
+                        <!-- 內部人交易明細 -->
+                        <div class="inst-wide-card glass-panel">
+                            <h4>📋 內部人交易紀錄 <span class="subtitle">Insider Transactions</span></h4>
+                            <div class="inst-table-wrap" id="inst-insider-table"></div>
+                        </div>
+                    </section>
+
+                    <section class="grid-section glass-panel">
+                        <div class="section-header">
+                            <h3>日線狀態雷達 <span class="subtitle">TD Sequential × 均線回測</span></h3>
+                            <div class="legend">
+                                <span class="legend-item"><span class="dot dot-green"></span> TD 買進</span>
+                                <span class="legend-item"><span class="dot dot-red"></span> TD 賣出</span>
+                                <span class="legend-item"><span class="dot dot-blue"></span> 均線回測</span>
+                            </div>
+                        </div>
+                        <div class="stock-grid" id="stock-grid"></div>
+                    </section>
+                </div>
+            </div>
+
+            <!-- ========== VIEW 2: TD9 陣列熱力圖 ========== -->
+            <div class="view-panel" id="view-heatmap">
+                <div class="heatmap-header">
+                    <h3>TD Sequential 全景掃描 <span class="subtitle">55 檔 AI/Tech 股 × TD 計數值</span></h3>
+                </div>
+                <div class="heatmap-grid" id="heatmap-grid"></div>
+                <div class="heatmap-scale">
+                    <span class="scale-label">賣出竭盡 ←</span>
+                    <div class="scale-bar">
+                        <span>-9</span><span>-6</span><span>-3</span><span>0</span><span>+3</span><span>+6</span><span>+9</span>
+                    </div>
+                    <span class="scale-label">→ 買入竭盡</span>
+                </div>
+            </div>
+
+            <!-- ========== VIEW 3: 系統警報紀錄 ========== -->
+            <div class="view-panel" id="view-alerts-history">
+                <div class="alerts-history-header">
+                    <h3>系統警報完整紀錄</h3>
+                    <div class="filter-row">
+                        <button class="filter-btn active" data-filter="all">全部</button>
+                        <button class="filter-btn" data-filter="td9">TD9 竭盡</button>
+                        <button class="filter-btn" data-filter="ma">均線回測</button>
+                        <button class="filter-btn" data-filter="hod">高點突破</button>
+                    </div>
+                </div>
+                <div class="alerts-history-list" id="alerts-history-list"></div>
+            </div>
+
+            <!-- ========== VIEW 4: 參數設定 ========== -->
+            <div class="view-panel" id="view-settings">
+                <h3>掃描器參數設定</h3>
+                <div class="settings-grid">
+                    <div class="setting-card glass-panel">
+                        <h4>📡 HOD 策略</h4>
+                        <div class="setting-row">
+                            <label>飆升門檻 (單根漲幅)</label>
+                            <div class="setting-value">
+                                <input type="number" value="0.5" step="0.1" min="0.1"> <span>%</span>
+                            </div>
+                        </div>
+                        <div class="setting-row">
+                            <label>抗跌股最低日漲幅</label>
+                            <div class="setting-value">
+                                <input type="number" value="0.1" step="0.05" min="0"> <span>%</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="setting-card glass-panel">
+                        <h4>🧊 TD9 策略</h4>
+                        <div class="setting-row">
+                            <label>觸發竭盡的 TD 數</label>
+                            <div class="setting-value">
+                                <input type="number" value="9" step="1" min="7" max="13">
+                            </div>
+                        </div>
+                        <div class="setting-row">
+                            <label>掃描週期</label>
+                            <div class="setting-value">
+                                <select>
+                                    <option>60 天</option>
+                                    <option>120 天</option>
+                                    <option>250 天</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="setting-card glass-panel">
+                        <h4>📐 均線回測</h4>
+                        <div class="setting-row">
+                            <label>監控均線</label>
+                            <div class="setting-value">
+                                <span class="tag">10MA</span>
+                                <span class="tag">20MA</span>
+                                <span class="tag">60MA</span>
+                            </div>
+                        </div>
+                        <div class="setting-row">
+                            <label>觸碰容差</label>
+                            <div class="setting-value">
+                                <input type="number" value="1.0" step="0.1" min="0.1"> <span>%</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="setting-card glass-panel">
+                        <h4>🔔 通知設定</h4>
+                        <div class="setting-row">
+                            <label>LINE Bot 推播</label>
+                            <div class="setting-value">
+                                <span class="status-on">已啟用</span>
+                            </div>
+                        </div>
+                        <div class="setting-row">
+                            <label>輪詢間隔</label>
+                            <div class="setting-value">
+                                <select>
+                                    <option>3 分鐘</option>
+                                    <option selected>5 分鐘</option>
+                                    <option>10 分鐘</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <p class="settings-note">⚠️ 參數調整功能尚在開發中，目前為展示用。未來將可直接修改 Python 設定檔。</p>
+            </div>
+
+        </main>
+    </div>
+    <script src="script.js?v=2"></script>
+</body>
+</html>
