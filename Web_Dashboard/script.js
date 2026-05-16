@@ -186,12 +186,17 @@ async function loadChartData(ticker, tf) {
         }
     } catch (e) { console.warn('QQQ chart fetch failed:', e); }
 
-    // Add Markers for 3m timeframe
-    if (tf === '3m' && stockData && qqqData) {
-        const { stockMarkers, qqqMarkers } = calculateMarkers(stockData, qqqData);
+    // Add Markers for both 3m and 1d timeframes
+    if (stockData && qqqData) {
+        const { stockMarkers, qqqMarkers } = calculateMarkers(stockData, qqqData, tf);
         candleSeries.setMarkers(stockMarkers);
         qqqSeries.setMarkers(qqqMarkers);
-        calculateVolumeProfile(stockData);
+        
+        if (tf === '3m') {
+            calculateVolumeProfile(stockData);
+        } else {
+            clearVPLines();
+        }
     } else {
         candleSeries.setMarkers([]);
         qqqSeries.setMarkers([]);
@@ -294,7 +299,7 @@ function calculateVolumeProfile(data) {
     }
 }
 
-function calculateMarkers(stockData, qqqData) {
+function calculateMarkers(stockData, qqqData, tf) {
     let qqqMarkers = [];
     let stockMarkers = [];
     
@@ -311,8 +316,18 @@ function calculateMarkers(stockData, qqqData) {
         
         let qCandle = qqqData[qIndex];
         
-        // Reset daily on gaps > 12 hours (43200 seconds)
-        if (sCandle.time - lastTime > 43200) {
+        // Setup initial HOD/LOD for the very first candle of daily chart
+        if (tf === '1d' && lastTime === 0) {
+            qHod = qCandle.high;
+            qLod = qCandle.low;
+            sHod = sCandle.high;
+            sLod = sCandle.low;
+            lastTime = sCandle.time;
+            continue;
+        }
+
+        // Reset daily on gaps > 12 hours (43200 seconds) for 3m chart
+        if (tf === '3m' && sCandle.time - lastTime > 43200) {
             qHod = qCandle.high;
             qLod = qCandle.low;
             sHod = sCandle.high;
@@ -345,7 +360,7 @@ function calculateMarkers(stockData, qqqData) {
             if (isSNewLow) {
                 stockMarkers.push({ time: sCandle.time, position: 'belowBar', color: '#10b981', shape: 'arrowUp', text: '弱:破底' });
             } else {
-                stockMarkers.push({ time: sCandle.time, position: 'belowBar', color: '#f59e0b', shape: 'arrowUp', text: '強:沒破底' });
+                stockMarkers.push({ time: sCandle.time, position: 'belowBar', color: '#f59e0b', shape: 'arrowUp', text: '強:未破底' });
             }
         }
         
