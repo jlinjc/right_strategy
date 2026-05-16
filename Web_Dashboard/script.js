@@ -1,4 +1,4 @@
-// ==========================================
+﻿// ==========================================
 // Anti-Gravity Dashboard — script.js
 // ==========================================
 
@@ -1611,51 +1611,46 @@ function renderSectorStrength() {
 
     grid.innerHTML = '';
     sortedSectors.forEach(sec => {
-        let card = document.createElement('div');
+        var card = document.createElement('div');
         card.className = 'glass-panel';
         card.style.padding = '16px';
         
-        let headerColor = sec.avgRet >= 0 ? 'rgba(239, 68, 68, 0.15)' : 'rgba(16, 185, 129, 0.15)';
-        let titleColor = sec.avgRet >= 0 ? '#ef4444' : '#10b981';
-        let retSign = sec.avgRet > 0 ? '+' : '';
+        var headerColor = sec.avgRet >= 0 ? 'rgba(239, 68, 68, 0.15)' : 'rgba(16, 185, 129, 0.15)';
+        var titleColor = sec.avgRet >= 0 ? '#ef4444' : '#10b981';
+        var retSign = sec.avgRet > 0 ? '+' : '';
         
-        let html = \`
-            <div style="display:flex; justify-content:space-between; align-items:center; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 12px; margin-bottom: 12px;">
-                <h3 style="margin:0; font-size:16px; color:var(--text-primary); display:flex; align-items:center; gap:8px;">
-                    \${sec.name}
-                    <span style="font-size:12px; padding: 2px 6px; background:\${headerColor}; color:\${titleColor}; border-radius: 4px;">\${retSign}\${sec.avgRet.toFixed(2)}%</span>
-                </h3>
-                <div style="font-size:11px; color:var(--text-muted);">
-                    <span style="color:#ef4444">強 \${sec.strong}</span> / <span style="color:#10b981">弱 \${sec.weak}</span>
-                </div>
-            </div>
-            <div style="display:flex; flex-direction:column; gap:4px; max-height: 250px; overflow-y: auto; padding-right: 4px;">
-        \`;
+        var html = '<div style="display:flex; justify-content:space-between; align-items:center; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 12px; margin-bottom: 12px;">' +
+            '<h3 style="margin:0; font-size:16px; color:var(--text-primary); display:flex; align-items:center; gap:8px;">' +
+            sec.name +
+            '<span style="font-size:12px; padding: 2px 6px; background:' + headerColor + '; color:' + titleColor + '; border-radius: 4px;">' + retSign + sec.avgRet.toFixed(2) + '%</span>' +
+            '</h3>' +
+            '<div style="font-size:11px; color:var(--text-muted);">' +
+            '<span style="color:#ef4444">強 ' + sec.strong + '</span> / <span style="color:#10b981">弱 ' + sec.weak + '</span>' +
+            '</div></div>' +
+            '<div style="display:flex; flex-direction:column; gap:4px; max-height: 250px; overflow-y: auto; padding-right: 4px;">';
         
         sec.stocks.forEach(s => {
-            let sRetColor = s.ret >= 0 ? '#ef4444' : '#10b981';
-            let sRetSign = s.ret > 0 ? '+' : '';
-            let sLabel = s.label === '強' ? \`<span style="background:rgba(239,68,68,0.15); color:#ef4444; padding:0 4px; border-radius:2px; font-size:10px;">強\${s.strong}</span>\` : 
-                         s.label === '弱' ? \`<span style="background:rgba(16,185,129,0.15); color:#10b981; padding:0 4px; border-radius:2px; font-size:10px;">弱\${s.weak}</span>\` : \`<span style="color:#64748b; font-size:10px;">中</span>\`;
+            var sRetColor = s.ret >= 0 ? '#ef4444' : '#10b981';
+            var sRetSign = s.ret > 0 ? '+' : '';
+            var sLabel = s.label === '強' ? '<span style="background:rgba(239,68,68,0.15); color:#ef4444; padding:0 4px; border-radius:2px; font-size:10px;">強' + s.strong + '</span>' : 
+                         s.label === '弱' ? '<span style="background:rgba(16,185,129,0.15); color:#10b981; padding:0 4px; border-radius:2px; font-size:10px;">弱' + s.weak + '</span>' : '<span style="color:#64748b; font-size:10px;">中</span>';
                          
-            let mtfTrend15 = globalState.mtf[s.ticker] ? globalState.mtf[s.ticker]['15m'] : '震盪';
-            let mtfTrend60 = globalState.mtf[s.ticker] ? globalState.mtf[s.ticker]['60m'] : '震盪';
-            let getDot = (t) => t === '多頭' ? '🔴' : t === '空頭' ? '🟢' : '⚪';
-            let dots = \`<span style="font-size:8px;">\${getDot(mtfTrend15)}\${getDot(mtfTrend60)}</span>\`;
 
-            html += \`
-                <div style="display:flex; justify-content:space-between; align-items:center; padding:6px; background:rgba(255,255,255,0.02); border-radius:4px; font-family:var(--font-mono); font-size:12px; cursor:pointer;" onmouseover="this.style.background='rgba(255,255,255,0.05)'" onmouseout="this.style.background='rgba(255,255,255,0.02)'" onclick="document.querySelector('.nav-link[data-view=\\'dashboard\\']').click(); setTimeout(()=>changeChartStock('\${s.ticker}'), 100);">
-                    <div style="display:flex; align-items:center; gap:6px;">
-                        <span style="color:var(--text-primary); font-weight:bold; width: 40px;">\${s.ticker}</span>
-                        \${dots}
-                        \${sLabel}
-                    </div>
-                    <span style="color:\${sRetColor};">\${sRetSign}\${s.ret.toFixed(2)}%</span>
-                </div>
-            \`;
+            var mtfTrend15 = globalState.mtf[s.ticker] ? globalState.mtf[s.ticker]['15m'] : '震盪';
+            var mtfTrend60 = globalState.mtf[s.ticker] ? globalState.mtf[s.ticker]['60m'] : '震盪';
+            var getDot = function(t) { return t === '多頭' ? '🔴' : t === '空頭' ? '🟢' : '⚪'; };
+            var dots = '<span style="font-size:8px;">' + getDot(mtfTrend15) + getDot(mtfTrend60) + '</span>';
+
+            html += '<div style="display:flex; justify-content:space-between; align-items:center; padding:6px; background:rgba(255,255,255,0.02); border-radius:4px; font-family:var(--font-mono); font-size:12px; cursor:pointer;" onmouseover="this.style.background=\'rgba(255,255,255,0.05)\'" onmouseout="this.style.background=\'rgba(255,255,255,0.02)\'" onclick="document.querySelector(\'.nav-link[data-view=dashboard]\').click(); setTimeout(function(){changeChartStock(\'' + s.ticker + '\')}, 100);">' +
+                '<div style="display:flex; align-items:center; gap:6px;">' +
+                '<span style="color:var(--text-primary); font-weight:bold; width: 40px;">' + s.ticker + '</span>' +
+                dots + sLabel +
+                '</div>' +
+                '<span style="color:' + sRetColor + ';">' + sRetSign + s.ret.toFixed(2) + '%</span>' +
+                '</div>';
         });
         
-        html += \`</div>\`;
+        html += '</div>';
         card.innerHTML = html;
         grid.appendChild(card);
     });
