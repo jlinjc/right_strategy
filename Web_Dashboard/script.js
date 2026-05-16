@@ -1,4 +1,4 @@
-﻿// ==========================================
+// ==========================================
 // Anti-Gravity Dashboard — script.js
 // ==========================================
 
@@ -25,6 +25,7 @@ const viewTitles = {
     'dashboard': '市場監控中心',
     'heatmap': 'TD9 陣列熱力圖',
     'sectors': '產業板塊強弱',
+    'momentum': '暴風動能選股',
     'alerts-history': '系統警報紀錄',
     'settings': '掃描器參數設定',
 };
@@ -1069,6 +1070,9 @@ loadIntradayRS();
 // Load sector rotation history
 loadSectorHistory();
 
+// Load momentum scanner data
+loadMomentumData();
+
 // Poll scanner data
 pollData();
 setInterval(pollData, 5000);
@@ -1861,3 +1865,89 @@ document.querySelectorAll('.sector-range-btn').forEach(function(btn) {
 window.addEventListener('resize', function() {
     if (sectorHistoryData) drawSectorChart();
 });
+
+// ==========================================
+// 17. Momentum Scanner
+// ==========================================
+var momentumData = null;
+
+async function loadMomentumData() {
+    try {
+        var res = await fetch('momentum_data.json?t=' + Date.now());
+        if (res.ok) {
+            momentumData = await res.json();
+            renderMomentumData();
+        }
+    } catch(e) { console.warn('Momentum data load failed:', e); }
+}
+
+function renderMomentumData() {
+    var grid = document.getElementById('momentum-grid');
+    if (!grid) return;
+    
+    if (!momentumData || !momentumData.stocks || momentumData.stocks.length === 0) {
+        grid.innerHTML = '<div style="color:var(--text-muted); padding:20px;">目前沒有符合動能篩選條件的標的。</div>';
+        return;
+    }
+
+    grid.innerHTML = '';
+    
+    momentumData.stocks.forEach(function(stock) {
+        var card = document.createElement('div');
+        card.className = 'glass-panel';
+        card.style.cssText = 'padding:16px; border-top:3px solid #6366f1; display:flex; flex-direction:column; gap:12px; cursor:pointer; transition:transform 0.2s, box-shadow 0.2s;';
+        card.onmouseover = function() { this.style.transform = 'translateY(-2px)'; this.style.boxShadow = '0 8px 16px rgba(0,0,0,0.4)'; };
+        card.onmouseout = function() { this.style.transform = 'none'; this.style.boxShadow = 'none'; };
+        card.onclick = function() {
+            document.querySelector('.nav-link[data-view=dashboard]').click();
+            setTimeout(function(){ changeChartStock(stock.ticker); }, 100);
+        };
+        
+        // Setup Tag Color
+        var setupBg = 'rgba(99, 102, 241, 0.15)';
+        var setupColor = '#818cf8';
+        if (stock.setup.includes('EP')) { setupBg = 'rgba(239, 68, 68, 0.15)'; setupColor = '#f87171'; card.style.borderTopColor = '#ef4444'; }
+        else if (stock.setup.includes('突破')) { setupBg = 'rgba(245, 158, 11, 0.15)'; setupColor = '#fbbf24'; card.style.borderTopColor = '#f59e0b'; }
+        else if (stock.setup.includes('強勢')) { setupBg = 'rgba(16, 185, 129, 0.15)'; setupColor = '#34d399'; card.style.borderTopColor = '#10b981'; }
+        
+        var reasonsHtml = stock.reasons.map(function(r) { 
+            return '<div style="font-size:11px; color:var(--text-muted); display:flex; align-items:center; gap:4px;">' +
+                   '<span style="color:#64748b;">\u2022</span> ' + r + '</div>'; 
+        }).join('');
+
+        var html = '<div style="display:flex; justify-content:space-between; align-items:flex-start;">' +
+            '<div style="display:flex; align-items:center; gap:8px;">' +
+            '<h3 style="margin:0; font-size:20px; color:var(--text-primary);">' + stock.ticker + '</h3>' +
+            '<span style="font-size:11px; padding:3px 8px; border-radius:4px; background:' + setupBg + '; color:' + setupColor + '; font-weight:600;">' + stock.setup + '</span>' +
+            '</div>' +
+            '<div style="text-align:right;">' +
+            '<div style="font-size:16px; font-weight:bold; color:var(--text-primary); font-family:var(--font-mono);">' + stock.price.toFixed(2) + '</div>' +
+            '</div>' +
+            '</div>' +
+            
+            // Reasons
+            '<div style="background:rgba(0,0,0,0.2); border-radius:6px; padding:8px 12px;">' +
+            reasonsHtml +
+            '</div>' +
+            
+            // Returns
+            '<div style="display:flex; justify-content:space-between; background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.05); border-radius:6px; padding:10px;">' +
+            '<div style="text-align:center;"><div style="font-size:10px; color:var(--text-muted); margin-bottom:2px;">1M 漲幅</div><div style="font-size:13px; color:' + (stock.returns['1M']>0?'#10b981':'#ef4444') + '; font-family:var(--font-mono);">' + (stock.returns['1M']>0?'+':'') + stock.returns['1M'] + '%</div></div>' +
+            '<div style="text-align:center;"><div style="font-size:10px; color:var(--text-muted); margin-bottom:2px;">3M 漲幅</div><div style="font-size:13px; color:' + (stock.returns['3M']>0?'#10b981':'#ef4444') + '; font-family:var(--font-mono);">' + (stock.returns['3M']>0?'+':'') + stock.returns['3M'] + '%</div></div>' +
+            '<div style="text-align:center;"><div style="font-size:10px; color:var(--text-muted); margin-bottom:2px;">ADR(日波)</div><div style="font-size:13px; color:#f59e0b; font-family:var(--font-mono);">' + stock.volatility.ADR_pct + '%</div></div>' +
+            '</div>' +
+            
+            // Action Plan
+            '<div style="border-top:1px dashed rgba(255,255,255,0.1); padding-top:12px;">' +
+            '<div style="font-size:12px; color:var(--text-primary); font-weight:bold; margin-bottom:8px; display:flex; align-items:center; gap:6px;"><span>🎯</span> 交易計畫建議</div>' +
+            '<table style="width:100%; font-size:11px; border-collapse:collapse;">' +
+            '<tr><td style="color:var(--text-muted); padding:4px 0; width:40%;">進場時機</td><td style="color:#38bdf8; text-align:right;">' + stock.levels.entry_suggest + '</td></tr>' +
+            '<tr><td style="color:var(--text-muted); padding:4px 0;">嚴格停損 (日低)</td><td style="color:#ef4444; text-align:right; font-family:var(--font-mono);">' + stock.levels.stop_loss + ' (-' + stock.levels.stop_pct + '%)</td></tr>' +
+            '<tr><td style="color:var(--text-muted); padding:4px 0;">獲利後移動停損</td><td style="color:#10b981; text-align:right;">' + stock.levels.trailing + ' 不破續抱</td></tr>' +
+            '</table>' +
+            '</div>';
+
+        card.innerHTML = html;
+        grid.appendChild(card);
+    });
+}

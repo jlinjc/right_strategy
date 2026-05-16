@@ -84,6 +84,13 @@ if __name__ == '__main__':
         cwd=SCRIPT_DIR,
     )
 
+    # 2.6. 產出暴風動能選股策略
+    print("🚀 正在執行暴風動能策略篩選...")
+    subprocess.run(
+        [sys.executable, os.path.join(SCRIPT_DIR, 'us_momentum_scanner.py')],
+        cwd=SCRIPT_DIR,
+    )
+
     # 基本面與籌碼面改為前端按需下載 (On-demand)
 
     # 3. 啟動網頁伺服器
