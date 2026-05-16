@@ -14,7 +14,7 @@ const AI_TECH_STOCKS = [
 let selectedStock = "NVDA";
 let currentTimeframe = "3m";
 let currentBtSignal = "td9_sell";
-let globalState = { td9: {}, ma: {}, alerts: [], engineOnline: false, lastUpdated: null };
+let globalState = { td9: {}, ma: {}, mtf: {}, alerts: [], engineOnline: false, lastUpdated: null, qqqStatus: null };
 let backtestData = {};
 let intradayRS = []; // sorted array of {ticker, ret, label}
 
@@ -398,8 +398,13 @@ document.querySelectorAll('.btn-tf').forEach(btn => {
 });
 
 function updateChartTitle() {
+    let mtfTrend15 = globalState.mtf[selectedStock] ? globalState.mtf[selectedStock]['15m'] : '震盪';
+    let mtfTrend60 = globalState.mtf[selectedStock] ? globalState.mtf[selectedStock]['60m'] : '震盪';
+    let getDot = (trend) => trend === '多頭' ? '🔴' : trend === '空頭' ? '🟢' : '⚪';
+    let dotsHtml = `<span style="font-size:12px; margin-left: 10px; opacity: 0.8;" title="15分K與60分K大環境趨勢">[15m:${getDot(mtfTrend15)} 60m:${getDot(mtfTrend60)}]</span>`;
+    
     document.getElementById('chart-title').innerHTML =
-        `個股分析圖表 — <span class="highlight">${selectedStock}</span>`;
+        `個股分析圖表 — <span class="highlight">${selectedStock}</span>${dotsHtml}`;
 }
 
 function changeChartStock(ticker) {
@@ -545,14 +550,14 @@ async function fetchJSON(file) {
 }
 
 async function pollData() {
-    var fetches = [fetchJSON('td9_data.json'), fetchJSON('ma_data.json')];
+    var fetches = [fetchJSON('td9_data.json'), fetchJSON('ma_data.json'), fetchJSON('mtf_trend.json')];
     // Only poll live scanner files if they've been found before
     if (!pollData._liveUnavailable) {
         fetches.push(fetchJSON('hod_data.json'), fetchJSON('orb_data.json'), fetchJSON('live_data.json'));
     } else {
         fetches.push(null, null, null);
     }
-    const [td9, ma, hod, orb, live] = await Promise.all(fetches);
+    const [td9, ma, mtf, hod, orb, live] = await Promise.all(fetches);
 
     // If none of the live files exist, stop polling them
     if (!hod && !orb && !live && !pollData._liveUnavailable) {
@@ -564,6 +569,7 @@ async function pollData() {
     let dataFound = false;
     if (td9) { globalState.td9 = td9.results || {}; dataFound = true; }
     if (ma) { globalState.ma = ma.results || {}; dataFound = true; }
+    if (mtf) { globalState.mtf = mtf || {}; dataFound = true; }
 
     let newAlerts = [];
     if (hod && hod.alerts) { newAlerts = newAlerts.concat(hod.alerts.map(a => ({ ...a, source: 'HOD' }))); dataFound = true; }
@@ -686,17 +692,23 @@ function renderStockGrid() {
     AI_TECH_STOCKS.forEach(ticker => {
         const tdVal = globalState.td9[ticker] || 0;
         const maVal = globalState.ma[ticker];
+        const mtfTrend = globalState.mtf[ticker] ? globalState.mtf[ticker]['60m'] : null;
         let cls = 'stock-node', tdText = `TD: ${tdVal}`;
 
         if (tdVal >= 8) { cls += ' td9-buy'; tdText = `TD: <span class='green'>${tdVal}</span>`; }
         else if (tdVal <= -8) { cls += ' td9-sell'; tdText = `TD: <span class='red'>${Math.abs(tdVal)}</span>`; }
         else if (maVal) { cls += ' ma-touch'; tdText = `回測 <span class='blue'>${maVal}</span>`; }
 
+        let trendDot = '';
+        if (mtfTrend === '多頭') trendDot = '<span style="color:#ef4444; font-size:8px;">🔴</span>';
+        else if (mtfTrend === '空頭') trendDot = '<span style="color:#10b981; font-size:8px;">🟢</span>';
+        else if (mtfTrend === '震盪') trendDot = '<span style="color:#94a3b8; font-size:8px;">⚪</span>';
+
         const div = document.createElement('div');
         div.className = cls;
         div.setAttribute('data-ticker', ticker);
         div.onclick = () => changeChartStock(ticker);
-        div.innerHTML = `<div class="node-symbol">${ticker}</div><div class="node-td">${tdText}</div>`;
+        div.innerHTML = `<div class="node-symbol">${ticker} ${trendDot}</div><div class="node-td">${tdText}</div>`;
         grid.appendChild(div);
     });
 }
@@ -722,10 +734,27 @@ function renderAlerts() {
     badge.textContent = `${realAlerts.length} 筆`;
     realAlerts.slice(0, 15).forEach(a => {
         let icon = a.type === 'up' ? '🛡️' : a.type === 'down' ? '🔴' : '🔥';
+        let cardClass = `alert-card ${a.type || 'surge'}`;
+        
+        let title = a.title || '';
+        let mtfTrend = globalState.mtf[a.symbol] ? globalState.mtf[a.symbol]['60m'] : '震盪';
+        
+        // Counter-trend logic
+        let isBuySignal = title.includes('突破') || title.includes('動能') || title.includes('買');
+        let isSellSignal = title.includes('破底') || title.includes('賣');
+        
+        if (isBuySignal && mtfTrend !== '多頭') {
+            title = '⚠️[逆勢] ' + title;
+            cardClass += ' counter-trend';
+        } else if (isSellSignal && mtfTrend !== '空頭') {
+            title = '⚠️[逆勢] ' + title;
+            cardClass += ' counter-trend';
+        }
+
         const card = document.createElement('div');
-        card.className = `alert-card ${a.type || 'surge'}`;
+        card.className = cardClass;
         card.onclick = () => changeChartStock(a.symbol);
-        card.innerHTML = `<div class="alert-icon">${icon}</div><div class="alert-info"><h4>${a.symbol}</h4><p>${a.title || ''} ${a.desc || ''}</p></div><span class="alert-time">${a.time || '--'}</span>`;
+        card.innerHTML = `<div class="alert-icon">${icon}</div><div class="alert-info"><h4>${a.symbol} <span style="font-size:10px;color:#94a3b8">[60m:${mtfTrend}]</span></h4><p>${title} ${a.desc || ''}</p></div><span class="alert-time">${a.time || '--'}</span>`;
         feed.appendChild(card);
     });
 }
@@ -1482,7 +1511,13 @@ function renderStrengthRanking() {
         else badge='<span class="rs-hod-badge">中</span>';
         var netClass = item.net>0?'up':item.net<0?'down':'';
         var netText = item.net>0?'+'+item.net:item.net===0?'0':''+item.net;
-        div.innerHTML = '<span class="rs-rank">'+(i+1)+'</span><span class="rs-ticker">'+item.ticker+'</span>'+badge+
+        
+        var mtfTrend15 = globalState.mtf[item.ticker] ? globalState.mtf[item.ticker]['15m'] : '震盪';
+        var mtfTrend60 = globalState.mtf[item.ticker] ? globalState.mtf[item.ticker]['60m'] : '震盪';
+        var getDot = function(t) { return t === '多頭' ? '🔴' : t === '空頭' ? '🟢' : '⚪'; };
+        var trendDots = '<span style="font-size:8px; margin-left:4px;" title="15m/60m">'+getDot(mtfTrend15)+getDot(mtfTrend60)+'</span>';
+
+        div.innerHTML = '<span class="rs-rank">'+(i+1)+'</span><span class="rs-ticker">'+item.ticker+trendDots+'</span>'+badge+
             '<span class="rs-ret '+retClass+'">'+(item.ret>=0?'+':'')+item.ret.toFixed(1)+'%</span>'+
             '<span class="rs-rs '+netClass+'">'+netText+'</span>';
         if (item.ticker===selectedStock) { div.style.background='rgba(139,92,246,0.1)'; div.style.border='1px solid rgba(139,92,246,0.3)'; }

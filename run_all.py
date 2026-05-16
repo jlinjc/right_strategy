@@ -6,7 +6,8 @@ import sys
 scripts = [
     "live_scanner.py",
     "us_scanner_td9.py",
-    "us_scanner_ma.py"
+    "us_scanner_ma.py",
+    "us_scanner_mtf.py"
 ]
 
 processes = []
