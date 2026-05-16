@@ -24,6 +24,9 @@
                 <a href="#" class="nav-link" data-view="heatmap">
                     <span class="nav-icon">🧊</span> TD9 陣列熱力圖
                 </a>
+                <a href="#" class="nav-link" data-view="sectors">
+                    <span class="nav-icon">🏛️</span> 產業板塊強弱
+                </a>
                 <a href="#" class="nav-link" data-view="alerts-history">
                     <span class="nav-icon">🔔</span> 系統警報紀錄
                 </a>
@@ -375,6 +378,41 @@
                     </div>
                 </div>
                 <p class="settings-note">⚠️ 參數調整功能尚在開發中，目前為展示用。未來將可直接修改 Python 設定檔。</p>
+            </div>
+
+            <!-- ========== VIEW 5: 產業板塊強弱 ========== -->
+            <div class="view-panel" id="view-sectors">
+                <div class="view-header">
+                    <h2>產業板塊強弱 <span class="subtitle">AI / Tech 各次產業資金輪動分析</span></h2>
+                </div>
+
+                <!-- 板塊輪動趨勢圖 -->
+                <section class="glass-panel" style="margin-top: 16px; padding: 20px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 12px;">
+                        <h3 style="margin:0; font-size:16px; color:var(--text-primary);">📈 板塊累積報酬走勢 <span style="font-size:11px; color:var(--text-muted);">(過去 60 個交易日)</span></h3>
+                        <div style="display:flex; gap:6px;">
+                            <button class="btn-tf sector-range-btn active" data-range="60" style="padding:3px 10px; font-size:11px;">60D</button>
+                            <button class="btn-tf sector-range-btn" data-range="20" style="padding:3px 10px; font-size:11px;">20D</button>
+                            <button class="btn-tf sector-range-btn" data-range="10" style="padding:3px 10px; font-size:11px;">10D</button>
+                            <button class="btn-tf sector-range-btn" data-range="5" style="padding:3px 10px; font-size:11px;">5D</button>
+                        </div>
+                    </div>
+                    <div style="position:relative; width:100%; height:380px;">
+                        <canvas id="sector-chart" style="width:100%; height:100%;"></canvas>
+                    </div>
+                    <div id="sector-legend" style="display:flex; flex-wrap:wrap; gap:8px 16px; margin-top:12px; font-size:11px;"></div>
+                </section>
+
+                <!-- 板塊動能排名 -->
+                <section class="glass-panel" style="margin-top: 16px; padding: 20px;">
+                    <h3 style="margin:0 0 12px 0; font-size:16px; color:var(--text-primary);">🏆 板塊動能排名</h3>
+                    <div id="sector-momentum" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap:10px;"></div>
+                </section>
+
+                <!-- 板塊個股明細 -->
+                <div class="sectors-grid" id="sectors-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; margin-top: 16px;">
+                    <div class="bt-loading">載入產業板塊資料中...</div>
+                </div>
             </div>
 
         </main>

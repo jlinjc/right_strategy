@@ -24,8 +24,25 @@ let intradayRS = []; // sorted array of {ticker, ret, label}
 const viewTitles = {
     'dashboard': '市場監控中心',
     'heatmap': 'TD9 陣列熱力圖',
+    'sectors': '產業板塊強弱',
     'alerts-history': '系統警報紀錄',
     'settings': '掃描器參數設定',
+};
+
+const SECTOR_MAP = {
+    "雲端巨頭 (Hyperscalers)": ["MSFT", "GOOGL", "AMZN", "META", "AAPL"],
+    "晶片設計 (IC Design)": ["NVDA", "AMD", "QCOM", "ARM"],
+    "晶圓代工與IDM (Foundry)": ["TSM", "INTC"],
+    "特用晶片 (Memory/Net/Power)": ["AVGO", "MRVL", "MU", "TXN", "MPWR"],
+    "半導體設備 (Semi Equipment)": ["AMAT", "LRCX", "KLAC"],
+    "AI伺服器與硬體 (AI Servers)": ["SMCI", "DELL", "HPE"],
+    "網通與儲存設備 (Network & Storage)": ["ANET", "NTAP", "PSTG"],
+    "資料中心基建與散熱 (Infra & Cooling)": ["VRT", "ETN", "PWR"],
+    "公用事業與電力 (Utilities & Power)": ["CEG", "NEE", "GE", "DUK"],
+    "資料庫與AI分析 (Data & AI Platforms)": ["PLTR", "SNOW", "MDB", "DDOG"],
+    "企業軟體 (Enterprise SaaS)": ["CRM", "NOW", "ORCL", "ADBE", "INTU", "IBM"],
+    "網路安全 (Cybersecurity)": ["CRWD", "PANW", "FTNT", "ZS", "NET", "OKTA"],
+    "自動化與應用 (Automation & Apps)": ["TSLA", "PATH", "APP", "SYM", "UBER"]
 };
 
 document.querySelectorAll('.nav-link').forEach(link => {
@@ -1049,6 +1066,9 @@ loadInstitutionalData();
 // Load intraday strength ranking
 loadIntradayRS();
 
+// Load sector rotation history
+loadSectorHistory();
+
 // Poll scanner data
 pollData();
 setInterval(pollData, 5000);
@@ -1487,6 +1507,7 @@ async function loadIntradayRS() {
     intradayRS = all.filter(function(x) { return x !== null; });
     intradayRS.sort(function(a, b) { return b.net !== a.net ? b.net - a.net : b.ret - a.ret; });
     renderStrengthRanking();
+    renderSectorStrength();
 }
 
 function analyzeStrength(sData, qData) {
@@ -1539,3 +1560,309 @@ function renderStrengthRanking() {
         el.appendChild(div);
     });
 }
+
+// ==========================================
+// 15. Sector Strength
+// ==========================================
+function renderSectorStrength() {
+    const grid = document.getElementById('sectors-grid');
+    if (!grid) return;
+    if (intradayRS.length === 0) {
+        grid.innerHTML = '<div class="bt-loading">載入產業板塊資料中...</div>';
+        return;
+    }
+
+    let sectorData = {};
+    Object.keys(SECTOR_MAP).forEach(sector => {
+        sectorData[sector] = { stocks: [], totalRet: 0, count: 0, strong: 0, weak: 0 };
+    });
+    sectorData["未分類"] = { stocks: [], totalRet: 0, count: 0, strong: 0, weak: 0 };
+
+    intradayRS.forEach(item => {
+        let foundSector = "未分類";
+        for (let [sector, tickers] of Object.entries(SECTOR_MAP)) {
+            if (tickers.includes(item.ticker)) {
+                foundSector = sector;
+                break;
+            }
+        }
+        sectorData[foundSector].stocks.push(item);
+        sectorData[foundSector].totalRet += item.ret;
+        sectorData[foundSector].count += 1;
+        sectorData[foundSector].strong += item.strong;
+        sectorData[foundSector].weak += item.weak;
+    });
+
+    let sortedSectors = [];
+    Object.keys(sectorData).forEach(sector => {
+        if (sectorData[sector].count > 0) {
+            let avgRet = sectorData[sector].totalRet / sectorData[sector].count;
+            sortedSectors.push({
+                name: sector,
+                avgRet: avgRet,
+                strong: sectorData[sector].strong,
+                weak: sectorData[sector].weak,
+                stocks: sectorData[sector].stocks.sort((a,b) => b.ret - a.ret)
+            });
+        }
+    });
+
+    sortedSectors.sort((a,b) => b.avgRet - a.avgRet);
+
+    grid.innerHTML = '';
+    sortedSectors.forEach(sec => {
+        let card = document.createElement('div');
+        card.className = 'glass-panel';
+        card.style.padding = '16px';
+        
+        let headerColor = sec.avgRet >= 0 ? 'rgba(239, 68, 68, 0.15)' : 'rgba(16, 185, 129, 0.15)';
+        let titleColor = sec.avgRet >= 0 ? '#ef4444' : '#10b981';
+        let retSign = sec.avgRet > 0 ? '+' : '';
+        
+        let html = \`
+            <div style="display:flex; justify-content:space-between; align-items:center; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 12px; margin-bottom: 12px;">
+                <h3 style="margin:0; font-size:16px; color:var(--text-primary); display:flex; align-items:center; gap:8px;">
+                    \${sec.name}
+                    <span style="font-size:12px; padding: 2px 6px; background:\${headerColor}; color:\${titleColor}; border-radius: 4px;">\${retSign}\${sec.avgRet.toFixed(2)}%</span>
+                </h3>
+                <div style="font-size:11px; color:var(--text-muted);">
+                    <span style="color:#ef4444">強 \${sec.strong}</span> / <span style="color:#10b981">弱 \${sec.weak}</span>
+                </div>
+            </div>
+            <div style="display:flex; flex-direction:column; gap:4px; max-height: 250px; overflow-y: auto; padding-right: 4px;">
+        \`;
+        
+        sec.stocks.forEach(s => {
+            let sRetColor = s.ret >= 0 ? '#ef4444' : '#10b981';
+            let sRetSign = s.ret > 0 ? '+' : '';
+            let sLabel = s.label === '強' ? \`<span style="background:rgba(239,68,68,0.15); color:#ef4444; padding:0 4px; border-radius:2px; font-size:10px;">強\${s.strong}</span>\` : 
+                         s.label === '弱' ? \`<span style="background:rgba(16,185,129,0.15); color:#10b981; padding:0 4px; border-radius:2px; font-size:10px;">弱\${s.weak}</span>\` : \`<span style="color:#64748b; font-size:10px;">中</span>\`;
+                         
+            let mtfTrend15 = globalState.mtf[s.ticker] ? globalState.mtf[s.ticker]['15m'] : '震盪';
+            let mtfTrend60 = globalState.mtf[s.ticker] ? globalState.mtf[s.ticker]['60m'] : '震盪';
+            let getDot = (t) => t === '多頭' ? '🔴' : t === '空頭' ? '🟢' : '⚪';
+            let dots = \`<span style="font-size:8px;">\${getDot(mtfTrend15)}\${getDot(mtfTrend60)}</span>\`;
+
+            html += \`
+                <div style="display:flex; justify-content:space-between; align-items:center; padding:6px; background:rgba(255,255,255,0.02); border-radius:4px; font-family:var(--font-mono); font-size:12px; cursor:pointer;" onmouseover="this.style.background='rgba(255,255,255,0.05)'" onmouseout="this.style.background='rgba(255,255,255,0.02)'" onclick="document.querySelector('.nav-link[data-view=\\'dashboard\\']').click(); setTimeout(()=>changeChartStock('\${s.ticker}'), 100);">
+                    <div style="display:flex; align-items:center; gap:6px;">
+                        <span style="color:var(--text-primary); font-weight:bold; width: 40px;">\${s.ticker}</span>
+                        \${dots}
+                        \${sLabel}
+                    </div>
+                    <span style="color:\${sRetColor};">\${sRetSign}\${s.ret.toFixed(2)}%</span>
+                </div>
+            \`;
+        });
+        
+        html += \`</div>\`;
+        card.innerHTML = html;
+        grid.appendChild(card);
+    });
+}
+
+// ==========================================
+// 16. Sector Rotation History Chart
+// ==========================================
+var sectorHistoryData = null;
+var sectorChartRange = 60;
+
+async function loadSectorHistory() {
+    try {
+        var res = await fetch('sector_history.json?t=' + Date.now());
+        if (res.ok) {
+            sectorHistoryData = await res.json();
+            drawSectorChart();
+            renderSectorMomentum();
+        }
+    } catch(e) { console.warn('Sector history load failed:', e); }
+}
+
+function drawSectorChart() {
+    var canvas = document.getElementById('sector-chart');
+    if (!canvas || !sectorHistoryData) return;
+    var ctx = canvas.getContext('2d');
+    var dpr = window.devicePixelRatio || 1;
+    var rect = canvas.parentElement.getBoundingClientRect();
+    canvas.width = rect.width * dpr;
+    canvas.height = rect.height * dpr;
+    ctx.scale(dpr, dpr);
+    var W = rect.width, H = rect.height;
+
+    ctx.clearRect(0, 0, W, H);
+
+    var dates = sectorHistoryData.dates;
+    var sectors = sectorHistoryData.sectors;
+    if (!dates || dates.length === 0) return;
+
+    // Apply range filter
+    var rangeLen = Math.min(sectorChartRange, dates.length);
+    var startIdx = dates.length - rangeLen;
+    var visibleDates = dates.slice(startIdx);
+    var N = visibleDates.length;
+    if (N < 2) return;
+
+    // Recalculate cumulative returns relative to the start of the visible window
+    var sectorEntries = [];
+    Object.keys(sectors).forEach(function(name) {
+        var s = sectors[name];
+        var cum = s.cumulative.slice(startIdx);
+        var baseVal = cum[0] || 0;
+        var rebased = cum.map(function(v) { return v - baseVal; });
+        sectorEntries.push({ name: name, data: rebased, color: s.color });
+    });
+
+    // Find global min/max
+    var allVals = [];
+    sectorEntries.forEach(function(s) { s.data.forEach(function(v) { allVals.push(v); }); });
+    var minVal = Math.min.apply(null, allVals);
+    var maxVal = Math.max.apply(null, allVals);
+    var padding = Math.max((maxVal - minVal) * 0.1, 0.5);
+    minVal -= padding;
+    maxVal += padding;
+
+    // Chart area
+    var padL = 55, padR = 15, padT = 15, padB = 35;
+    var cW = W - padL - padR;
+    var cH = H - padT - padB;
+
+    function xPos(i) { return padL + (i / (N - 1)) * cW; }
+    function yPos(v) { return padT + (1 - (v - minVal) / (maxVal - minVal)) * cH; }
+
+    // Draw grid
+    ctx.strokeStyle = 'rgba(255,255,255,0.04)';
+    ctx.lineWidth = 1;
+    var gridSteps = 6;
+    for (var g = 0; g <= gridSteps; g++) {
+        var gv = minVal + (maxVal - minVal) * (g / gridSteps);
+        var gy = yPos(gv);
+        ctx.beginPath(); ctx.moveTo(padL, gy); ctx.lineTo(W - padR, gy); ctx.stroke();
+        ctx.fillStyle = '#64748b';
+        ctx.font = '10px monospace';
+        ctx.textAlign = 'right';
+        ctx.fillText((gv > 0 ? '+' : '') + gv.toFixed(1) + '%', padL - 6, gy + 3);
+    }
+
+    // Draw zero line
+    if (minVal < 0 && maxVal > 0) {
+        var zy = yPos(0);
+        ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+        ctx.setLineDash([4, 4]);
+        ctx.beginPath(); ctx.moveTo(padL, zy); ctx.lineTo(W - padR, zy); ctx.stroke();
+        ctx.setLineDash([]);
+    }
+
+    // Draw date labels
+    ctx.fillStyle = '#64748b';
+    ctx.font = '10px monospace';
+    ctx.textAlign = 'center';
+    var labelInterval = Math.max(1, Math.floor(N / 8));
+    for (var d = 0; d < N; d += labelInterval) {
+        var lbl = visibleDates[d].substring(5); // MM-DD
+        ctx.fillText(lbl, xPos(d), H - padB + 18);
+    }
+    // Always show last date
+    ctx.fillText(visibleDates[N-1].substring(5), xPos(N-1), H - padB + 18);
+
+    // Draw lines
+    sectorEntries.forEach(function(sec) {
+        ctx.strokeStyle = sec.color;
+        ctx.lineWidth = 2;
+        ctx.globalAlpha = 0.85;
+        ctx.beginPath();
+        var started = false;
+        for (var i = 0; i < N; i++) {
+            var px = xPos(i), py = yPos(sec.data[i]);
+            if (!started) { ctx.moveTo(px, py); started = true; }
+            else ctx.lineTo(px, py);
+        }
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+
+        // Draw endpoint dot
+        var lastX = xPos(N-1), lastY = yPos(sec.data[N-1]);
+        ctx.fillStyle = sec.color;
+        ctx.beginPath();
+        ctx.arc(lastX, lastY, 3, 0, Math.PI * 2);
+        ctx.fill();
+    });
+
+    // Legend
+    var legendEl = document.getElementById('sector-legend');
+    if (legendEl) {
+        legendEl.innerHTML = '';
+        sectorEntries.sort(function(a,b) { return b.data[b.data.length-1] - a.data[a.data.length-1]; });
+        sectorEntries.forEach(function(sec) {
+            var val = sec.data[sec.data.length - 1];
+            var sign = val > 0 ? '+' : '';
+            var item = document.createElement('span');
+            item.style.cssText = 'display:flex; align-items:center; gap:4px; cursor:pointer; padding:2px 6px; border-radius:4px; transition:background 0.2s;';
+            item.onmouseover = function() { this.style.background = 'rgba(255,255,255,0.06)'; };
+            item.onmouseout = function() { this.style.background = 'transparent'; };
+            item.innerHTML = '<span style="display:inline-block;width:10px;height:3px;background:' + sec.color + ';border-radius:2px;"></span>' +
+                '<span style="color:var(--text-muted)">' + sec.name.split('(')[0].trim() + '</span>' +
+                '<span style="color:' + sec.color + '; font-family:var(--font-mono);">' + sign + val.toFixed(1) + '%</span>';
+            legendEl.appendChild(item);
+        });
+    }
+}
+
+function renderSectorMomentum() {
+    var el = document.getElementById('sector-momentum');
+    if (!el || !sectorHistoryData) return;
+    var sectors = sectorHistoryData.sectors;
+
+    var items = [];
+    Object.keys(sectors).forEach(function(name) {
+        var s = sectors[name];
+        items.push({
+            name: name,
+            latest: s.latest,
+            ret5d: s.ret_5d,
+            ret10d: s.ret_10d,
+            color: s.color,
+            count: s.stock_count
+        });
+    });
+    items.sort(function(a,b) { return b.ret5d - a.ret5d; });
+
+    el.innerHTML = '';
+    items.forEach(function(item, idx) {
+        var card = document.createElement('div');
+        card.style.cssText = 'background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.06); border-radius:8px; padding:12px; display:flex; justify-content:space-between; align-items:center;';
+        if (item.ret5d > 0) card.style.borderLeftColor = 'rgba(239,68,68,0.4)';
+        else card.style.borderLeftColor = 'rgba(16,185,129,0.4)';
+        card.style.borderLeftWidth = '3px';
+
+        var fmtRet = function(v) { return (v > 0 ? '+' : '') + v.toFixed(1) + '%'; };
+        var retColor = function(v) { return v >= 0 ? '#ef4444' : '#10b981'; };
+
+        card.innerHTML = '<div style="display:flex; align-items:center; gap:10px;">' +
+            '<span style="font-size:16px; font-weight:bold; color:#94a3b8; width:24px;">' + (idx+1) + '</span>' +
+            '<div>' +
+            '<div style="font-size:13px; color:var(--text-primary); font-weight:600;">' + item.name.split('(')[0].trim() + '</div>' +
+            '<div style="font-size:10px; color:var(--text-muted); margin-top:2px;">' + item.count + ' 檔</div>' +
+            '</div></div>' +
+            '<div style="display:flex; gap:16px; font-family:var(--font-mono); font-size:12px; text-align:right;">' +
+            '<div><div style="color:var(--text-muted); font-size:9px;">5D</div><div style="color:' + retColor(item.ret5d) + ';">' + fmtRet(item.ret5d) + '</div></div>' +
+            '<div><div style="color:var(--text-muted); font-size:9px;">10D</div><div style="color:' + retColor(item.ret10d) + ';">' + fmtRet(item.ret10d) + '</div></div>' +
+            '<div><div style="color:var(--text-muted); font-size:9px;">60D</div><div style="color:' + retColor(item.latest) + ';">' + fmtRet(item.latest) + '</div></div>' +
+            '</div>';
+        el.appendChild(card);
+    });
+}
+
+// Range button handlers
+document.querySelectorAll('.sector-range-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+        document.querySelectorAll('.sector-range-btn').forEach(function(b) { b.classList.remove('active'); });
+        btn.classList.add('active');
+        sectorChartRange = parseInt(btn.dataset.range);
+        drawSectorChart();
+    });
+});
+
+// Redraw on resize
+window.addEventListener('resize', function() {
+    if (sectorHistoryData) drawSectorChart();
+});

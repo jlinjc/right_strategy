@@ -77,6 +77,13 @@ if __name__ == '__main__':
         cwd=SCRIPT_DIR,
     )
 
+    # 2.5. 產出板塊輪動歷史
+    print("🏛️ 正在計算產業板塊輪動...")
+    subprocess.run(
+        [sys.executable, os.path.join(SCRIPT_DIR, 'us_sector_history.py')],
+        cwd=SCRIPT_DIR,
+    )
+
     # 基本面與籌碼面改為前端按需下載 (On-demand)
 
     # 3. 啟動網頁伺服器
