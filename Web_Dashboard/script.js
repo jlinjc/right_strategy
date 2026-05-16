@@ -191,9 +191,11 @@ async function loadChartData(ticker, tf) {
         const { stockMarkers, qqqMarkers } = calculateMarkers(stockData, qqqData);
         candleSeries.setMarkers(stockMarkers);
         qqqSeries.setMarkers(qqqMarkers);
+        calculateVolumeProfile(stockData);
     } else {
         candleSeries.setMarkers([]);
         qqqSeries.setMarkers([]);
+        clearVPLines();
     }
 
     // Restore zoom: if we had a saved range (user was zoomed in), restore it
@@ -205,6 +207,90 @@ async function loadChartData(ticker, tf) {
         }
     } else {
         chart.timeScale().fitContent();
+    }
+}
+
+let vpLines = [];
+
+function clearVPLines() {
+    vpLines.forEach(line => {
+        try { candleSeries.removePriceLine(line); } catch(e) {}
+    });
+    vpLines = [];
+}
+
+function calculateVolumeProfile(data) {
+    clearVPLines();
+    if (!data || data.length === 0) return;
+    
+    // Split data into days based on > 12 hours gap
+    let days = [];
+    let currentDay = [];
+    let lastTime = 0;
+    
+    for (let i = 0; i < data.length; i++) {
+        if (data[i].time - lastTime > 43200 && lastTime !== 0) {
+            if (currentDay.length > 0) days.push(currentDay);
+            currentDay = [];
+        }
+        currentDay.push(data[i]);
+        lastTime = data[i].time;
+    }
+    if (currentDay.length > 0) days.push(currentDay);
+    
+    function calcProfileForDay(dayData, isToday) {
+        if (!dayData || dayData.length === 0) return;
+        let high = -Infinity, low = Infinity, totalVol = 0;
+        
+        dayData.forEach(d => {
+            if (d.high > high) high = d.high;
+            if (d.low < low) low = d.low;
+            totalVol += (d.volume || 0);
+        });
+        
+        if (totalVol === 0 || high === low) return;
+        
+        const BINS = 100;
+        const binSize = (high - low) / BINS;
+        let profile = new Array(BINS).fill(0);
+        
+        dayData.forEach(d => {
+            let topBin = Math.floor((d.high - low) / binSize);
+            let botBin = Math.floor((d.low - low) / binSize);
+            if (topBin >= BINS) topBin = BINS - 1;
+            if (botBin < 0) botBin = 0;
+            
+            let binsCovered = topBin - botBin + 1;
+            let volPerBin = (d.volume || 0) / binsCovered;
+            
+            for (let b = botBin; b <= topBin; b++) {
+                profile[b] += volPerBin;
+            }
+        });
+        
+        let maxVol = -1, pocIdx = 0;
+        for (let i = 0; i < BINS; i++) {
+            if (profile[i] > maxVol) {
+                maxVol = profile[i];
+                pocIdx = i;
+            }
+        }
+        
+        let pocPrice = low + (pocIdx + 0.5) * binSize;
+        
+        if (isToday) {
+            vpLines.push(candleSeries.createPriceLine({ price: pocPrice, color: '#f97316', lineWidth: 2, lineStyle: 0, axisLabelVisible: true, title: 'POC (最大量)' }));
+        } else {
+            // Yesterday's lines (thinner, more transparent)
+            vpLines.push(candleSeries.createPriceLine({ price: pocPrice, color: 'rgba(249, 115, 22, 0.4)', lineWidth: 1, lineStyle: 0, axisLabelVisible: true, title: 'Y-POC' }));
+        }
+    }
+
+    if (days.length >= 2) {
+        calcProfileForDay(days[days.length - 2], false); // Yesterday
+    }
+    if (days.length >= 1) {
+        calcProfileForDay(days[days.length - 1], true);  // Today
     }
 }
 
@@ -1018,6 +1104,34 @@ document.getElementById('btn-send-line')?.addEventListener('click', async () => 
 // ==========================================
 let fundamentalsData = {};
 
+// ==========================================
+// On-demand Data Download (Fundamentals & Institutional)
+// ==========================================
+async function downloadFundInstData() {
+    var btnF = document.getElementById('btn-download-fund');
+    var btnI = document.getElementById('btn-download-inst');
+    if(btnF) { btnF.disabled=true; btnF.textContent='⏳ 下載中...'; }
+    if(btnI) { btnI.disabled=true; btnI.textContent='⏳ 下載中...'; }
+
+    try {
+        var res = await fetch('/api/fund_inst', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ticker: selectedStock })
+        });
+        if (res.ok) {
+            await loadFundamentalsData();
+            await loadInstitutionalData();
+        }
+    } catch(e) {}
+
+    if(btnF) { btnF.disabled=false; btnF.textContent='⬇️ 下載數據'; }
+    if(btnI) { btnI.disabled=false; btnI.textContent='⬇️ 下載數據'; }
+}
+
+document.getElementById('btn-download-fund')?.addEventListener('click', downloadFundInstData);
+document.getElementById('btn-download-inst')?.addEventListener('click', downloadFundInstData);
+
 async function loadFundamentalsData() {
     const data = await fetchJSON('fundamentals_data.json');
     if (data && data.stocks) {
@@ -1040,7 +1154,7 @@ function renderFundamentals() {
         if (s) s.textContent = '--';
         ['fund-valuation-grid','fund-profit-grid','fund-growth-grid','fund-market-grid'].forEach(function(id) {
             const e = document.getElementById(id);
-            if (e) e.innerHTML = '<div class="fund-metric-card"><div class="fund-metric-label">載入中</div><div class="fund-metric-value muted">--</div></div>';
+            if (e) e.innerHTML = '<div class="fund-metric-card" style="grid-column:1/-1;text-align:center;padding:20px;border:1px dashed rgba(255,255,255,0.1);"><div class="fund-metric-label">尚未下載 (請按上方 ⬇️下載數據 按鈕)</div></div>';
         });
         return;
     }
@@ -1230,7 +1344,7 @@ function renderInstitutional() {
     if (!d) {
         ['inst-ownership','inst-short','inst-insider-summary','inst-holders-table','inst-insider-table'].forEach(function(id){
             var e = document.getElementById(id);
-            if (e) e.innerHTML = '<div style="color:var(--text-muted);font-size:12px;padding:20px;text-align:center">載入中...</div>';
+            if (e) e.innerHTML = '<div style="color:var(--text-muted);font-size:12px;padding:30px;text-align:center;border:1px dashed rgba(255,255,255,0.1);border-radius:10px;">尚未下載 (請按上方 ⬇️下載數據 按鈕)</div>';
         });
         return;
     }
@@ -1363,8 +1477,8 @@ function renderStrengthRanking() {
         div.onclick = function() { changeChartStock(item.ticker); };
         var retClass = item.ret>=0?'up':'down';
         var badge = '';
-        if (item.label==='強') badge='<span class="rs-hod-badge" style="background:rgba(16,185,129,0.15);color:#10b981">強'+item.strong+'</span>';
-        else if (item.label==='弱') badge='<span class="rs-hod-badge" style="background:rgba(239,68,68,0.15);color:#ef4444">弱'+item.weak+'</span>';
+        if (item.label==='強') badge='<span class="rs-hod-badge" style="background:rgba(239,68,68,0.15);color:#ef4444">強'+item.strong+'</span>';
+        else if (item.label==='弱') badge='<span class="rs-hod-badge" style="background:rgba(16,185,129,0.15);color:#10b981">弱'+item.weak+'</span>';
         else badge='<span class="rs-hod-badge">中</span>';
         var netClass = item.net>0?'up':item.net<0?'down':'';
         var netText = item.net>0?'+'+item.net:item.net===0?'0':''+item.net;

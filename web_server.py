@@ -243,6 +243,62 @@ class APIHandler(http.server.SimpleHTTPRequestHandler):
                 self.end_headers()
                 self.wfile.write(json.dumps({'status': 'error', 'message': str(e)}).encode('utf-8'))
 
+        elif self.path == '/api/fund_inst':
+            # 按需下載個股的 基本面 + 籌碼面 數據
+            content_length = int(self.headers['Content-Length'])
+            post_data = self.rfile.read(content_length)
+            try:
+                data = json.loads(post_data.decode('utf-8'))
+                ticker = data.get('ticker', '').upper().strip()
+                if not ticker:
+                    raise ValueError('No ticker')
+
+                # 從原本的腳本匯入爬蟲函數
+                import sys
+                if SCRIPT_DIR not in sys.path:
+                    sys.path.append(SCRIPT_DIR)
+                from generate_fundamentals import fetch_fundamentals
+                from generate_institutional import fetch_institutional
+
+                print(f"[{datetime.now().strftime('%H:%M:%S')}] ⏳ 正在下載 {ticker} 基本面與籌碼面數據...")
+                fund_data = fetch_fundamentals(ticker)
+                inst_data = fetch_institutional(ticker)
+
+                # 將下載的資料寫入全域 JSON 檔案以便前端存取 (這可以保持原有的讀取邏輯)
+                # 基本面
+                fund_path = os.path.join(WEB_DIR, 'fundamentals_data.json')
+                fund_db = {'stocks': {}}
+                if os.path.exists(fund_path):
+                    with open(fund_path, 'r', encoding='utf-8') as f:
+                        fund_db = json.load(f)
+                if fund_data:
+                    fund_db['stocks'][ticker] = fund_data
+                with open(fund_path, 'w', encoding='utf-8') as f:
+                    json.dump(fund_db, f, ensure_ascii=False)
+
+                # 籌碼面
+                inst_path = os.path.join(WEB_DIR, 'institutional_data.json')
+                inst_db = {'stocks': {}}
+                if os.path.exists(inst_path):
+                    with open(inst_path, 'r', encoding='utf-8') as f:
+                        inst_db = json.load(f)
+                if inst_data:
+                    inst_db['stocks'][ticker] = inst_data
+                with open(inst_path, 'w', encoding='utf-8') as f:
+                    json.dump(inst_db, f, ensure_ascii=False)
+
+                print(f"[{datetime.now().strftime('%H:%M:%S')}] ✅ {ticker} 數據下載完成")
+
+                self.send_response(200)
+                self.send_header('Content-type', 'application/json')
+                self.end_headers()
+                self.wfile.write(json.dumps({'status': 'ok'}).encode('utf-8'))
+            except Exception as e:
+                self.send_response(500)
+                self.send_header('Content-type', 'application/json')
+                self.end_headers()
+                self.wfile.write(json.dumps({'status': 'error', 'message': str(e)}).encode('utf-8'))
+
         else:
             self.send_error(404, "Not Found")
 
@@ -273,10 +329,26 @@ def start_server():
     refresh_thread.start()
     print(f"⏰ 盤中自動刷新已啟動 (每 3 分鐘)")
 
+    import socket
+    def get_local_ip():
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        try:
+            s.connect(('10.255.255.255', 1))
+            ip = s.getsockname()[0]
+        except Exception:
+            ip = '127.0.0.1'
+        finally:
+            s.close()
+        return ip
+
+    local_ip = get_local_ip()
+
     # Ensure address reuse
     socketserver.TCPServer.allow_reuse_address = True
     with socketserver.TCPServer(("", PORT), APIHandler) as httpd:
-        print(f"🌐 啟動自訂 Web Server (支援 API) → http://localhost:{PORT}")
+        print(f"🌐 啟動自訂 Web Server (支援 API)")
+        print(f"   💻 本機網址 (自己用)   → http://localhost:{PORT}")
+        print(f"   📱 區域網路 (手機可用) → http://{local_ip}:{PORT}")
         try:
             httpd.serve_forever()
         except KeyboardInterrupt:

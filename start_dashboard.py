@@ -77,19 +77,7 @@ if __name__ == '__main__':
         cwd=SCRIPT_DIR,
     )
 
-    # 2.5 產出基本面數據
-    print("💼 正在產出個股基本面數據...")
-    subprocess.run(
-        [sys.executable, os.path.join(SCRIPT_DIR, 'generate_fundamentals.py')],
-        cwd=SCRIPT_DIR,
-    )
-
-    # 2.6 產出籌碼面數據
-    print("🏦 正在產出籌碼面數據...")
-    subprocess.run(
-        [sys.executable, os.path.join(SCRIPT_DIR, 'generate_institutional.py')],
-        cwd=SCRIPT_DIR,
-    )
+    # 基本面與籌碼面改為前端按需下載 (On-demand)
 
     # 3. 啟動網頁伺服器
     start_web_server()

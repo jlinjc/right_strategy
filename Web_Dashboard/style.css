@@ -9,10 +9,10 @@
     --text-muted: #64748b;
     --accent-blue: #3b82f6;
     --accent-purple: #8b5cf6;
-    --color-up: #10b981;
-    --color-up-bg: rgba(16, 185, 129, 0.12);
-    --color-down: #ef4444;
-    --color-down-bg: rgba(239, 68, 68, 0.12);
+    --color-up: #ef4444;
+    --color-up-bg: rgba(239, 68, 68, 0.12);
+    --color-down: #10b981;
+    --color-down-bg: rgba(16, 185, 129, 0.12);
     --color-surge: #f59e0b;
     --color-surge-bg: rgba(245, 158, 11, 0.12);
     --color-blue-bg: rgba(59, 130, 246, 0.12);
