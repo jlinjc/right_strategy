@@ -1,3 +1,4 @@
+// [LOCAL VERSION DIFF]: 新增了 Strategy Screener (策略選股) 頁面的渲染邏輯，並在圖表標題與清單中加入 TTM Squeeze 與 PE < 20 的標籤。
 // ==========================================
 // Anti-Gravity Dashboard — script.js
 // ==========================================
@@ -436,8 +437,17 @@ function updateChartTitle() {
     let getDot = (trend) => trend === '多頭' ? '🔴' : trend === '空頭' ? '🟢' : '⚪';
     let dotsHtml = `<span style="font-size:12px; margin-left: 10px; opacity: 0.8;" title="15分K與60分K大環境趨勢">[15m:${getDot(mtfTrend15)} 60m:${getDot(mtfTrend60)}]</span>`;
     
+    let extraBadges = '';
+    if (typeof momentumData !== 'undefined' && momentumData && momentumData.stocks) {
+        let mStock = momentumData.stocks.find(s => s.ticker === selectedStock);
+        if (mStock && mStock.indicators) {
+            if (mStock.indicators.is_squeezed) extraBadges += `<span style="margin-left:8px; font-size:12px; padding:2px 6px; border-radius:4px; background:rgba(236, 72, 153, 0.2); color:#ec4899; font-weight:600;" title="Squeeze 擠壓狀態">⚡ Squeeze</span>`;
+            if (mStock.indicators.pe && mStock.indicators.pe < 20) extraBadges += `<span style="margin-left:6px; font-size:12px; padding:2px 6px; border-radius:4px; background:rgba(59, 130, 246, 0.2); color:#3b82f6; font-weight:600;" title="估值偏低 (PE < 20)">💰 PE ${mStock.indicators.pe}</span>`;
+        }
+    }
+    
     document.getElementById('chart-title').innerHTML =
-        `個股分析圖表 — <span class="highlight">${selectedStock}</span>${dotsHtml}`;
+        `個股分析圖表 — <span class="highlight">${selectedStock}</span>${dotsHtml}${extraBadges}`;
 }
 
 function changeChartStock(ticker) {
@@ -737,11 +747,20 @@ function renderStockGrid() {
         else if (mtfTrend === '空頭') trendDot = '<span style="color:#10b981; font-size:8px;">🟢</span>';
         else if (mtfTrend === '震盪') trendDot = '<span style="color:#94a3b8; font-size:8px;">⚪</span>';
 
+        let extraIcons = '';
+        if (typeof momentumData !== 'undefined' && momentumData && momentumData.stocks) {
+            let mStock = momentumData.stocks.find(s => s.ticker === ticker);
+            if (mStock && mStock.indicators) {
+                if (mStock.indicators.is_squeezed) extraIcons += '<span title="Squeeze" style="margin-left:4px; font-size:12px;">⚡</span>';
+                if (mStock.indicators.pe && mStock.indicators.pe < 20) extraIcons += '<span title="PE < 20" style="margin-left:2px; font-size:12px;">💰</span>';
+            }
+        }
+
         const div = document.createElement('div');
         div.className = cls;
         div.setAttribute('data-ticker', ticker);
         div.onclick = () => changeChartStock(ticker);
-        div.innerHTML = `<div class="node-symbol">${ticker} ${trendDot}</div><div class="node-td">${tdText}</div>`;
+        div.innerHTML = `<div class="node-symbol">${ticker} ${trendDot}${extraIcons}</div><div class="node-td">${tdText}</div>`;
         grid.appendChild(div);
     });
 }
@@ -1072,6 +1091,9 @@ loadSectorHistory();
 
 // Load momentum scanner data
 loadMomentumData();
+
+// Load screener data
+loadScreenerData();
 
 // Poll scanner data
 pollData();
@@ -1877,6 +1899,8 @@ async function loadMomentumData() {
         if (res.ok) {
             momentumData = await res.json();
             renderMomentumData();
+            updateChartTitle();
+            renderStockGrid();
         }
     } catch(e) { console.warn('Momentum data load failed:', e); }
 }
@@ -1903,12 +1927,21 @@ function renderMomentumData() {
             setTimeout(function(){ changeChartStock(stock.ticker); }, 100);
         };
         
-        // Setup Tag Color
         var setupBg = 'rgba(99, 102, 241, 0.15)';
         var setupColor = '#818cf8';
         if (stock.setup.includes('EP')) { setupBg = 'rgba(239, 68, 68, 0.15)'; setupColor = '#f87171'; card.style.borderTopColor = '#ef4444'; }
         else if (stock.setup.includes('突破')) { setupBg = 'rgba(245, 158, 11, 0.15)'; setupColor = '#fbbf24'; card.style.borderTopColor = '#f59e0b'; }
         else if (stock.setup.includes('強勢')) { setupBg = 'rgba(16, 185, 129, 0.15)'; setupColor = '#34d399'; card.style.borderTopColor = '#10b981'; }
+        
+        var badgesHtml = '<span style="font-size:11px; padding:3px 8px; border-radius:4px; background:' + setupBg + '; color:' + setupColor + '; font-weight:600;">' + stock.setup + '</span>';
+        if (stock.indicators) {
+            if (stock.indicators.is_squeezed) {
+                badgesHtml += '<span style="margin-left:6px; font-size:11px; padding:3px 8px; border-radius:4px; background:rgba(236, 72, 153, 0.15); color:#ec4899; font-weight:600;" title="處於 TTM Squeeze 擠壓狀態，隨時準備爆發">⚡ Squeeze</span>';
+            }
+            if (stock.indicators.pe && stock.indicators.pe < 20) {
+                badgesHtml += '<span style="margin-left:6px; font-size:11px; padding:3px 8px; border-radius:4px; background:rgba(59, 130, 246, 0.15); color:#3b82f6; font-weight:600;" title="估值偏低 (本益比 < 20)">💰 PE ' + stock.indicators.pe + '</span>';
+            }
+        }
         
         var reasonsHtml = stock.reasons.map(function(r) { 
             return '<div style="font-size:11px; color:var(--text-muted); display:flex; align-items:center; gap:4px;">' +
@@ -1916,9 +1949,9 @@ function renderMomentumData() {
         }).join('');
 
         var html = '<div style="display:flex; justify-content:space-between; align-items:flex-start;">' +
-            '<div style="display:flex; align-items:center; gap:8px;">' +
+            '<div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">' +
             '<h3 style="margin:0; font-size:20px; color:var(--text-primary);">' + stock.ticker + '</h3>' +
-            '<span style="font-size:11px; padding:3px 8px; border-radius:4px; background:' + setupBg + '; color:' + setupColor + '; font-weight:600;">' + stock.setup + '</span>' +
+            '<div>' + badgesHtml + '</div>' +
             '</div>' +
             '<div style="text-align:right;">' +
             '<div style="font-size:16px; font-weight:bold; color:var(--text-primary); font-family:var(--font-mono);">' + stock.price.toFixed(2) + '</div>' +
@@ -1951,3 +1984,95 @@ function renderMomentumData() {
         grid.appendChild(card);
     });
 }
+
+// ==========================================
+// 18. Strategy Screener
+// ==========================================
+var screenerData = null;
+
+async function loadScreenerData() {
+    try {
+        var res = await fetch('screener_data.json?t=' + Date.now());
+        if (res.ok) {
+            screenerData = await res.json();
+            renderScreener();
+        }
+    } catch(e) { console.warn('Screener data load failed:', e); }
+}
+
+function renderScreener() {
+    var grid = document.getElementById('screener-grid');
+    var countEl = document.getElementById('screener-count');
+    if (!grid) return;
+    
+    if (!screenerData || !screenerData.stocks || screenerData.stocks.length === 0) {
+        grid.innerHTML = '<div class="bt-loading">尚未產生篩選資料，請執行 generate_screener.py</div>';
+        if (countEl) countEl.textContent = '';
+        return;
+    }
+
+    var filterSqueeze = document.getElementById('filter-squeeze')?.checked;
+    var filterPE = document.getElementById('filter-pe')?.checked;
+
+    var filtered = screenerData.stocks.filter(function(s) {
+        if (!s.indicators) return false;
+        var pass = true;
+        if (filterSqueeze && !s.indicators.is_squeezed) pass = false;
+        if (filterPE && (s.indicators.pe === null || s.indicators.pe >= 20)) pass = false;
+        return pass;
+    });
+
+    if (countEl) countEl.textContent = '共 ' + filtered.length + ' 檔符合條件';
+
+    if (filtered.length === 0) {
+        grid.innerHTML = '<div style="color:var(--text-muted); padding:20px; grid-column:1/-1;">目前沒有符合所有篩選條件的標的。</div>';
+        return;
+    }
+
+    grid.innerHTML = '';
+    
+    filtered.forEach(function(stock) {
+        var card = document.createElement('div');
+        card.className = 'glass-panel';
+        card.style.cssText = 'padding:16px; border-top:3px solid #6366f1; display:flex; flex-direction:column; gap:12px; cursor:pointer; transition:transform 0.2s, box-shadow 0.2s;';
+        card.onmouseover = function() { this.style.transform = 'translateY(-2px)'; this.style.boxShadow = '0 8px 16px rgba(0,0,0,0.4)'; };
+        card.onmouseout = function() { this.style.transform = 'none'; this.style.boxShadow = 'none'; };
+        card.onclick = function() {
+            document.querySelector('.nav-link[data-view=dashboard]').click();
+            setTimeout(function(){ changeChartStock(stock.ticker); }, 100);
+        };
+        
+        var badgesHtml = '';
+        if (stock.indicators.is_squeezed) {
+            badgesHtml += '<span style="font-size:11px; padding:3px 8px; border-radius:4px; background:rgba(236, 72, 153, 0.15); color:#ec4899; font-weight:600; margin-right:6px;">⚡ Squeeze</span>';
+        }
+        if (stock.indicators.pe !== null && stock.indicators.pe < 20) {
+            badgesHtml += '<span style="font-size:11px; padding:3px 8px; border-radius:4px; background:rgba(59, 130, 246, 0.15); color:#3b82f6; font-weight:600; margin-right:6px;">💰 PE ' + stock.indicators.pe + '</span>';
+        }
+
+        var mtfTrend15 = globalState.mtf[stock.ticker] ? globalState.mtf[stock.ticker]['15m'] : '震盪';
+        var mtfTrend60 = globalState.mtf[stock.ticker] ? globalState.mtf[stock.ticker]['60m'] : '震盪';
+        var getDot = function(t) { return t === '多頭' ? '🔴' : t === '空頭' ? '🟢' : '⚪'; };
+        var dots = '<span style="font-size:10px; opacity:0.8;">' + getDot(mtfTrend15) + getDot(mtfTrend60) + '</span>';
+
+        var html = '<div style="display:flex; justify-content:space-between; align-items:flex-start;">' +
+            '<div style="display:flex; align-items:center; gap:8px;">' +
+            '<h3 style="margin:0; font-size:20px; color:var(--text-primary);">' + stock.ticker + '</h3>' +
+            dots +
+            '</div>' +
+            '<div style="text-align:right;">' +
+            '<div style="font-size:16px; font-weight:bold; color:var(--text-primary); font-family:var(--font-mono);">' + stock.price.toFixed(2) + '</div>' +
+            '</div>' +
+            '</div>' +
+            '<div style="display:flex; flex-wrap:wrap; margin-top:4px;">' + badgesHtml + '</div>' +
+            '<div style="display:flex; justify-content:space-between; background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.05); border-radius:6px; padding:10px; margin-top:4px;">' +
+            '<div style="text-align:center;"><div style="font-size:10px; color:var(--text-muted); margin-bottom:2px;">1M 漲幅</div><div style="font-size:13px; color:' + (stock.returns['1M']>0?'#10b981':'#ef4444') + '; font-family:var(--font-mono);">' + (stock.returns['1M']>0?'+':'') + stock.returns['1M'] + '%</div></div>' +
+            '</div>';
+
+        card.innerHTML = html;
+        grid.appendChild(card);
+    });
+}
+
+document.getElementById('filter-squeeze')?.addEventListener('change', renderScreener);
+document.getElementById('filter-pe')?.addEventListener('change', renderScreener);

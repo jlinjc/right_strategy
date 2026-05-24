@@ -1,3 +1,4 @@
+# [LOCAL VERSION DIFF]: 新增了 check_squeeze (TTM Squeeze 擠壓檢測)，並整合基本面資料 (PE 本益比過濾)，以及將風險部位計算結果加入 LINE 通知中。
 """
 us_momentum_scanner.py - 暴風動能策略選股引擎
 ===================================================
@@ -23,11 +24,18 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 DASHBOARD_DIR = os.path.join(SCRIPT_DIR, 'Web_Dashboard')
 OUTPUT_PATH = os.path.join(DASHBOARD_DIR, 'momentum_data.json')
 
-# 載入監控清單
+# 載入監控清單與共用風控函式
 try:
-    from scanner_base import AI_TECH_STOCKS
+    from scanner_base import (
+        AI_TECH_STOCKS, send_line_notify,
+        calculate_position, TOTAL_CAPITAL, RISK_PER_TRADE
+    )
 except ImportError:
     AI_TECH_STOCKS = ["NVDA", "AMD", "TSM", "MSFT", "GOOGL", "META", "AAPL", "PLTR", "SMCI"]
+    def send_line_notify(msg): pass
+    def calculate_position(entry, stop): return 0, 0, 0
+    TOTAL_CAPITAL = 10000
+    RISK_PER_TRADE = 0.02
 
 
 def calculate_adr(high, low, close, window=14):
@@ -49,9 +57,47 @@ def calculate_adr(high, low, close, window=14):
     return atr, adr_pct
 
 
+def check_squeeze(close, high, low, window=20):
+    """計算 TTM Squeeze 狀態"""
+    if len(close) < window:
+        return False
+    
+    ma = close.rolling(window).mean()
+    std = close.rolling(window).std()
+    
+    # 布林通道 (Bollinger Bands)
+    bb_up = ma + (2 * std)
+    bb_low = ma - (2 * std)
+    
+    # 肯特納通道 (Keltner Channels)
+    tr1 = high - low
+    tr2 = (high - close.shift(1)).abs()
+    tr3 = (low - close.shift(1)).abs()
+    tr = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
+    atr = tr.rolling(window).mean()
+    
+    kc_up = ma + (1.5 * atr)
+    kc_low = ma - (1.5 * atr)
+    
+    # Squeeze 條件：布林通道被完全包覆在肯特納通道內
+    is_squeezed = bool((bb_up.iloc[-1] < kc_up.iloc[-1]) and (bb_low.iloc[-1] > kc_low.iloc[-1]))
+    return is_squeezed
+
+
 def analyze_momentum(tickers):
     print(f"[{datetime.now().strftime('%H:%M:%S')}] 🚀 正在執行暴風動能策略掃描 ({len(tickers)} 檔)...")
     
+    # 載入基本面資料以取得本益比 (PE)
+    fundamentals = {}
+    fund_path = os.path.join(DASHBOARD_DIR, 'fundamentals_data.json')
+    if os.path.exists(fund_path):
+        try:
+            with open(fund_path, 'r', encoding='utf-8') as f:
+                fdata = json.load(f)
+                fundamentals = fdata.get('stocks', {})
+        except Exception as e:
+            print(f"⚠️ 無法讀取基本面資料: {e}")
+
     # 抓取 6 個月的資料以涵蓋 1M, 3M, 6M 報酬率計算
     tickers_str = " ".join(tickers)
     df = yf.download(tickers_str, period="6mo", interval="1d", progress=False, group_by='ticker')
@@ -132,10 +178,30 @@ def analyze_momentum(tickers):
             else:
                 continue # 不滿足強勢條件的過濾掉
                 
+            # 判斷 Squeeze 與 基本面
+            is_squeezed = check_squeeze(close, high, low)
+            if is_squeezed:
+                reasons.append("⚡ 處於 Squeeze 擠壓狀態 (動能醞釀中)")
+                # 如果處於擠壓狀態，提升一點優先級，特別是對於緊密整理的股票
+                if setup_type == "🎯 緊密整理突破":
+                    priority += 0.5
+                    
+            pe = None
+            if ticker in fundamentals:
+                pe = fundamentals[ticker].get('pe_fwd')
+                if pe is None:
+                    pe = fundamentals[ticker].get('pe_ttm')
+            
+            if pe is not None and pe > 0 and pe < 20:
+                reasons.append(f"💰 估值偏低 (PE: {pe})")
+                
             # 計算操作建議點位
             # 停損永遠是當日最低點，或用 ATR 防守
             recommended_stop = max(last_low, last_close - (atr * 1.5))
             stop_dist_pct = ((last_close - recommended_stop) / last_close) * 100
+            
+            # 計算倉位
+            shares, cost, actual_risk = calculate_position(last_close, recommended_stop)
             
             results.append({
                 "ticker": ticker,
@@ -147,6 +213,10 @@ def analyze_momentum(tickers):
                     "1M": round(ret_1m, 1),
                     "3M": round(ret_3m, 1),
                     "6M": round(ret_6m, 1)
+                },
+                "indicators": {
+                    "is_squeezed": is_squeezed,
+                    "pe": pe
                 },
                 "volatility": {
                     "ADR_pct": round(adr_pct, 1),
@@ -160,6 +230,11 @@ def analyze_momentum(tickers):
                     "stop_loss": round(recommended_stop, 2),
                     "stop_pct": round(stop_dist_pct, 1),
                     "trailing": "10MA" if setup_type != "🔥 情境轉折 (EP)" else "5MA/10MA"
+                },
+                "position": {
+                    "shares": shares,
+                    "cost": round(cost, 2),
+                    "risk": round(actual_risk, 2)
                 }
             })
             
@@ -179,6 +254,21 @@ def analyze_momentum(tickers):
         json.dump(output, f, ensure_ascii=False, indent=2)
         
     print(f"  ✅ 動能選股完成！共篩選出 {len(results)} 檔股票。")
+    
+    # 針對高優先級 (EP或緊密整理突破) 發送 LINE 警報
+    high_priority_results = [r for r in results if r['priority'] >= 2]
+    if high_priority_results:
+        alerts = ["【動能突破掃描報告】"]
+        for r in high_priority_results:
+            msg = f"{r['setup']} {r['ticker']}\n"
+            msg += f"現價: ${r['price']}\n"
+            msg += f"停損: ${r['levels']['stop_loss']} (-{r['levels']['stop_pct']}%)\n"
+            msg += f"建議買入: {r['position']['shares']} 股 (約 ${r['position']['cost']:,.0f})\n"
+            msg += f"風險金額: ${r['position']['risk']:,.0f} ({RISK_PER_TRADE*100}% 本金)\n"
+            msg += "亮點: " + ", ".join(r['reasons'])
+            alerts.append(msg)
+            
+        send_line_notify("\n\n".join(alerts))
 
 
 if __name__ == '__main__':

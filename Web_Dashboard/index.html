@@ -1,3 +1,4 @@
+<!-- [LOCAL VERSION DIFF]: 新增了 Strategy Screener (策略選股) 的 View，包含 Squeeze 與 PE 條件過濾的 UI 元素。 -->
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
@@ -29,6 +30,9 @@
                 </a>
                 <a href="#" class="nav-link" data-view="momentum">
                     <span class="nav-icon">🚀</span> 暴風動能選股
+                </a>
+                <a href="#" class="nav-link" data-view="screener">
+                    <span class="nav-icon">🎯</span> 策略篩選器
                 </a>
                 <a href="#" class="nav-link" data-view="alerts-history">
                     <span class="nav-icon">🔔</span> 系統警報紀錄
@@ -426,6 +430,31 @@
                 
                 <div class="momentum-grid" id="momentum-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(350px, 1fr)); gap: 20px; margin-top: 20px;">
                     <div class="bt-loading">執行暴風動能篩選中...</div>
+                </div>
+            </div>
+
+            <!-- ========== VIEW 7: 策略篩選器 ========== -->
+            <div class="view-panel" id="view-screener">
+                <div class="view-header">
+                    <h2>策略篩選器 <span class="subtitle">自訂條件過濾出符合型態與基本面的標的</span></h2>
+                </div>
+                
+                <div class="screener-controls glass-panel" style="margin-top: 20px; padding: 20px; display: flex; gap: 16px; align-items: center; flex-wrap: wrap;">
+                    <label style="color: var(--text-primary); font-weight: bold; font-size: 14px;">快速篩選：</label>
+                    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                        <input type="checkbox" id="filter-squeeze" checked style="accent-color: #ec4899; width: 16px; height: 16px;">
+                        <span style="background: rgba(236, 72, 153, 0.15); color: #ec4899; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: 600;">⚡ Squeeze 擠壓中</span>
+                    </label>
+                    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                        <input type="checkbox" id="filter-pe" checked style="accent-color: #3b82f6; width: 16px; height: 16px;">
+                        <span style="background: rgba(59, 130, 246, 0.15); color: #3b82f6; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: 600;">💰 本益比 (PE) < 20</span>
+                    </label>
+                    <div style="flex-grow: 1;"></div>
+                    <span id="screener-count" style="font-size: 13px; color: var(--text-muted); font-family: var(--font-mono);"></span>
+                </div>
+                
+                <div class="screener-grid" id="screener-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; margin-top: 20px;">
+                    <div class="bt-loading">載入篩選資料中... (請先執行 generate_screener.py)</div>
                 </div>
             </div>
 
