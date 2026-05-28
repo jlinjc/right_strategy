@@ -189,10 +189,15 @@ def generate_power_gauge():
             pct_from_high = (last_price - high_52w) / high_52w * 100
             pct_from_low = (last_price - low_52w) / low_52w * 100
 
-            # --- 成交量趨勢 ---
+            # --- 成交量趨勢與 OBV ---
             vol_avg20 = float(volume.rolling(20).mean().iloc[-1])
             vol_avg5 = float(volume.rolling(5).mean().iloc[-1])
             vol_ratio = vol_avg5 / vol_avg20 if vol_avg20 > 0 else 1
+
+            obv = (np.sign(close.diff()) * volume).fillna(0).cumsum()
+            obv_5d = float(obv.rolling(5).mean().iloc[-1])
+            obv_20d = float(obv.rolling(20).mean().iloc[-1])
+            obv_accumulating = obv_5d > obv_20d
 
             # --- 從基本面資料讀取 ---
             fund = fundamentals.get(ticker, {})
@@ -210,12 +215,38 @@ def generate_power_gauge():
             beta = fund.get('beta')
             fcf_yield = fund.get('fcf_yield')
             target_upside = fund.get('upside')
+            target_price = fund.get('target')
             rec = fund.get('rec', 'N/A')
             analysts = fund.get('analysts', 0)
             mcap_fmt = fund.get('mcap_fmt', '')
             name = fund.get('name', ticker)
             sector = fund.get('sector', '')
             industry = fund.get('industry', '')
+            inst_holders = fund.get('inst_holders')
+            short_ratio = fund.get('short_ratio')
+            eps_up_30d = fund.get('eps_up_30d', 0)
+            eps_down_30d = fund.get('eps_down_30d', 0)
+            options_pc_ratio = fund.get('options_pc_ratio')
+
+            # --- 交易規劃 (Trade Plan) ---
+            swing_low_20d = float(low.tail(20).min())
+            swing_high_60d = float(high.tail(60).max())
+            
+            # 停損點：20MA 或 近1個月低點，取兩者較高者 (保護性防守)
+            # 如果跌破這兩者，說明多頭結構破壞
+            stop_loss = max(ma20, swing_low_20d)
+            if last_price <= stop_loss:
+                # 已經在停損點之下，改用近期低點作為支撐
+                stop_loss = swing_low_20d * 0.98 
+                
+            # 目標價：分析師目標 或 近3個月高點，取兩者較高者
+            plan_target = max(target_price or last_price, swing_high_60d)
+            if plan_target <= last_price:
+                plan_target = last_price * 1.15 # 預設至少 15% 空間
+                
+            risk = last_price - stop_loss
+            reward = plan_target - last_price
+            rr_ratio = reward / risk if risk > 0 else 9.99
 
             raw_metrics[ticker] = {
                 'ticker': ticker,
@@ -251,10 +282,20 @@ def generate_power_gauge():
                 'beta': beta,
                 'fcf_yield': fcf_yield,
                 'pct_from_low': pct_from_low,
-                # Consensus raw
+                # Consensus & Smart Money
                 'target_upside': target_upside,
                 'rec': rec,
                 'analysts': analysts or 0,
+                'obv_accumulating': obv_accumulating,
+                'inst_holders': inst_holders,
+                'short_ratio': short_ratio,
+                'eps_up_30d': eps_up_30d,
+                'eps_down_30d': eps_down_30d,
+                'options_pc_ratio': options_pc_ratio,
+                # Trade Plan
+                'stop_loss': stop_loss,
+                'plan_target': plan_target,
+                'rr_ratio': rr_ratio,
             }
         except Exception as e:
             print(f"  ⚠️ {ticker}: {e}")
@@ -451,6 +492,21 @@ def generate_power_gauge():
                 'fundamental': round(fundamental_score, 1),
                 'consensus': round(consensus_score, 1),
                 'risk': round(risk_score, 1),
+            },
+            'trade_plan': {
+                'stop_loss': round(m['stop_loss'], 2),
+                'target': round(m['plan_target'], 2),
+                'rr_ratio': round(m['rr_ratio'], 2),
+                'risk_pct': round((m['stop_loss'] / m['price'] - 1) * 100, 1),
+                'reward_pct': round((m['plan_target'] / m['price'] - 1) * 100, 1),
+            },
+            'smart_money': {
+                'obv_accumulating': m['obv_accumulating'],
+                'inst_holders': m['inst_holders'],
+                'short_ratio': m['short_ratio'],
+                'options_pc_ratio': m['options_pc_ratio'],
+                'eps_up_30d': m['eps_up_30d'],
+                'eps_down_30d': m['eps_down_30d'],
             },
             'key_metrics': {
                 'ret_1m': round(m['ret_1m'], 1),

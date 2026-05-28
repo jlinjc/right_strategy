@@ -260,6 +260,10 @@ def fetch_fundamentals(ticker):
             'pct_l52': pct_l,
             'div_yield': safe_pct(safe_get(info, 'dividendYield'), 2),
 
+            # 籌碼與資金面 (Smart Money)
+            'inst_holders': safe_pct(safe_get(info, 'heldPercentInstitutions'), 1),
+            'short_ratio': safe_round(safe_get(info, 'shortRatio'), 2),
+
             # 分析師共識
             'target': round(target, 2) if target else None,
             'target_hi': safe_round(safe_get(info, 'targetHighPrice'), 2),
@@ -268,6 +272,38 @@ def fetch_fundamentals(ticker):
             'rec': safe_get(info, 'recommendationKey', 'N/A'),
             'upside': upside,
         }
+
+        # --- 財報預期修正 (Earnings Revisions) ---
+        eps_up = 0
+        eps_down = 0
+        try:
+            rev_df = stock.eps_revisions
+            if rev_df is not None and not rev_df.empty:
+                # '0y' 代表今年度
+                if '0y' in rev_df.index:
+                    eps_up = int(rev_df.loc['0y', 'upLast30days'])
+                    eps_down = int(rev_df.loc['0y', 'downLast30days'])
+        except Exception:
+            pass
+        data['eps_up_30d'] = eps_up
+        data['eps_down_30d'] = eps_down
+
+        # --- 選擇權金流 (Options Put/Call Ratio) ---
+        pc_ratio = None
+        try:
+            dates = stock.options
+            if dates:
+                # 取最近一個到期日
+                chain = stock.option_chain(dates[0])
+                c_vol = chain.calls['volume'].sum() if not chain.calls.empty else 0
+                p_vol = chain.puts['volume'].sum() if not chain.puts.empty else 0
+                if c_vol > 0:
+                    pc_ratio = round(float(p_vol) / float(c_vol), 2)
+                elif p_vol > 0:
+                    pc_ratio = 9.99  # Put 壓倒性多
+        except Exception:
+            pass
+        data['options_pc_ratio'] = pc_ratio
 
         # 季度趨勢
         data['quarters'] = get_quarterly_trends(stock)

@@ -2511,6 +2511,18 @@ function openStockXray(ticker) {
 
     var d = stock.dimensions;
     var km = stock.key_metrics || {};
+    var tp = stock.trade_plan || {};
+    var sm = stock.smart_money || {};
+
+    // 檢查大盤狀態
+    fetch('qqq_ma.json?t=' + Date.now()).then(r => r.json()).then(qqq => {
+        var warnEl = document.getElementById('xray-macro-warning');
+        if (qqq && qqq.last_close < qqq.ma20) {
+            warnEl.style.display = 'flex';
+        } else {
+            warnEl.style.display = 'none';
+        }
+    }).catch(e => console.log('QQQ fetch error', e));
 
     // Title
     document.getElementById('xray-title').innerHTML =
@@ -2530,6 +2542,26 @@ function openStockXray(ticker) {
         '      <div style="font-size:11px; color:var(--text-muted); margin-top:4px;">' + stock.grade_label + '</div>' +
         '    </div>' +
         '    <div class="xray-grade-big pg-grade-' + stock.grade + '">' + stock.grade + '</div>' +
+        '  </div>' +
+        '</div>';
+
+    // Trade Plan
+    var rrColor = tp.rr_ratio >= 3 ? '#10b981' : (tp.rr_ratio >= 1.5 ? '#f59e0b' : '#ef4444');
+    var rrLabel = tp.rr_ratio >= 3 ? '🟢 極佳進場點 (R/R > 3)' : (tp.rr_ratio >= 1.5 ? '🟡 可小注試單 (R/R 1.5~3)' : '🔴 追高風險大 (R/R < 1.5)');
+    document.getElementById('xray-trade-plan').innerHTML = 
+        '<div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px;">' +
+        '  <div>' +
+        '    <div style="font-size:12px; color:var(--text-muted); margin-bottom:4px;">防守底線 (Stop Loss)</div>' +
+        '    <div style="font-size:20px; font-weight:700; font-family:var(--font-mono); color:#ef4444;">$' + (tp.stop_loss || '--') + ' <span style="font-size:12px;">(' + (tp.risk_pct || 0) + '%)</span></div>' +
+        '  </div>' +
+        '  <div>' +
+        '    <div style="font-size:12px; color:var(--text-muted); margin-bottom:4px;">獲利目標 (Target)</div>' +
+        '    <div style="font-size:20px; font-weight:700; font-family:var(--font-mono); color:#10b981;">$' + (tp.target || '--') + ' <span style="font-size:12px;">(+' + (tp.reward_pct || 0) + '%)</span></div>' +
+        '  </div>' +
+        '  <div style="text-align:right;">' +
+        '    <div style="font-size:12px; color:var(--text-muted); margin-bottom:4px;">進場盈虧比 (R/R Ratio)</div>' +
+        '    <div style="font-size:24px; font-weight:800; font-family:var(--font-mono); color:' + rrColor + ';">' + (tp.rr_ratio || 0).toFixed(2) + '</div>' +
+        '    <div style="font-size:12px; color:' + rrColor + ';">' + rrLabel + '</div>' +
         '  </div>' +
         '</div>';
 
@@ -2554,20 +2586,23 @@ function openStockXray(ticker) {
     var metrics = [
         {label: 'Forward P/E', value: km.pe_fwd != null ? km.pe_fwd.toFixed(1) : '--'},
         {label: 'RSI (14)', value: km.rsi != null ? km.rsi.toFixed(0) : '--'},
-        {label: '1M 報酬率', value: km.ret_1m != null ? (km.ret_1m > 0 ? '+' : '') + km.ret_1m.toFixed(1) + '%' : '--'},
-        {label: '3M 報酬率', value: km.ret_3m != null ? (km.ret_3m > 0 ? '+' : '') + km.ret_3m.toFixed(1) + '%' : '--'},
+        {label: '機構持股', value: sm.inst_holders != null ? sm.inst_holders.toFixed(1) + '%' : '--', color: '#8b5cf6'},
+        {label: '空單比率', value: sm.short_ratio != null ? sm.short_ratio.toFixed(1) + '%' : '--', color: '#ef4444'},
+        {label: '大戶動向(OBV)', value: sm.obv_accumulating ? '📈 正在吃貨' : '📉 正在出貨', color: sm.obv_accumulating ? '#10b981' : '#ef4444'},
+        {label: 'Options P/C', value: sm.options_pc_ratio != null ? sm.options_pc_ratio.toFixed(2) : '--', color: sm.options_pc_ratio < 0.7 ? '#10b981' : (sm.options_pc_ratio > 1.2 ? '#ef4444' : '')},
+        {label: 'EPS近30日上/下修', value: (sm.eps_up_30d || 0) + ' / ' + (sm.eps_down_30d || 0), color: sm.eps_up_30d > sm.eps_down_30d ? '#10b981' : (sm.eps_down_30d > sm.eps_up_30d ? '#ef4444' : '')},
         {label: '營收成長 YoY', value: km.rev_growth != null ? km.rev_growth.toFixed(1) + '%' : '--'},
         {label: '毛利率', value: km.gross_margin != null ? km.gross_margin.toFixed(1) + '%' : '--'},
         {label: 'ROE', value: km.roe != null ? km.roe.toFixed(1) + '%' : '--'},
         {label: '分析師上檔', value: km.target_upside != null ? (km.target_upside > 0 ? '+' : '') + km.target_upside.toFixed(1) + '%' : '--'},
         {label: '推薦評級', value: km.rec || '--'},
         {label: 'Beta', value: km.beta != null ? km.beta.toFixed(2) : '--'},
-        {label: '距52W高', value: km.pct_from_high != null ? km.pct_from_high.toFixed(1) + '%' : '--'},
         {label: '均線排列', value: km.ma_aligned ? '✅ 多頭' : '❌ 空頭'},
     ];
     var fundHtml = '';
     metrics.forEach(function(m) {
-        fundHtml += '<div class="xray-metric-card"><div class="metric-value">' + m.value + '</div><div class="metric-label">' + m.label + '</div></div>';
+        var vColor = m.color ? 'color:' + m.color + ';' : '';
+        fundHtml += '<div class="xray-metric-card"><div class="metric-value" style="' + vColor + '">' + m.value + '</div><div class="metric-label">' + m.label + '</div></div>';
     });
     document.getElementById('xray-fundamentals').innerHTML = fundHtml;
 
