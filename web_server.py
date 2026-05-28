@@ -145,7 +145,7 @@ class APIHandler(http.server.SimpleHTTPRequestHandler):
     def log_message(self, format, *args):
         """過濾 404 log — 不印出已知不存在的檔案"""
         msg = format % args
-        if '404' in msg and any(f in msg for f in ['hod_data', 'orb_data', 'live_data']):
+        if '404' in msg and any(f in msg for f in ['hod_data', 'orb_data', 'live_data', 'mtf_trend', 'td9_data', 'ma_data']):
             return  # 靜默跳過
         super().log_message(format, *args)
 
@@ -293,6 +293,79 @@ class APIHandler(http.server.SimpleHTTPRequestHandler):
                 self.send_header('Content-type', 'application/json')
                 self.end_headers()
                 self.wfile.write(json.dumps({'status': 'ok'}).encode('utf-8'))
+            except Exception as e:
+                self.send_response(500)
+                self.send_header('Content-type', 'application/json')
+                self.end_headers()
+                self.wfile.write(json.dumps({'status': 'error', 'message': str(e)}).encode('utf-8'))
+
+        elif self.path == '/api/generate_report':
+            # AI 報告生成 (呼叫 Gemini API)
+            content_length = int(self.headers['Content-Length'])
+            post_data = self.rfile.read(content_length)
+            try:
+                data = json.loads(post_data.decode('utf-8'))
+                prompt = data.get('prompt', '')
+                title = data.get('title', None)
+
+                from generate_ai_report import generate_report
+                result = generate_report(prompt=prompt if prompt else None, custom_title=title)
+
+                self.send_response(200)
+                self.send_header('Content-type', 'application/json')
+                self.end_headers()
+                self.wfile.write(json.dumps(result, ensure_ascii=False).encode('utf-8'))
+            except Exception as e:
+                print(f"⚠️ AI 報告生成失敗: {e}")
+                self.send_response(500)
+                self.send_header('Content-type', 'application/json')
+                self.end_headers()
+                self.wfile.write(json.dumps({'status': 'error', 'message': str(e)}).encode('utf-8'))
+
+        elif self.path == '/api/save_report':
+            # 手動儲存報告 (使用者貼上 LLM 回覆)
+            content_length = int(self.headers['Content-Length'])
+            post_data = self.rfile.read(content_length)
+            try:
+                data = json.loads(post_data.decode('utf-8'))
+                content = data.get('content', '')
+                title = data.get('title', 'AI 深度投研報告')
+
+                if not content.strip():
+                    raise ValueError('報告內容不能為空')
+
+                from generate_ai_report import ensure_dirs, load_report_index, save_report_index, REPORT_DIR
+                ensure_dirs()
+
+                now = datetime.now()
+                date_str = now.strftime('%Y-%m-%d')
+                time_str = now.strftime('%H%M%S')
+                filename = f"report_{date_str}_{time_str}.md"
+                filepath = os.path.join(REPORT_DIR, filename)
+
+                header = f"---\ntitle: {title}\ndate: {now.strftime('%Y-%m-%d %H:%M:%S')}\nmodel: manual\n---\n\n"
+                with open(filepath, 'w', encoding='utf-8') as f:
+                    f.write(header + content)
+
+                index = load_report_index()
+                index["reports"].insert(0, {
+                    "filename": filename,
+                    "title": title,
+                    "date": now.strftime('%Y-%m-%d %H:%M:%S'),
+                    "model": "manual",
+                    "prompt_preview": "(手動貼上)",
+                })
+                index["reports"] = index["reports"][:50]
+                save_report_index(index)
+
+                print(f"[{now.strftime('%H:%M:%S')}] 📄 手動報告已儲存: {filename}")
+                self.send_response(200)
+                self.send_header('Content-type', 'application/json')
+                self.end_headers()
+                self.wfile.write(json.dumps({
+                    'status': 'ok', 'filename': filename, 'title': title,
+                    'date': now.strftime('%Y-%m-%d %H:%M:%S')
+                }, ensure_ascii=False).encode('utf-8'))
             except Exception as e:
                 self.send_response(500)
                 self.send_header('Content-type', 'application/json')

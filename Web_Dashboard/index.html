@@ -34,6 +34,12 @@
                 <a href="#" class="nav-link" data-view="screener">
                     <span class="nav-icon">🎯</span> 策略篩選器
                 </a>
+                <a href="#" class="nav-link" data-view="power-gauge">
+                    <span class="nav-icon">⚡</span> 綜合戰力評分
+                </a>
+                <a href="#" class="nav-link" data-view="ai-report">
+                    <span class="nav-icon">🧠</span> AI 深度投研
+                </a>
                 <a href="#" class="nav-link" data-view="alerts-history">
                     <span class="nav-icon">🔔</span> 系統警報紀錄
                 </a>
@@ -458,8 +464,153 @@
                 </div>
             </div>
 
+            <!-- ========== VIEW 8: AI 深度投研報告 ========== -->
+            <div class="view-panel" id="view-ai-report">
+                <div class="view-header">
+                    <h2>AI 深度投研報告 <span class="subtitle">由 Gemini 生成的硬核半導體供應鏈分析</span></h2>
+                </div>
+
+                <!-- 操作面板 -->
+                <div class="glass-panel" style="margin-top: 16px; padding: 20px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+                        <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                            <button class="btn-tf" id="btn-generate-report" style="padding: 8px 16px; background: linear-gradient(135deg, rgba(139,92,246,0.3), rgba(59,130,246,0.3)); border-color: rgba(139,92,246,0.5); font-size: 13px; font-weight: 600;">
+                                🧠 呼叫 Gemini 生成報告
+                            </button>
+                            <button class="btn-tf" id="btn-toggle-editor" style="padding: 8px 16px; font-size: 13px;">
+                                ✏️ 手動貼上報告
+                            </button>
+                            <button class="btn-tf" id="btn-toggle-prompt" style="padding: 8px 12px; font-size: 12px; background: rgba(245,158,11,0.15); border-color: rgba(245,158,11,0.3);">
+                                📝 編輯 Prompt
+                            </button>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <span id="ai-report-status" style="font-size: 12px; color: var(--text-muted); font-family: var(--font-mono);"></span>
+                            <select id="ai-report-history" style="padding: 6px 10px; background: var(--bg-card); border: 1px solid var(--border-glow); border-radius: 6px; color: var(--text-primary); font-size: 12px; font-family: var(--font-mono); max-width: 280px;">
+                                <option value="">選擇歷史報告...</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Prompt 編輯器 (預設隱藏) -->
+                    <div id="ai-prompt-editor" style="display: none; margin-top: 16px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                            <label style="font-size: 13px; color: var(--text-primary); font-weight: 600;">📝 Prompt 模板 (可自訂修改)</label>
+                            <button class="btn-tf" id="btn-reset-prompt" style="padding: 4px 10px; font-size: 11px;">🔄 重置為預設</button>
+                        </div>
+                        <textarea id="ai-prompt-textarea" style="width: 100%; height: 300px; padding: 14px; background: rgba(0,0,0,0.3); border: 1px solid rgba(139,92,246,0.3); border-radius: 8px; color: var(--text-primary); font-size: 12px; font-family: var(--font-mono); line-height: 1.6; resize: vertical; outline: none;" placeholder="在此輸入要發送給 LLM 的 Prompt..."></textarea>
+                    </div>
+
+                    <!-- 手動編輯器 (預設隱藏) -->
+                    <div id="ai-manual-editor" style="display: none; margin-top: 16px;">
+                        <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 8px;">
+                            <input type="text" id="ai-manual-title" placeholder="報告標題 (選填)" style="flex: 1; padding: 8px 12px; background: var(--bg-card); border: 1px solid var(--border-glow); border-radius: 6px; color: var(--text-primary); font-size: 13px;">
+                            <button class="btn-tf" id="btn-save-manual" style="padding: 8px 16px; font-size: 13px; background: rgba(16,185,129,0.15); border-color: rgba(16,185,129,0.3); font-weight: 600;">💾 儲存報告</button>
+                        </div>
+                        <textarea id="ai-manual-textarea" style="width: 100%; height: 400px; padding: 14px; background: rgba(0,0,0,0.3); border: 1px solid rgba(16,185,129,0.3); border-radius: 8px; color: var(--text-primary); font-size: 12px; font-family: var(--font-mono); line-height: 1.6; resize: vertical; outline: none;" placeholder="將 ChatGPT / Claude / Gemini 的回覆貼在這裡 (支援 Markdown 格式)..."></textarea>
+                    </div>
+                </div>
+
+                <!-- 報告顯示區 -->
+                <div class="glass-panel" id="ai-report-container" style="margin-top: 16px; padding: 32px 40px; min-height: 400px;">
+                    <div id="ai-report-content" class="markdown-body">
+                        <div style="text-align: center; padding: 60px 20px; color: var(--text-muted);">
+                            <div style="font-size: 48px; margin-bottom: 16px; opacity: 0.5;">🧠</div>
+                            <h3 style="color: var(--text-primary); margin-bottom: 8px;">尚無報告</h3>
+                            <p style="font-size: 13px; line-height: 1.8;">
+                                點擊上方「🧠 呼叫 Gemini 生成報告」自動生成<br>
+                                或點擊「✏️ 手動貼上報告」將 LLM 的回答貼上保存
+                            </p>
+                            <p style="font-size: 11px; margin-top: 12px; color: var(--text-muted); opacity: 0.6;">
+                                自動生成需要在 .env 中設定 GEMINI_API_KEY
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ========== VIEW 9: 綜合戰力評分 (Power Gauge) ========== -->
+            <div class="view-panel" id="view-power-gauge">
+                <div class="view-header">
+                    <h2>綜合戰力評分 <span class="subtitle">五維雷達圖 × 百分位排名 — 一眼看出最值得買的股票</span></h2>
+                </div>
+
+                <!-- 摘要統計 -->
+                <div class="pg-summary" id="pg-summary" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap:12px; margin-top:16px;"></div>
+
+                <!-- 排行榜 -->
+                <section class="glass-panel" style="margin-top:16px; padding:20px; overflow:hidden;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; flex-wrap:wrap; gap:10px;">
+                        <h3 style="margin:0; font-size:16px; color:var(--text-main);">🏆 戰力排行榜</h3>
+                        <div style="display:flex; gap:6px; flex-wrap:wrap;">
+                            <button class="btn-tf pg-sort-btn active" data-sort="total">總分</button>
+                            <button class="btn-tf pg-sort-btn" data-sort="momentum">動能</button>
+                            <button class="btn-tf pg-sort-btn" data-sort="technical">技術</button>
+                            <button class="btn-tf pg-sort-btn" data-sort="fundamental">基本</button>
+                            <button class="btn-tf pg-sort-btn" data-sort="consensus">共識</button>
+                            <button class="btn-tf pg-sort-btn" data-sort="risk">風險</button>
+                        </div>
+                    </div>
+                    <div id="pg-leaderboard" style="overflow-x:auto;"></div>
+                </section>
+            </div>
+
+            <!-- ========== VIEW 10: 個股深度 X 光 ========== -->
+            <div class="view-panel" id="view-stock-xray">
+                <div class="view-header">
+                    <div style="display:flex; align-items:center; gap:12px;">
+                        <button class="btn-tf" id="xray-back-btn" style="padding:6px 12px; font-size:12px;">← 返回排行榜</button>
+                        <h2 id="xray-title">個股深度 X 光</h2>
+                    </div>
+                </div>
+
+                <!-- 頭部：價格 + 評分 -->
+                <div class="xray-hero" id="xray-hero" style="margin-top:16px;"></div>
+
+                <!-- 雷達圖 + 維度明細 -->
+                <div style="display:grid; grid-template-columns: 340px 1fr; gap:16px; margin-top:16px;">
+                    <section class="glass-panel" style="padding:20px; display:flex; flex-direction:column; align-items:center;">
+                        <h3 style="font-size:14px; color:var(--text-main); margin-bottom:12px; align-self:flex-start;">🎯 五維雷達圖</h3>
+                        <canvas id="xray-radar" width="280" height="280"></canvas>
+                    </section>
+                    <section class="glass-panel" style="padding:20px;">
+                        <h3 style="font-size:14px; color:var(--text-main); margin-bottom:12px;">📊 維度評分明細</h3>
+                        <div id="xray-dimensions"></div>
+                    </section>
+                </div>
+
+                <!-- K 線圖 -->
+                <section class="glass-panel" style="margin-top:16px; padding:20px;">
+                    <h3 style="font-size:14px; color:var(--text-main); margin-bottom:12px;">📈 日線走勢圖</h3>
+                    <div id="xray-chart" style="width:100%; height:350px;"></div>
+                </section>
+
+                <!-- 基本面指標 -->
+                <section class="glass-panel" style="margin-top:16px; padding:20px;">
+                    <h3 style="font-size:14px; color:var(--text-main); margin-bottom:12px;">💼 基本面核心指標</h3>
+                    <div id="xray-fundamentals" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap:12px;"></div>
+                </section>
+
+                <!-- 季度趨勢 -->
+                <section class="glass-panel" style="margin-top:16px; padding:20px;">
+                    <h3 style="font-size:14px; color:var(--text-main); margin-bottom:12px;">📊 季度財報趨勢 <span style="font-size:11px; color:var(--text-muted);">(最近 8 季)</span></h3>
+                    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:16px;">
+                        <div><canvas id="xray-revenue-chart" height="200"></canvas></div>
+                        <div><canvas id="xray-margin-chart" height="200"></canvas></div>
+                    </div>
+                </section>
+
+                <!-- 訊號彙整 -->
+                <section class="glass-panel" style="margin-top:16px; padding:20px;">
+                    <h3 style="font-size:14px; color:var(--text-main); margin-bottom:12px;">🚦 訊號彙整</h3>
+                    <div id="xray-signals" style="display:flex; flex-wrap:wrap; gap:10px;"></div>
+                </section>
+            </div>
+
         </main>
     </div>
-    <script src="script.js?v=2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked@14.0.0/marked.min.js"></script>
+    <script src="script.js?v=3"></script>
 </body>
 </html>
+

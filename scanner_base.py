@@ -42,6 +42,8 @@ def upload_image_to_catbox(image_path):
 
 def send_line_notify(message, image_path=None):
     """發送 LINE Bot 廣播通知 (支援圖片)"""
+    return # [USER REQUEST]: 依據使用者要求，暫停所有 LINE 推播功能
+    
     if not LINE_BOT_TOKEN:
         return
         

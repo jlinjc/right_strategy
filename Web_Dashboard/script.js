@@ -27,6 +27,9 @@ const viewTitles = {
     'heatmap': 'TD9 陣列熱力圖',
     'sectors': '產業板塊強弱',
     'momentum': '暴風動能選股',
+    'power-gauge': '綜合戰力評分',
+    'stock-xray': '個股深度 X 光',
+    'ai-report': 'AI 深度投研報告',
     'alerts-history': '系統警報紀錄',
     'settings': '掃描器參數設定',
 };
@@ -67,6 +70,7 @@ document.querySelectorAll('.nav-link').forEach(link => {
         // Render view-specific content
         if (target === 'heatmap') renderHeatmap();
         if (target === 'alerts-history') renderAlertsHistory();
+        if (target === 'power-gauge') loadAndRenderPowerGauge();
     });
 });
 
@@ -2076,3 +2080,836 @@ function renderScreener() {
 
 document.getElementById('filter-squeeze')?.addEventListener('change', renderScreener);
 document.getElementById('filter-pe')?.addEventListener('change', renderScreener);
+
+// ==========================================
+// 19. AI 深度投研報告
+// ==========================================
+var AI_DEFAULT_PROMPT = `【角色與思維設定】
+你是一位兼具 TechInsights 逆向工程思維、SemiAnalysis 硬核產業分析能力、以及頂尖晶圓廠設備副總級別技術視野的科技投研專家。你拒絕使用任何市場共識（Market Consensus）或券商公開報告的官話。請完全從「第一性原理（First Principles）」出發，專注於物理失效、良率殺手、以及二級供應鏈（Tier 3-5）中不可替代的單點崩潰節點。
+
+【掃描目標範圍】
+當前時間節點為 2026 年中，請針對以下前沿技術節點進行深度解構：
+- 目標節點：2nm/A16 背面供電網路 (BSPDN) 的量產爬坡期
+- 關聯技術：High-NA EUV 光阻缺陷、玻璃基板 TGV 製程、或 1.6T CPO 矽光子模組
+
+【強制性排他條款（自動過濾雜訊）】
+請完全跳過市場已充分定價（Fully Priced-in）的主流板塊與 Tier 1/2 巨頭。只要提及以下名詞，即視為任務失敗：
+- 晶片端：NVIDIA、AMD、TSMC 常規產能、Intel。
+- 記憶體端：常規 HBM3e/HBM4、常規 DDR5。
+- 通用設備/組裝：常規 CoWoS 組裝產能、標準散熱水冷板、常規 800G 光模組。
+你必須將視角強制拉低到大眾看不見的次級零部件、特種化學品配位基、精密光學元件加工。
+
+【四維硬核交叉論證（AI 思考鏈約束）】
+在評估「下一個供需失衡黑洞」時，你必須依序完成以下四個步驟的推論，並將其邏輯體現在最終輸出中：
+1. 物理失效與良率殺手（Failure Mechanism）：指出在 2026 年該製程線上面臨的「核心物理極限」。
+2. 特殊設備產能天花板（Tool Bottleneck）：鎖定上游最不可或缺的「單點壟斷機台或關鍵零組件」。
+3. 2026 環保法規與純度壁壘（Regulation & Purity）：結合 PFAS 環保禁令實施進度。
+4. 晶圓廠微觀動向（Fab Micro-signals）：結合最新技術論壇中提及率正在「斜率陡峭上升」的底層硬核技術名詞。
+
+【輸出格式要求】
+請精準篩選出符合上述所有條件的 3 個最迫切、最剛需的「隱形缺貨節點」，並嚴格按照以下結構輸出：
+
+### 📌 節點 [X]：[精準的底層材料 / 特定次級設備 / 微型特殊零組件名稱]
+- **1. 核心工程物理痛點（Why It's Critical）：** 詳細說明其對應的物理失效模式。
+- **2. 產能卡脖子關鍵與壁壘（Where Is The Bottleneck）：** 點出全球產能集中在哪些未被大眾注意的 Tier 3-5 廠商？
+- **3. 台股與美股核心受惠隱形冠軍（Investment Targets）：**
+  請分別提供「台股」與「美股」中，市值中小型、具備極高技術定價權的隱形冠軍。
+  | 股票代號/名稱 | 所屬市場 | 2026核心技術護城河 | 2026實質營收與獲利動能 | 替代風險評級 (高/中/低) |`;
+
+var aiReportIndex = null;
+
+// 載入 Prompt (從 localStorage 讀取，若無則用預設)
+function loadAIPrompt() {
+    var saved = localStorage.getItem('ai_report_prompt');
+    return saved || AI_DEFAULT_PROMPT;
+}
+
+function saveAIPrompt(prompt) {
+    localStorage.setItem('ai_report_prompt', prompt);
+}
+
+// 初始化 Prompt textarea
+var promptTextarea = document.getElementById('ai-prompt-textarea');
+if (promptTextarea) {
+    promptTextarea.value = loadAIPrompt();
+    promptTextarea.addEventListener('input', function() {
+        saveAIPrompt(this.value);
+    });
+}
+
+// Toggle Prompt Editor
+document.getElementById('btn-toggle-prompt')?.addEventListener('click', function() {
+    var editor = document.getElementById('ai-prompt-editor');
+    var manual = document.getElementById('ai-manual-editor');
+    if (editor) {
+        editor.style.display = editor.style.display === 'none' ? 'block' : 'none';
+        if (manual) manual.style.display = 'none';
+    }
+});
+
+// Reset Prompt
+document.getElementById('btn-reset-prompt')?.addEventListener('click', function() {
+    if (confirm('確定要重置 Prompt 為預設模板嗎？')) {
+        localStorage.removeItem('ai_report_prompt');
+        if (promptTextarea) promptTextarea.value = AI_DEFAULT_PROMPT;
+    }
+});
+
+// Toggle Manual Editor
+document.getElementById('btn-toggle-editor')?.addEventListener('click', function() {
+    var manual = document.getElementById('ai-manual-editor');
+    var prompt = document.getElementById('ai-prompt-editor');
+    if (manual) {
+        manual.style.display = manual.style.display === 'none' ? 'block' : 'none';
+        if (prompt) prompt.style.display = 'none';
+    }
+});
+
+// 生成報告 (呼叫 Gemini API)
+document.getElementById('btn-generate-report')?.addEventListener('click', async function() {
+    var btn = this;
+    var statusEl = document.getElementById('ai-report-status');
+    var contentEl = document.getElementById('ai-report-content');
+    var prompt = loadAIPrompt();
+
+    btn.disabled = true;
+    btn.textContent = '⏳ Gemini 思考中...';
+    if (statusEl) statusEl.textContent = '正在呼叫 API...';
+
+    // 顯示 loading 動畫
+    if (contentEl) {
+        contentEl.innerHTML = '<div style="text-align:center; padding:80px 20px;"><div class="ai-loading-spinner"></div><p style="margin-top:20px; color:var(--text-muted); font-size:14px;">🧠 Gemini 正在進行深度投研分析...</p><p style="color:var(--text-muted); font-size:12px; opacity:0.6;">這可能需要 30-60 秒</p></div>';
+    }
+
+    try {
+        var res = await fetch('/api/generate_report', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ prompt: prompt })
+        });
+        var data = await res.json();
+
+        if (data.status === 'ok') {
+            if (statusEl) statusEl.textContent = '✅ ' + data.date;
+            // 載入新生成的報告
+            await loadAIReport(data.filename);
+            await loadAIReportIndex();
+        } else {
+            if (statusEl) statusEl.textContent = '❌ 生成失敗';
+            if (contentEl) {
+                contentEl.innerHTML = '<div style="text-align:center; padding:60px 20px; color:#ef4444;"><div style="font-size:36px; margin-bottom:12px;">⚠️</div><h3>報告生成失敗</h3><p style="font-size:13px; color:var(--text-muted); margin-top:8px;">' + (data.message || '未知錯誤') + '</p></div>';
+            }
+        }
+    } catch(e) {
+        if (statusEl) statusEl.textContent = '❌ 網路錯誤';
+        if (contentEl) {
+            contentEl.innerHTML = '<div style="text-align:center; padding:60px 20px; color:#ef4444;"><div style="font-size:36px; margin-bottom:12px;">⚠️</div><h3>連線失敗</h3><p style="font-size:13px; color:var(--text-muted); margin-top:8px;">' + e.message + '</p></div>';
+        }
+    }
+
+    btn.disabled = false;
+    btn.textContent = '🧠 呼叫 Gemini 生成報告';
+});
+
+// 儲存手動報告
+document.getElementById('btn-save-manual')?.addEventListener('click', async function() {
+    var btn = this;
+    var content = document.getElementById('ai-manual-textarea')?.value;
+    var title = document.getElementById('ai-manual-title')?.value || 'AI 深度投研報告';
+    var statusEl = document.getElementById('ai-report-status');
+
+    if (!content || !content.trim()) {
+        alert('請先貼上報告內容');
+        return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = '⏳ 儲存中...';
+
+    try {
+        var res = await fetch('/api/save_report', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ content: content, title: title })
+        });
+        var data = await res.json();
+
+        if (data.status === 'ok') {
+            if (statusEl) statusEl.textContent = '✅ 已儲存 ' + data.date;
+            await loadAIReport(data.filename);
+            await loadAIReportIndex();
+            // 隱藏編輯器
+            var manual = document.getElementById('ai-manual-editor');
+            if (manual) manual.style.display = 'none';
+            // 清空
+            document.getElementById('ai-manual-textarea').value = '';
+            document.getElementById('ai-manual-title').value = '';
+        } else {
+            alert('⚠️ 儲存失敗: ' + (data.message || ''));
+        }
+    } catch(e) {
+        alert('⚠️ 連線失敗: ' + e.message);
+    }
+
+    btn.disabled = false;
+    btn.textContent = '💾 儲存報告';
+});
+
+// 載入報告內容
+async function loadAIReport(filename) {
+    var contentEl = document.getElementById('ai-report-content');
+    if (!contentEl) return;
+
+    try {
+        var res = await fetch('ai_reports/' + filename + '?t=' + Date.now());
+        if (!res.ok) throw new Error('載入失敗 (' + res.status + ')');
+        var md = await res.text();
+
+        // 移除 YAML front matter
+        md = md.replace(/^---[\s\S]*?---\s*\n/, '');
+
+        // 使用 marked.js 渲染 Markdown
+        if (typeof marked !== 'undefined') {
+            contentEl.innerHTML = marked.parse(md);
+        } else {
+            // Fallback: 基本 pre 格式
+            contentEl.innerHTML = '<pre style="white-space:pre-wrap; color:var(--text-primary); line-height:1.8;">' + md.replace(/</g, '&lt;') + '</pre>';
+        }
+    } catch(e) {
+        contentEl.innerHTML = '<div style="text-align:center; padding:40px; color:#ef4444;">⚠️ 無法載入報告: ' + e.message + '</div>';
+    }
+}
+
+// 載入報告索引 (歷史清單)
+async function loadAIReportIndex() {
+    var select = document.getElementById('ai-report-history');
+    if (!select) return;
+
+    try {
+        var res = await fetch('ai_reports/index.json?t=' + Date.now());
+        if (!res.ok) return;
+        aiReportIndex = await res.json();
+
+        select.innerHTML = '<option value="">選擇歷史報告 (' + aiReportIndex.reports.length + ' 份)...</option>';
+        aiReportIndex.reports.forEach(function(r) {
+            var opt = document.createElement('option');
+            opt.value = r.filename;
+            var modelTag = r.model === 'manual' ? '[手動]' : '[' + r.model + ']';
+            opt.textContent = r.date.substring(0, 16) + ' ' + modelTag + ' ' + r.title;
+            select.appendChild(opt);
+        });
+
+        // 自動載入最新報告
+        if (aiReportIndex.reports.length > 0) {
+            var latest = aiReportIndex.reports[0];
+            var statusEl = document.getElementById('ai-report-status');
+            if (statusEl && !statusEl.textContent) statusEl.textContent = '最新: ' + latest.date.substring(0, 16);
+            loadAIReport(latest.filename);
+        }
+    } catch(e) {
+        // 尚無報告索引，靜默跳過
+    }
+}
+
+// 歷史報告切換
+document.getElementById('ai-report-history')?.addEventListener('change', function() {
+    if (this.value) {
+        loadAIReport(this.value);
+        var statusEl = document.getElementById('ai-report-status');
+        // 從選中的 option 取得日期
+        var opt = this.options[this.selectedIndex];
+        if (statusEl) statusEl.textContent = '檢視: ' + opt.textContent.substring(0, 16);
+    }
+});
+
+// 初始載入
+loadAIReportIndex();
+
+// ==========================================
+// 20. Power Gauge (綜合戰力評分)
+// ==========================================
+var pgData = null;
+var pgSortKey = 'total';
+
+function scoreColor(val) {
+    if (val >= 80) return '#e879f9';
+    if (val >= 65) return '#10b981';
+    if (val >= 50) return '#3b82f6';
+    if (val >= 35) return '#f59e0b';
+    return '#ef4444';
+}
+
+function drawMiniRadar(canvas, dims, size) {
+    var ctx = canvas.getContext('2d');
+    var w = size || 48;
+    canvas.width = w; canvas.height = w;
+    var cx = w/2, cy = w/2, r = w/2 - 4;
+    var labels = ['momentum','technical','fundamental','consensus','risk'];
+    var n = labels.length;
+    var angle = Math.PI * 2 / n;
+    var startAngle = -Math.PI / 2;
+
+    // Background pentagon
+    ctx.beginPath();
+    for (var i = 0; i < n; i++) {
+        var a = startAngle + i * angle;
+        ctx.lineTo(cx + r * Math.cos(a), cy + r * Math.sin(a));
+    }
+    ctx.closePath();
+    ctx.fillStyle = 'rgba(139,92,246,0.08)';
+    ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+    ctx.lineWidth = 0.5;
+    ctx.fill();
+    ctx.stroke();
+
+    // Data polygon
+    ctx.beginPath();
+    for (var i = 0; i < n; i++) {
+        var a = startAngle + i * angle;
+        var val = (dims[labels[i]] || 50) / 100;
+        ctx.lineTo(cx + r * val * Math.cos(a), cy + r * val * Math.sin(a));
+    }
+    ctx.closePath();
+    ctx.fillStyle = 'rgba(139,92,246,0.25)';
+    ctx.strokeStyle = '#8b5cf6';
+    ctx.lineWidth = 1.5;
+    ctx.fill();
+    ctx.stroke();
+}
+
+async function loadAndRenderPowerGauge() {
+    if (pgData) { renderPowerGauge(); return; }
+    try {
+        var res = await fetch('power_gauge_data.json?t=' + Date.now());
+        if (!res.ok) {
+            document.getElementById('pg-leaderboard').innerHTML =
+                '<div style="text-align:center; padding:40px; color:var(--text-muted);">' +
+                '<div style="font-size:48px; margin-bottom:12px; opacity:0.5;">⚡</div>' +
+                '<p>尚未產生評分資料</p><p style="font-size:12px; margin-top:8px;">請先執行 <code>python generate_power_gauge.py</code></p></div>';
+            return;
+        }
+        pgData = await res.json();
+        renderPowerGauge();
+    } catch(e) {
+        console.error('Power Gauge load error:', e);
+    }
+}
+
+function renderPowerGauge() {
+    if (!pgData || !pgData.stocks) return;
+    var stocks = [...pgData.stocks];
+
+    // Sort
+    if (pgSortKey === 'total') {
+        stocks.sort(function(a,b) { return b.total_score - a.total_score; });
+    } else {
+        stocks.sort(function(a,b) { return (b.dimensions[pgSortKey]||0) - (a.dimensions[pgSortKey]||0); });
+    }
+
+    // Re-assign display rank
+    stocks.forEach(function(s, i) { s._displayRank = i + 1; });
+
+    // Summary stats
+    var sGrades = {S:0, A:0, B:0, C:0, D:0};
+    stocks.forEach(function(s) { sGrades[s.grade] = (sGrades[s.grade]||0) + 1; });
+    var avgScore = stocks.reduce(function(sum,s) { return sum + s.total_score; }, 0) / stocks.length;
+
+    var summaryEl = document.getElementById('pg-summary');
+    summaryEl.innerHTML =
+        '<div class="pg-stat-card"><div class="pg-stat-value">' + stocks.length + '</div><div class="pg-stat-label">追蹤股票數</div></div>' +
+        '<div class="pg-stat-card"><div class="pg-stat-value">' + avgScore.toFixed(1) + '</div><div class="pg-stat-label">平均戰力分數</div></div>' +
+        '<div class="pg-stat-card"><div class="pg-stat-value" style="background:linear-gradient(135deg,#e879f9,#8b5cf6);-webkit-background-clip:text;-webkit-text-fill-color:transparent;">' + sGrades.S + '</div><div class="pg-stat-label">S 級 (≥80)</div></div>' +
+        '<div class="pg-stat-card"><div class="pg-stat-value" style="-webkit-text-fill-color:#10b981;">' + sGrades.A + '</div><div class="pg-stat-label">A 級 (65~79)</div></div>' +
+        '<div class="pg-stat-card"><div class="pg-stat-value" style="-webkit-text-fill-color:#3b82f6;">' + sGrades.B + '</div><div class="pg-stat-label">B 級 (50~64)</div></div>' +
+        '<div class="pg-stat-card"><div class="pg-stat-value" style="-webkit-text-fill-color:#f59e0b;">' + (sGrades.C + sGrades.D) + '</div><div class="pg-stat-label">C/D 級 (<50)</div></div>';
+
+    // Leaderboard table
+    var html = '<table class="pg-table"><thead><tr>';
+    html += '<th>#</th><th>雷達</th><th>股票</th><th>總分</th><th>等級</th>';
+    html += '<th>動能</th><th>技術</th><th>基本</th><th>共識</th><th>風險</th>';
+    html += '<th>1M %</th><th>RSI</th><th>信號</th>';
+    html += '</tr></thead><tbody>';
+
+    stocks.forEach(function(s) {
+        var d = s.dimensions;
+        var rankClass = s._displayRank <= 10 ? 'pg-rank-top' : (s._displayRank <= 30 ? 'pg-rank-mid' : 'pg-rank-low');
+
+        html += '<tr onclick="openStockXray(\'' + s.ticker + '\')">';
+        html += '<td><span class="pg-rank ' + rankClass + '">' + s._displayRank + '</span></td>';
+        html += '<td><canvas class="pg-mini-radar" data-ticker="' + s.ticker + '"></canvas></td>';
+        html += '<td><strong style="color:var(--text-main);">' + s.ticker + '</strong> <span style="color:var(--text-muted); font-size:11px;">' + (s.name || '') + '</span></td>';
+        html += '<td><span style="font-family:var(--font-mono); font-weight:700; color:' + scoreColor(s.total_score) + ';">' + s.total_score.toFixed(1) + '</span></td>';
+        html += '<td><span class="pg-grade pg-grade-' + s.grade + '">' + s.grade + '</span></td>';
+
+        // 五維分數條
+        ['momentum','technical','fundamental','consensus','risk'].forEach(function(dim) {
+            var v = d[dim] || 0;
+            html += '<td><span style="font-family:var(--font-mono); font-size:12px; color:' + scoreColor(v) + ';">' + v.toFixed(0) + '</span>';
+            html += '<div class="pg-score-bar"><div class="pg-score-bar-fill" style="width:' + v + '%; background:' + scoreColor(v) + ';"></div></div></td>';
+        });
+
+        // Key metrics
+        var km = s.key_metrics || {};
+        var ret1m = km.ret_1m || 0;
+        html += '<td style="font-family:var(--font-mono); color:' + (ret1m >= 0 ? '#ef4444' : '#10b981') + ';">' + (ret1m > 0 ? '+' : '') + ret1m.toFixed(1) + '%</td>';
+        html += '<td style="font-family:var(--font-mono); color:var(--text-secondary);">' + (km.rsi || 50).toFixed(0) + '</td>';
+
+        // Signals
+        html += '<td>';
+        (s.signals || []).forEach(function(sig) {
+            html += '<span class="pg-signal-badge ' + sig.type + '">' + sig.label + '</span>';
+        });
+        html += '</td>';
+        html += '</tr>';
+    });
+
+    html += '</tbody></table>';
+    document.getElementById('pg-leaderboard').innerHTML = html;
+
+    // Draw mini radars
+    setTimeout(function() {
+        document.querySelectorAll('.pg-mini-radar').forEach(function(canvas) {
+            var ticker = canvas.getAttribute('data-ticker');
+            var stock = pgData.stocks.find(function(s) { return s.ticker === ticker; });
+            if (stock) drawMiniRadar(canvas, stock.dimensions, 48);
+        });
+    }, 50);
+}
+
+// Sort buttons
+document.querySelectorAll('.pg-sort-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+        document.querySelectorAll('.pg-sort-btn').forEach(function(b) { b.classList.remove('active'); });
+        btn.classList.add('active');
+        pgSortKey = btn.getAttribute('data-sort');
+        renderPowerGauge();
+    });
+});
+
+// ==========================================
+// 21. Stock X-Ray (個股深度 X 光)
+// ==========================================
+var xrayChart = null;
+var xrayCandleSeries = null;
+var xrayVolumeSeries = null;
+
+function switchToView(viewName) {
+    document.querySelectorAll('.nav-link').forEach(function(l) { l.classList.remove('active'); });
+    document.querySelectorAll('.view-panel').forEach(function(v) { v.classList.remove('active'); });
+    var panel = document.getElementById('view-' + viewName);
+    if (panel) panel.classList.add('active');
+    document.getElementById('view-title').textContent = viewTitles[viewName] || '';
+}
+
+function openStockXray(ticker) {
+    switchToView('stock-xray');
+
+    // 從 pgData 找到該股票
+    if (!pgData || !pgData.stocks) return;
+    var stock = pgData.stocks.find(function(s) { return s.ticker === ticker; });
+    if (!stock) return;
+
+    var d = stock.dimensions;
+    var km = stock.key_metrics || {};
+
+    // Title
+    document.getElementById('xray-title').innerHTML =
+        '<span class="xray-ticker" style="background:linear-gradient(135deg,#8b5cf6,#3b82f6);-webkit-background-clip:text;-webkit-text-fill-color:transparent;">' + ticker + '</span> ' + (stock.name || '');
+
+    // Hero
+    document.getElementById('xray-hero').innerHTML =
+        '<div class="xray-hero-card">' +
+        '  <div class="xray-hero-left">' +
+        '    <h1><span class="xray-ticker">' + ticker + '</span> <span style="color:var(--text-secondary); font-size:18px;">' + (stock.name || '') + '</span></h1>' +
+        '    <div class="xray-meta">' + (stock.sector || '') + ' · ' + (stock.industry || '') + ' · 市值 ' + (stock.mcap_fmt || '--') + '</div>' +
+        '    <div style="margin-top:8px; font-family:var(--font-mono); font-size:24px; font-weight:700;">$' + (stock.price || '--') + '</div>' +
+        '  </div>' +
+        '  <div class="xray-hero-right">' +
+        '    <div style="text-align:center;">' +
+        '      <div class="xray-score-big" style="color:' + scoreColor(stock.total_score) + ';">' + stock.total_score.toFixed(1) + '</div>' +
+        '      <div style="font-size:11px; color:var(--text-muted); margin-top:4px;">' + stock.grade_label + '</div>' +
+        '    </div>' +
+        '    <div class="xray-grade-big pg-grade-' + stock.grade + '">' + stock.grade + '</div>' +
+        '  </div>' +
+        '</div>';
+
+    // Radar chart
+    drawXrayRadar(d);
+
+    // Dimension bars
+    var dimLabels = {momentum:'🚀 動能', technical:'📐 技術', fundamental:'💼 基本面', consensus:'🏛️ 共識', risk:'🛡️ 風險'};
+    var dimColors = {momentum:'#f59e0b', technical:'#3b82f6', fundamental:'#10b981', consensus:'#8b5cf6', risk:'#06b6d4'};
+    var dimHtml = '';
+    Object.keys(dimLabels).forEach(function(key) {
+        var val = d[key] || 0;
+        dimHtml += '<div class="xray-dim-row">' +
+            '<div class="xray-dim-label">' + dimLabels[key] + '</div>' +
+            '<div class="xray-dim-bar"><div class="xray-dim-bar-fill" style="width:' + val + '%; background:' + dimColors[key] + ';"></div></div>' +
+            '<div class="xray-dim-value" style="color:' + scoreColor(val) + ';">' + val.toFixed(1) + '</div>' +
+            '</div>';
+    });
+    document.getElementById('xray-dimensions').innerHTML = dimHtml;
+
+    // Fundamentals cards
+    var metrics = [
+        {label: 'Forward P/E', value: km.pe_fwd != null ? km.pe_fwd.toFixed(1) : '--'},
+        {label: 'RSI (14)', value: km.rsi != null ? km.rsi.toFixed(0) : '--'},
+        {label: '1M 報酬率', value: km.ret_1m != null ? (km.ret_1m > 0 ? '+' : '') + km.ret_1m.toFixed(1) + '%' : '--'},
+        {label: '3M 報酬率', value: km.ret_3m != null ? (km.ret_3m > 0 ? '+' : '') + km.ret_3m.toFixed(1) + '%' : '--'},
+        {label: '營收成長 YoY', value: km.rev_growth != null ? km.rev_growth.toFixed(1) + '%' : '--'},
+        {label: '毛利率', value: km.gross_margin != null ? km.gross_margin.toFixed(1) + '%' : '--'},
+        {label: 'ROE', value: km.roe != null ? km.roe.toFixed(1) + '%' : '--'},
+        {label: '分析師上檔', value: km.target_upside != null ? (km.target_upside > 0 ? '+' : '') + km.target_upside.toFixed(1) + '%' : '--'},
+        {label: '推薦評級', value: km.rec || '--'},
+        {label: 'Beta', value: km.beta != null ? km.beta.toFixed(2) : '--'},
+        {label: '距52W高', value: km.pct_from_high != null ? km.pct_from_high.toFixed(1) + '%' : '--'},
+        {label: '均線排列', value: km.ma_aligned ? '✅ 多頭' : '❌ 空頭'},
+    ];
+    var fundHtml = '';
+    metrics.forEach(function(m) {
+        fundHtml += '<div class="xray-metric-card"><div class="metric-value">' + m.value + '</div><div class="metric-label">' + m.label + '</div></div>';
+    });
+    document.getElementById('xray-fundamentals').innerHTML = fundHtml;
+
+    // Signals
+    var allPossibleSignals = [
+        {type: 'squeeze', label: '⚡ TTM Squeeze'},
+        {type: 'td9_sell', label: '🔴 TD9 賣出竭盡'},
+        {type: 'td9_buy', label: '🟢 TD9 買入竭盡'},
+        {type: 'ma_touch', label: '🔵 均線回測'},
+        {type: 'momentum', label: '🚀 動能突破'},
+    ];
+    var activeTypes = (stock.signals || []).map(function(s) { return s.type; });
+    var sigHtml = '';
+    allPossibleSignals.forEach(function(ps) {
+        var isActive = activeTypes.indexOf(ps.type) >= 0;
+        var activeSignal = isActive ? stock.signals.find(function(s) { return s.type === ps.type; }) : null;
+        sigHtml += '<div class="xray-signal ' + (isActive ? 'active' : 'inactive') + '">' +
+            (isActive ? '✅' : '⬜') + ' ' + (activeSignal ? activeSignal.label : ps.label) + '</div>';
+    });
+    document.getElementById('xray-signals').innerHTML = sigHtml;
+
+    // Load K-line chart
+    loadXrayChart(ticker);
+
+    // Load quarterly trends
+    loadXrayQuarterly(ticker);
+}
+
+function drawXrayRadar(dims) {
+    var canvas = document.getElementById('xray-radar');
+    var ctx = canvas.getContext('2d');
+    var w = 280, cx = w/2, cy = w/2, r = 110;
+    canvas.width = w; canvas.height = w;
+    ctx.clearRect(0, 0, w, w);
+
+    var labels = ['momentum','technical','fundamental','consensus','risk'];
+    var labelNames = ['動能','技術','基本面','共識','風險'];
+    var colors = ['#f59e0b','#3b82f6','#10b981','#8b5cf6','#06b6d4'];
+    var n = labels.length;
+    var angle = Math.PI * 2 / n;
+    var startAngle = -Math.PI / 2;
+
+    // Draw grid rings
+    [0.2, 0.4, 0.6, 0.8, 1.0].forEach(function(scale) {
+        ctx.beginPath();
+        for (var i = 0; i < n; i++) {
+            var a = startAngle + i * angle;
+            ctx.lineTo(cx + r * scale * Math.cos(a), cy + r * scale * Math.sin(a));
+        }
+        ctx.closePath();
+        ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+        ctx.lineWidth = 0.5;
+        ctx.stroke();
+    });
+
+    // Draw axes
+    for (var i = 0; i < n; i++) {
+        var a = startAngle + i * angle;
+        ctx.beginPath();
+        ctx.moveTo(cx, cy);
+        ctx.lineTo(cx + r * Math.cos(a), cy + r * Math.sin(a));
+        ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+        ctx.lineWidth = 0.5;
+        ctx.stroke();
+    }
+
+    // Draw data polygon
+    ctx.beginPath();
+    for (var i = 0; i < n; i++) {
+        var a = startAngle + i * angle;
+        var val = (dims[labels[i]] || 0) / 100;
+        ctx.lineTo(cx + r * val * Math.cos(a), cy + r * val * Math.sin(a));
+    }
+    ctx.closePath();
+    var grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
+    grad.addColorStop(0, 'rgba(139,92,246,0.35)');
+    grad.addColorStop(1, 'rgba(59,130,246,0.15)');
+    ctx.fillStyle = grad;
+    ctx.fill();
+    ctx.strokeStyle = '#8b5cf6';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // Draw dots and labels
+    for (var i = 0; i < n; i++) {
+        var a = startAngle + i * angle;
+        var val = (dims[labels[i]] || 0) / 100;
+
+        // Dot
+        ctx.beginPath();
+        ctx.arc(cx + r * val * Math.cos(a), cy + r * val * Math.sin(a), 4, 0, Math.PI * 2);
+        ctx.fillStyle = colors[i];
+        ctx.fill();
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+
+        // Label
+        var labelR = r + 20;
+        var lx = cx + labelR * Math.cos(a);
+        var ly = cy + labelR * Math.sin(a);
+        ctx.font = '600 11px Inter, sans-serif';
+        ctx.fillStyle = colors[i];
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(labelNames[i], lx, ly);
+
+        // Score
+        ctx.font = '700 10px JetBrains Mono, monospace';
+        ctx.fillStyle = 'rgba(255,255,255,0.6)';
+        ctx.fillText(Math.round(dims[labels[i]] || 0), lx, ly + 13);
+    }
+}
+
+async function loadXrayChart(ticker) {
+    var container = document.getElementById('xray-chart');
+    container.innerHTML = '';
+
+    try {
+        var res = await fetch('charts/' + ticker + '_daily.json?t=' + Date.now());
+        if (!res.ok) {
+            container.innerHTML = '<div style="text-align:center; padding:40px; color:var(--text-muted);">無 K 線資料</div>';
+            return;
+        }
+        var data = await res.json();
+
+        if (xrayChart) { xrayChart.remove(); xrayChart = null; }
+
+        xrayChart = LightweightCharts.createChart(container, {
+            layout: { background: { type: 'solid', color: 'transparent' }, textColor: '#94a3b8' },
+            grid: { vertLines: { color: 'rgba(255,255,255,0.03)' }, horzLines: { color: 'rgba(255,255,255,0.03)' } },
+            rightPriceScale: { borderColor: 'rgba(255,255,255,0.08)' },
+            timeScale: { borderColor: 'rgba(255,255,255,0.08)' },
+            width: container.clientWidth,
+            height: 350,
+        });
+
+        xrayCandleSeries = xrayChart.addCandlestickSeries({
+            upColor: '#ef4444', downColor: '#10b981',
+            borderDownColor: '#10b981', borderUpColor: '#ef4444',
+            wickDownColor: '#10b981', wickUpColor: '#ef4444',
+        });
+        xrayCandleSeries.priceScale().applyOptions({ scaleMargins: { top: 0.02, bottom: 0.25 } });
+
+        xrayVolumeSeries = xrayChart.addHistogramSeries({
+            color: '#26a69a', priceFormat: { type: 'volume' }, priceScaleId: '',
+        });
+        xrayVolumeSeries.priceScale().applyOptions({ scaleMargins: { top: 0.78, bottom: 0 } });
+
+        xrayCandleSeries.setData(data);
+        xrayVolumeSeries.setData(data.map(function(d) {
+            return { time: d.time, value: d.volume, color: d.close >= d.open ? 'rgba(239,68,68,0.3)' : 'rgba(16,185,129,0.3)' };
+        }));
+
+        xrayChart.timeScale().fitContent();
+    } catch(e) {
+        container.innerHTML = '<div style="text-align:center; padding:40px; color:var(--text-muted);">K 線載入失敗</div>';
+    }
+}
+
+async function loadXrayQuarterly(ticker) {
+    var revCanvas = document.getElementById('xray-revenue-chart');
+    var marginCanvas = document.getElementById('xray-margin-chart');
+
+    try {
+        var res = await fetch('fundamentals_data.json?t=' + Date.now());
+        if (!res.ok) return;
+        var fData = await res.json();
+        var stock = fData.stocks && fData.stocks[ticker];
+        if (!stock || !stock.quarters || stock.quarters.length === 0) {
+            revCanvas.parentElement.innerHTML = '<div style="text-align:center; padding:30px; color:var(--text-muted); font-size:12px;">無季度資料 (請先執行 generate_fundamentals.py)</div>';
+            marginCanvas.parentElement.innerHTML = '';
+            return;
+        }
+
+        var quarters = stock.quarters.slice(0, 8).reverse();
+
+        // Revenue bar chart
+        drawBarChart(revCanvas, quarters, 'revenue_fmt', 'revenue', '季度營收', '#8b5cf6');
+
+        // Margin line chart
+        drawLineChart(marginCanvas, quarters, '毛利率 vs 營業利潤率', [
+            {key: 'gross_margin', label: '毛利率', color: '#10b981'},
+            {key: 'op_margin', label: '營業利潤率', color: '#f59e0b'},
+        ]);
+
+    } catch(e) {
+        console.error('Quarterly load error:', e);
+    }
+}
+
+function drawBarChart(canvas, quarters, fmtKey, valKey, title, color) {
+    var ctx = canvas.getContext('2d');
+    var w = canvas.parentElement.clientWidth || 400;
+    var h = 200;
+    canvas.width = w; canvas.height = h;
+
+    var padding = {top: 30, right: 10, bottom: 40, left: 10};
+    var cw = w - padding.left - padding.right;
+    var ch = h - padding.top - padding.bottom;
+
+    ctx.clearRect(0, 0, w, h);
+
+    // Title
+    ctx.font = '600 12px Inter, sans-serif';
+    ctx.fillStyle = 'rgba(255,255,255,0.6)';
+    ctx.textAlign = 'left';
+    ctx.fillText(title, padding.left, 18);
+
+    var vals = quarters.map(function(q) { return q[valKey] || 0; });
+    var maxVal = Math.max.apply(null, vals) * 1.1 || 1;
+    var barW = cw / quarters.length * 0.6;
+    var gap = cw / quarters.length;
+
+    quarters.forEach(function(q, i) {
+        var val = q[valKey] || 0;
+        var barH = (val / maxVal) * ch;
+        var x = padding.left + i * gap + (gap - barW) / 2;
+        var y = padding.top + ch - barH;
+
+        // Bar
+        ctx.fillStyle = color;
+        ctx.globalAlpha = 0.7;
+        ctx.beginPath();
+        ctx.roundRect(x, y, barW, barH, [4, 4, 0, 0]);
+        ctx.fill();
+        ctx.globalAlpha = 1;
+
+        // Label
+        ctx.font = '500 9px Inter, sans-serif';
+        ctx.fillStyle = 'rgba(255,255,255,0.5)';
+        ctx.textAlign = 'center';
+        ctx.fillText(q.label || '', x + barW/2, h - padding.bottom + 14);
+
+        // Value
+        if (q[fmtKey]) {
+            ctx.font = '600 9px JetBrains Mono, monospace';
+            ctx.fillStyle = 'rgba(255,255,255,0.7)';
+            ctx.fillText(q[fmtKey], x + barW/2, y - 6);
+        }
+    });
+}
+
+function drawLineChart(canvas, quarters, title, series) {
+    var ctx = canvas.getContext('2d');
+    var w = canvas.parentElement.clientWidth || 400;
+    var h = 200;
+    canvas.width = w; canvas.height = h;
+
+    var padding = {top: 30, right: 10, bottom: 40, left: 40};
+    var cw = w - padding.left - padding.right;
+    var ch = h - padding.top - padding.bottom;
+
+    ctx.clearRect(0, 0, w, h);
+
+    // Title
+    ctx.font = '600 12px Inter, sans-serif';
+    ctx.fillStyle = 'rgba(255,255,255,0.6)';
+    ctx.textAlign = 'left';
+    ctx.fillText(title, padding.left, 18);
+
+    // Find min/max across all series
+    var allVals = [];
+    series.forEach(function(s) {
+        quarters.forEach(function(q) { if (q[s.key] != null) allVals.push(q[s.key]); });
+    });
+    if (allVals.length === 0) return;
+    var minVal = Math.min.apply(null, allVals) - 5;
+    var maxVal = Math.max.apply(null, allVals) + 5;
+    var range = maxVal - minVal || 1;
+
+    // Y axis labels
+    ctx.font = '500 9px JetBrains Mono, monospace';
+    ctx.fillStyle = 'rgba(255,255,255,0.3)';
+    ctx.textAlign = 'right';
+    for (var i = 0; i <= 4; i++) {
+        var yVal = minVal + (range * i / 4);
+        var y = padding.top + ch - (ch * i / 4);
+        ctx.fillText(yVal.toFixed(0) + '%', padding.left - 6, y + 3);
+        ctx.beginPath();
+        ctx.moveTo(padding.left, y);
+        ctx.lineTo(w - padding.right, y);
+        ctx.strokeStyle = 'rgba(255,255,255,0.04)';
+        ctx.lineWidth = 0.5;
+        ctx.stroke();
+    }
+
+    // X axis labels
+    var gap = cw / (quarters.length - 1 || 1);
+    ctx.textAlign = 'center';
+    quarters.forEach(function(q, i) {
+        ctx.fillStyle = 'rgba(255,255,255,0.4)';
+        ctx.font = '500 9px Inter, sans-serif';
+        ctx.fillText(q.label || '', padding.left + i * gap, h - padding.bottom + 14);
+    });
+
+    // Draw lines
+    series.forEach(function(s) {
+        ctx.beginPath();
+        var started = false;
+        quarters.forEach(function(q, i) {
+            var val = q[s.key];
+            if (val == null) return;
+            var x = padding.left + i * gap;
+            var y = padding.top + ch - ((val - minVal) / range * ch);
+            if (!started) { ctx.moveTo(x, y); started = true; }
+            else ctx.lineTo(x, y);
+        });
+        ctx.strokeStyle = s.color;
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        // Dots
+        quarters.forEach(function(q, i) {
+            var val = q[s.key];
+            if (val == null) return;
+            var x = padding.left + i * gap;
+            var y = padding.top + ch - ((val - minVal) / range * ch);
+            ctx.beginPath();
+            ctx.arc(x, y, 3, 0, Math.PI * 2);
+            ctx.fillStyle = s.color;
+            ctx.fill();
+        });
+    });
+
+    // Legend
+    var legendX = w - padding.right - 10;
+    ctx.textAlign = 'right';
+    series.forEach(function(s, i) {
+        var ly = padding.top + 6 + i * 16;
+        ctx.beginPath();
+        ctx.arc(legendX - ctx.measureText(s.label).width - 12, ly, 4, 0, Math.PI * 2);
+        ctx.fillStyle = s.color;
+        ctx.fill();
+        ctx.font = '500 10px Inter, sans-serif';
+        ctx.fillStyle = s.color;
+        ctx.fillText(s.label, legendX, ly + 4);
+    });
+}
+
+// Back button
+document.getElementById('xray-back-btn')?.addEventListener('click', function() {
+    switchToView('power-gauge');
+    loadAndRenderPowerGauge();
+});

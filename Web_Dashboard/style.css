@@ -725,3 +725,474 @@ nav { flex: 1; display: flex; flex-direction: column; gap: 4px; }
 .inst-trade-buy { color: var(--color-up); font-weight: 700; }
 .inst-trade-sell { color: var(--color-down); font-weight: 700; }
 .inst-trade-other { color: var(--text-muted); }
+
+/* ===== VIEW 8: AI Report — Markdown Body ===== */
+.markdown-body {
+    color: #cbd5e1;
+    font-size: 14px;
+    line-height: 1.85;
+    word-wrap: break-word;
+}
+
+.markdown-body h1 {
+    font-size: 26px; font-weight: 800;
+    color: #f8fafc;
+    padding-bottom: 12px;
+    margin: 28px 0 16px;
+    border-bottom: 2px solid rgba(139, 92, 246, 0.3);
+    background: linear-gradient(90deg, #f8fafc, #a78bfa);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.markdown-body h2 {
+    font-size: 22px; font-weight: 700;
+    color: #e2e8f0;
+    margin: 24px 0 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.markdown-body h3 {
+    font-size: 18px; font-weight: 700;
+    color: #f8fafc;
+    margin: 22px 0 10px;
+    padding: 8px 14px;
+    background: linear-gradient(90deg, rgba(139, 92, 246, 0.12), transparent);
+    border-left: 3px solid var(--accent-purple);
+    border-radius: 0 8px 8px 0;
+}
+
+.markdown-body h4 {
+    font-size: 16px; font-weight: 600;
+    color: #e2e8f0;
+    margin: 18px 0 8px;
+}
+
+.markdown-body p {
+    margin: 10px 0;
+}
+
+.markdown-body strong {
+    color: #f8fafc;
+    font-weight: 700;
+}
+
+.markdown-body em {
+    color: #a78bfa;
+    font-style: italic;
+}
+
+.markdown-body a {
+    color: var(--accent-blue);
+    text-decoration: none;
+    border-bottom: 1px dashed var(--accent-blue);
+    transition: opacity 0.15s;
+}
+.markdown-body a:hover { opacity: 0.7; }
+
+.markdown-body ul, .markdown-body ol {
+    margin: 10px 0 10px 20px;
+    padding-left: 8px;
+}
+
+.markdown-body li {
+    margin: 6px 0;
+    padding-left: 4px;
+}
+
+.markdown-body li::marker {
+    color: var(--accent-purple);
+}
+
+.markdown-body blockquote {
+    margin: 14px 0;
+    padding: 12px 18px;
+    border-left: 4px solid var(--accent-purple);
+    background: rgba(139, 92, 246, 0.06);
+    border-radius: 0 8px 8px 0;
+    color: #94a3b8;
+    font-style: italic;
+}
+
+.markdown-body code {
+    font-family: var(--font-mono);
+    font-size: 13px;
+    padding: 2px 6px;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+    color: #f59e0b;
+}
+
+.markdown-body pre {
+    margin: 14px 0;
+    padding: 16px 20px;
+    background: rgba(0, 0, 0, 0.4);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 10px;
+    overflow-x: auto;
+    font-size: 13px;
+    line-height: 1.6;
+}
+
+.markdown-body pre code {
+    background: none;
+    border: none;
+    padding: 0;
+    color: #e2e8f0;
+}
+
+.markdown-body table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 14px 0;
+    font-size: 13px;
+    font-family: var(--font-mono);
+}
+
+.markdown-body thead th {
+    text-align: left;
+    padding: 10px 14px;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border-bottom: 2px solid rgba(139, 92, 246, 0.25);
+    background: rgba(0, 0, 0, 0.3);
+    position: sticky;
+    top: 0;
+}
+
+.markdown-body tbody td {
+    padding: 10px 14px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+    color: #cbd5e1;
+    vertical-align: top;
+}
+
+.markdown-body tbody tr:hover td {
+    background: rgba(139, 92, 246, 0.05);
+}
+
+.markdown-body tbody tr:nth-child(even) td {
+    background: rgba(255, 255, 255, 0.015);
+}
+
+.markdown-body hr {
+    border: none;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(139, 92, 246, 0.3), transparent);
+    margin: 24px 0;
+}
+
+.markdown-body img {
+    max-width: 100%;
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    margin: 12px 0;
+}
+
+/* AI Loading Spinner */
+.ai-loading-spinner {
+    width: 48px;
+    height: 48px;
+    border: 3px solid rgba(139, 92, 246, 0.15);
+    border-top: 3px solid var(--accent-purple);
+    border-radius: 50%;
+    animation: aiSpin 1s linear infinite;
+    margin: 0 auto;
+}
+
+@keyframes aiSpin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* View header for AI report */
+.view-header h2 {
+    font-size: 22px; font-weight: 700;
+}
+.view-header .subtitle {
+    font-size: 12px; color: var(--text-muted);
+    font-weight: 400; margin-left: 8px;
+}
+
+/* Counter-trend badge */
+.alert-card.counter-trend {
+    opacity: 0.7;
+    border-left-color: var(--text-muted);
+}
+
+/* ============================================================
+   VIEW 9: Power Gauge (綜合戰力評分)
+   ============================================================ */
+
+/* 摘要卡片 */
+.pg-stat-card {
+    background: var(--bg-panel);
+    border: 1px solid var(--border-glow);
+    border-radius: 10px;
+    padding: 16px;
+    text-align: center;
+    transition: border-color 0.2s;
+}
+.pg-stat-card:hover {
+    border-color: var(--accent-purple);
+}
+.pg-stat-card .pg-stat-value {
+    font-size: 28px;
+    font-weight: 700;
+    font-family: var(--font-mono);
+    background: linear-gradient(135deg, #8b5cf6, #3b82f6);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+.pg-stat-card .pg-stat-label {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: 4px;
+}
+
+/* 排行榜表格 */
+.pg-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    font-size: 13px;
+}
+.pg-table thead th {
+    position: sticky;
+    top: 0;
+    background: rgba(9, 9, 11, 0.95);
+    padding: 10px 12px;
+    text-align: left;
+    font-weight: 600;
+    color: var(--text-muted);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border-bottom: 1px solid var(--border-glow);
+    cursor: pointer;
+    user-select: none;
+    white-space: nowrap;
+}
+.pg-table thead th:hover {
+    color: var(--accent-purple);
+}
+.pg-table tbody tr {
+    cursor: pointer;
+    transition: background 0.15s;
+}
+.pg-table tbody tr:hover {
+    background: rgba(139, 92, 246, 0.08);
+}
+.pg-table td {
+    padding: 10px 12px;
+    border-bottom: 1px solid rgba(255,255,255,0.03);
+    white-space: nowrap;
+}
+
+/* 等級徽章 */
+.pg-grade {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    font-weight: 800;
+    font-size: 16px;
+    font-family: var(--font-mono);
+}
+.pg-grade-S { background: linear-gradient(135deg, rgba(139,92,246,0.3), rgba(236,72,153,0.3)); color: #e879f9; border: 1px solid rgba(232,121,249,0.4); text-shadow: 0 0 12px rgba(232,121,249,0.5); }
+.pg-grade-A { background: rgba(16,185,129,0.15); color: #10b981; border: 1px solid rgba(16,185,129,0.3); }
+.pg-grade-B { background: rgba(59,130,246,0.15); color: #3b82f6; border: 1px solid rgba(59,130,246,0.3); }
+.pg-grade-C { background: rgba(245,158,11,0.15); color: #f59e0b; border: 1px solid rgba(245,158,11,0.3); }
+.pg-grade-D { background: rgba(239,68,68,0.15); color: #ef4444; border: 1px solid rgba(239,68,68,0.3); }
+
+/* 分數條 */
+.pg-score-bar {
+    width: 80px;
+    height: 6px;
+    background: rgba(255,255,255,0.06);
+    border-radius: 3px;
+    overflow: hidden;
+    display: inline-block;
+    vertical-align: middle;
+    margin-left: 6px;
+}
+.pg-score-bar-fill {
+    height: 100%;
+    border-radius: 3px;
+    transition: width 0.5s ease;
+}
+
+/* 迷你雷達圖 (排行榜 inline) */
+.pg-mini-radar {
+    width: 48px;
+    height: 48px;
+}
+
+/* 信號 badge */
+.pg-signal-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: 600;
+    margin: 1px 2px;
+}
+.pg-signal-badge.squeeze { background: rgba(236,72,153,0.15); color: #ec4899; }
+.pg-signal-badge.td9_sell { background: rgba(239,68,68,0.15); color: #ef4444; }
+.pg-signal-badge.td9_buy { background: rgba(16,185,129,0.15); color: #10b981; }
+.pg-signal-badge.ma_touch { background: rgba(59,130,246,0.15); color: #3b82f6; }
+.pg-signal-badge.momentum { background: rgba(245,158,11,0.15); color: #f59e0b; }
+
+/* 排名數字 */
+.pg-rank {
+    font-family: var(--font-mono);
+    font-weight: 700;
+    font-size: 14px;
+}
+.pg-rank-top { color: #e879f9; }
+.pg-rank-mid { color: var(--text-secondary); }
+.pg-rank-low { color: var(--text-muted); }
+
+/* ============================================================
+   VIEW 10: Stock X-Ray (個股深度 X 光)
+   ============================================================ */
+
+/* Hero 卡片 */
+.xray-hero-card {
+    background: var(--bg-panel);
+    border: 1px solid var(--border-glow);
+    border-radius: 14px;
+    padding: 24px 32px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 16px;
+}
+.xray-hero-left h1 {
+    font-size: 28px;
+    font-weight: 800;
+    margin-bottom: 4px;
+}
+.xray-hero-left h1 .xray-ticker {
+    background: linear-gradient(135deg, #8b5cf6, #3b82f6);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+.xray-hero-left .xray-meta {
+    font-size: 12px;
+    color: var(--text-muted);
+}
+.xray-hero-right {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+}
+.xray-score-big {
+    font-size: 48px;
+    font-weight: 800;
+    font-family: var(--font-mono);
+    line-height: 1;
+}
+.xray-grade-big {
+    width: 56px;
+    height: 56px;
+    border-radius: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 28px;
+    font-weight: 900;
+    font-family: var(--font-mono);
+}
+
+/* 維度分數條 */
+.xray-dim-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+}
+.xray-dim-row:last-child { border-bottom: none; }
+.xray-dim-label {
+    width: 80px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-secondary);
+}
+.xray-dim-bar {
+    flex: 1;
+    height: 10px;
+    background: rgba(255,255,255,0.06);
+    border-radius: 5px;
+    overflow: hidden;
+}
+.xray-dim-bar-fill {
+    height: 100%;
+    border-radius: 5px;
+    transition: width 0.6s ease;
+}
+.xray-dim-value {
+    width: 50px;
+    text-align: right;
+    font-family: var(--font-mono);
+    font-weight: 700;
+    font-size: 14px;
+}
+
+/* 基本面指標卡 */
+.xray-metric-card {
+    background: rgba(0,0,0,0.3);
+    border: 1px solid rgba(255,255,255,0.05);
+    border-radius: 10px;
+    padding: 14px;
+    text-align: center;
+}
+.xray-metric-card .metric-value {
+    font-size: 22px;
+    font-weight: 700;
+    font-family: var(--font-mono);
+    color: var(--text-main);
+}
+.xray-metric-card .metric-label {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: 4px;
+}
+
+/* X-Ray 信號 badge */
+.xray-signal {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 14px;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 600;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+}
+.xray-signal.active {
+    background: rgba(139,92,246,0.12);
+    border-color: rgba(139,92,246,0.3);
+    color: #c4b5fd;
+}
+.xray-signal.inactive {
+    opacity: 0.4;
+}
+
+/* Responsive: X-Ray grid */
+@media (max-width: 768px) {
+    #view-stock-xray > div[style*="grid-template-columns: 340px"] {
+        grid-template-columns: 1fr !important;
+    }
+}
+

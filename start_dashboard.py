@@ -93,6 +93,13 @@ if __name__ == '__main__':
         cwd=SCRIPT_DIR,
     )
 
+    # 2.7. 產出綜合戰力評分 (Power Gauge)
+    print("⚡ 正在計算綜合戰力評分...")
+    subprocess.run(
+        [sys.executable, os.path.join(SCRIPT_DIR, 'generate_power_gauge.py')],
+        cwd=SCRIPT_DIR,
+    )
+
     # 基本面與籌碼面改為前端按需下載 (On-demand)
 
     # 3. 啟動網頁伺服器
