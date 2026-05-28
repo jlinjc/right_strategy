@@ -1,10 +1,14 @@
 # [LOCAL VERSION DIFF]: 全新加入的檔案。用於產生前端 Dashboard 所需的 Strategy Screener 候選清單資料。
 import os
+import sys
 import json
 import time
 from datetime import datetime
 import pandas as pd
 import yfinance as yf
+
+if sys.stdout.encoding and sys.stdout.encoding.lower() != 'utf-8':
+    sys.stdout.reconfigure(encoding='utf-8')
 
 from scanner_base import AI_TECH_STOCKS, DASHBOARD_DIR
 

@@ -22,7 +22,7 @@ from datetime import datetime
 if sys.stdout.encoding and sys.stdout.encoding.lower() != 'utf-8':
     sys.stdout.reconfigure(encoding='utf-8')
 
-from scanner_base import AI_TECH_STOCKS, DASHBOARD_DIR
+from scanner_base import AI_TECH_STOCKS, DASHBOARD_DIR, BENCHMARK
 
 OUTPUT_PATH = os.path.join(DASHBOARD_DIR, 'power_gauge_data.json')
 
@@ -93,9 +93,47 @@ def generate_power_gauge():
     print(f"[{datetime.now().strftime('%H:%M:%S')}] ⚡ Power Gauge: 正在計算 {len(tickers)} 檔股票的綜合戰力評分...")
 
     # ===== Phase 1: 下載價格數據 =====
-    print("  → 下載 6 個月價格數據...")
-    tickers_str = " ".join(tickers)
+    print("  → 下載 6 個月價格數據 (含大盤 QQQ)...")
+    all_download_tickers = list(set([BENCHMARK] + tickers))
+    tickers_str = " ".join(all_download_tickers)
     df_6m = yf.download(tickers_str, period="6mo", interval="1d", progress=False, group_by='ticker')
+
+    # ===== Phase 1.5: 計算大盤均線過濾器 =====
+    print("  → 計算大盤 (QQQ) 均線狀態...")
+    qqq_data = df_6m[BENCHMARK].dropna(subset=['Close'])
+    qqq_close = qqq_data['Close']
+    qqq_last = float(qqq_close.iloc[-1])
+    qqq_ma20 = float(qqq_close.rolling(20).mean().iloc[-1])
+    qqq_ma50 = float(qqq_close.rolling(50).mean().iloc[-1])
+    
+    if qqq_last < qqq_ma50:
+        macro_regime = "BEARISH"
+        macro_label = "🔴 大盤空頭 (QQQ < 50MA) - 絕對空手/極小試單"
+    elif qqq_last < qqq_ma20:
+        macro_regime = "CAUTION"
+        macro_label = "🟡 大盤回檔 (QQQ < 20MA) - 減倉/最多1/3部位"
+    else:
+        macro_regime = "BULLISH"
+        macro_label = "🟢 大盤多頭 (QQQ > 20MA) - 正常操作"
+    
+    print(f"    QQQ = ${qqq_last:.2f} (20MA = ${qqq_ma20:.2f}, 50MA = ${qqq_ma50:.2f}) -> {macro_label}")
+
+    try:
+        ma_data = {
+            'ma5': float(round(qqq_close.rolling(5).mean().iloc[-1], 2)) if len(qqq_close) >= 5 else 0.0,
+            'ma10': float(round(qqq_close.rolling(10).mean().iloc[-1], 2)) if len(qqq_close) >= 10 else 0.0,
+            'ma20': float(round(qqq_ma20, 2)),
+            'ma50': float(round(qqq_ma50, 2)),
+            'last_close': float(round(qqq_last, 2)),
+            'regime': macro_regime,
+            'label': macro_label
+        }
+        qqq_path = os.path.join(DASHBOARD_DIR, 'qqq_ma.json')
+        with open(qqq_path, 'w', encoding='utf-8') as f:
+            json.dump(ma_data, f, ensure_ascii=False)
+        print(f"    📐 QQQ 狀態已寫入 qqq_ma.json")
+    except Exception as e:
+        print(f"    ⚠️ 寫入 qqq_ma.json 失敗: {e}")
 
     # ===== Phase 2: 讀取現有的基本面數據 =====
     fundamentals = {}
@@ -199,6 +237,14 @@ def generate_power_gauge():
             obv_20d = float(obv.rolling(20).mean().iloc[-1])
             obv_accumulating = obv_5d > obv_20d
 
+            # --- CMF 5D (Chaikin Money Flow 5天大戶吃貨指標) ---
+            mf_mult = ((close - low) - (high - close)) / (high - low + 1e-6)
+            mf_vol = mf_mult * volume
+            cmf_5d = float(mf_vol.tail(5).sum() / (volume.tail(5).sum() + 1e-6))
+            
+            # --- 20MA 乖離率 ---
+            deviation_20ma = float((last_price - ma20) / ma20 * 100)
+
             # --- 從基本面資料讀取 ---
             fund = fundamentals.get(ticker, {})
             pe_fwd = fund.get('pe_fwd')
@@ -227,17 +273,17 @@ def generate_power_gauge():
             eps_up_30d = fund.get('eps_up_30d', 0)
             eps_down_30d = fund.get('eps_down_30d', 0)
             options_pc_ratio = fund.get('options_pc_ratio')
+            options_oi_pc_ratio = fund.get('options_oi_pc_ratio')
 
             # --- 交易規劃 (Trade Plan) ---
+            swing_low_5d = float(low.tail(5).min())
             swing_low_20d = float(low.tail(20).min())
             swing_high_60d = float(high.tail(60).max())
             
-            # 停損點：20MA 或 近1個月低點，取兩者較高者 (保護性防守)
-            # 如果跌破這兩者，說明多頭結構破壞
-            stop_loss = max(ma20, swing_low_20d)
-            if last_price <= stop_loss:
-                # 已經在停損點之下，改用近期低點作為支撐
-                stop_loss = swing_low_20d * 0.98 
+            # 停損點：5日低點與 1.5 ATR 停損取其高者，作為現價買入的防守線
+            stop_loss = max(swing_low_5d, last_price - 1.5 * atr14)
+            if stop_loss >= last_price:
+                stop_loss = last_price - 1.5 * atr14
                 
             # 目標價：分析師目標 或 近3個月高點，取兩者較高者
             plan_target = max(target_price or last_price, swing_high_60d)
@@ -246,7 +292,7 @@ def generate_power_gauge():
                 
             risk = last_price - stop_loss
             reward = plan_target - last_price
-            rr_ratio = reward / risk if risk > 0 else 9.99
+            rr_ratio = reward / risk if risk > 0 else 0
 
             raw_metrics[ticker] = {
                 'ticker': ticker,
@@ -284,6 +330,7 @@ def generate_power_gauge():
                 'pct_from_low': pct_from_low,
                 # Consensus & Smart Money
                 'target_upside': target_upside,
+                'target_price': target_price,
                 'rec': rec,
                 'analysts': analysts or 0,
                 'obv_accumulating': obv_accumulating,
@@ -292,7 +339,17 @@ def generate_power_gauge():
                 'eps_up_30d': eps_up_30d,
                 'eps_down_30d': eps_down_30d,
                 'options_pc_ratio': options_pc_ratio,
-                # Trade Plan
+                'options_oi_pc_ratio': options_oi_pc_ratio,
+                'cmf_5d': cmf_5d,
+                'deviation_20ma': deviation_20ma,
+                # Trade Plan parameters
+                'swing_low_5d': swing_low_5d,
+                'swing_low_20d': swing_low_20d,
+                'swing_high_60d': swing_high_60d,
+                'ma10': ma10,
+                'ma20': ma20,
+                'ma50': ma50,
+                'atr14': atr14,
                 'stop_loss': stop_loss,
                 'plan_target': plan_target,
                 'rr_ratio': rr_ratio,
@@ -476,6 +533,106 @@ def generate_power_gauge():
             grade = 'D'
             grade_label = '避開'
 
+        # --- 交易決策判定 ---
+        is_overextended = m['deviation_20ma'] > 8.0
+        
+        if is_overextended:
+            verdict = "WAIT_PULLBACK"
+            verdict_label = "⌛ 乖離過高，不宜現價追高 (等拉回)"
+        elif m['rr_ratio'] < 3.0:
+            verdict = "NO_GO"
+            verdict_label = "❌ 盈虧比不佳，不宜進場 (R/R < 3)"
+        else:
+            verdict = "BUY"
+            verdict_label = "🟢 盈虧比極佳，現價進場 (R/R >= 3)"
+
+        # --- 拉回買點規劃 ---
+        pullback_entry = max(m['ma10'], m['price'] * 0.96)
+        pullback_stop = max(m['ma20'], m['swing_low_20d'])
+        if pullback_stop >= pullback_entry:
+            pullback_stop = pullback_entry - 1.5 * m['atr14']
+        
+        pullback_risk = pullback_entry - pullback_stop
+        pullback_reward = m['plan_target'] - pullback_entry
+        pullback_rr = pullback_reward / pullback_risk if pullback_risk > 0 else 0
+
+        # --- 資金控管與部位大小建議 ---
+        if macro_regime == "BEARISH":
+            suggested_size_pct = 0.0
+            sizing_label = "🔴 絕對風控：大盤空頭趨勢 (QQQ < 50MA)，100% 現金空手觀望"
+        elif macro_regime == "CAUTION":
+            if verdict == "BUY":
+                suggested_size_pct = 3.3
+                sizing_label = "🟡 試單限制：大盤偏弱 (QQQ < 20MA)，限 3.3% 倉位小注試單"
+            else:
+                suggested_size_pct = 0.0
+                sizing_label = "🔴 大盤偏弱且個股無現價買點，建議空手觀望"
+        else:
+            # BULLISH
+            if verdict == "BUY":
+                if total_score >= 80:
+                    suggested_size_pct = 10.0
+                    sizing_label = "🔥 高信心重倉：S 級強勢個股，建議 10.0% 滿額多頭倉位"
+                elif total_score >= 65:
+                    suggested_size_pct = 7.5
+                    sizing_label = "🟢 多頭排列：A 級核心持股，建議 7.5% 穩健多頭倉位"
+                else:
+                    suggested_size_pct = 5.0
+                    sizing_label = "🔵 動能試單：B 級動能持股，建議 5.0% 標準多頭倉位"
+            elif is_overextended:
+                suggested_size_pct = 0.0
+                sizing_label = f"⌛ 靜待拉回：等股價拉回至 ${pullback_entry:.2f} 附近再考慮扣板機"
+            else:
+                suggested_size_pct = 0.0
+                sizing_label = "⌛ 放棄現價：盈虧比小於 1:3，無交易價值"
+
+        # --- 大戶籌碼與選擇權金流分析 ---
+        if m['cmf_5d'] > 0.1 and m['obv_accumulating']:
+            inst_sentiment = "HEAVY_ACCUMULATION"
+            inst_sentiment_label = "🐳 主力強力吃貨 (CMF > 0.1 & OBV 向上)"
+        elif m['cmf_5d'] > 0.05 or m['obv_accumulating']:
+            inst_sentiment = "ACCUMULATING"
+            inst_sentiment_label = "🐋 主力溫和吃貨 (OBV 累積中)"
+        elif m['cmf_5d'] < -0.1:
+            inst_sentiment = "DISTRIBUTION"
+            inst_sentiment_label = "⚠️ 主力持續出貨 (CMF < -0.1 資金流出)"
+        else:
+            inst_sentiment = "NEUTRAL"
+            inst_sentiment_label = "⚖️ 籌碼均衡盤整"
+
+        # 選擇權金流 sentiment
+        pcr = m['options_pc_ratio']
+        if pcr is None:
+            options_sentiment = "NEUTRAL"
+            options_sentiment_label = "⚖️ 選擇權量能均衡"
+        elif pcr < 0.65:
+            options_sentiment = "BULLISH"
+            options_sentiment_label = f"🚀 選擇權買氣暴增 (P/C={pcr:.2f} 機構瘋狂搶購 Call)"
+        elif pcr > 1.2:
+            options_sentiment = "BEARISH"
+            options_sentiment_label = f"⚠️ 選擇權看空避險 (P/C={pcr:.2f} 機構大量買進 Put)"
+        else:
+            options_sentiment = "NEUTRAL"
+            options_sentiment_label = f"⚖️ 選擇權正常波動 (P/C={pcr:.2f})"
+
+        # 分析師財報 EPS 預期修正 sentiment
+        up = m['eps_up_30d']
+        down = m['eps_down_30d']
+        if up > 0 or down > 0:
+            up_ratio = up / (up + down)
+            if up_ratio > 0.7 and up >= 5:
+                revisions_sentiment = "BULLISH"
+                revisions_sentiment_label = f"📈 財報強烈看好 ({up} 家分析師上修 EPS，僅 {down} 家下修)"
+            elif up_ratio < 0.3 and down >= 5:
+                revisions_sentiment = "BEARISH"
+                revisions_sentiment_label = f"💥 財報預警警告 ({down} 家分析師偷偷下修 EPS，僅 {up} 家上修)"
+            else:
+                revisions_sentiment = "NEUTRAL"
+                revisions_sentiment_label = f"⚖️ 財報預期持平 (上修 {up} 家 / 下修 {down} 家)"
+        else:
+            revisions_sentiment = "NEUTRAL"
+            revisions_sentiment_label = "⚖️ 財報預期持平 (無顯著修正)"
+
         results.append({
             'ticker': ticker,
             'name': m['name'],
@@ -494,19 +651,39 @@ def generate_power_gauge():
                 'risk': round(risk_score, 1),
             },
             'trade_plan': {
+                'verdict': verdict,
+                'verdict_label': verdict_label,
                 'stop_loss': round(m['stop_loss'], 2),
                 'target': round(m['plan_target'], 2),
                 'rr_ratio': round(m['rr_ratio'], 2),
                 'risk_pct': round((m['stop_loss'] / m['price'] - 1) * 100, 1),
                 'reward_pct': round((m['plan_target'] / m['price'] - 1) * 100, 1),
+                'is_overextended': is_overextended,
+                'deviation_20ma': round(m['deviation_20ma'], 1),
+                # Pullback planning
+                'pullback_entry': round(pullback_entry, 2),
+                'pullback_stop': round(pullback_stop, 2),
+                'pullback_rr': round(pullback_rr, 2),
+                # Position Sizing
+                'suggested_size_pct': suggested_size_pct,
+                'sizing_label': sizing_label,
             },
             'smart_money': {
                 'obv_accumulating': m['obv_accumulating'],
                 'inst_holders': m['inst_holders'],
                 'short_ratio': m['short_ratio'],
                 'options_pc_ratio': m['options_pc_ratio'],
+                'options_oi_pc_ratio': m['options_oi_pc_ratio'],
                 'eps_up_30d': m['eps_up_30d'],
                 'eps_down_30d': m['eps_down_30d'],
+                # Sentiments
+                'cmf_5d': round(m['cmf_5d'], 3),
+                'inst_sentiment': inst_sentiment,
+                'inst_sentiment_label': inst_sentiment_label,
+                'options_sentiment': options_sentiment,
+                'options_sentiment_label': options_sentiment_label,
+                'revisions_sentiment': revisions_sentiment,
+                'revisions_sentiment_label': revisions_sentiment_label,
             },
             'key_metrics': {
                 'ret_1m': round(m['ret_1m'], 1),

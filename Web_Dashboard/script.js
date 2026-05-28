@@ -86,12 +86,12 @@ let qqqMaLines = { ma5: null, ma10: null, ma20: null };
 try {
     const utc8DateFormatter = (timestamp) => {
         const d = new Date((timestamp + 8 * 3600) * 1000);
-        return `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,'0')}-${String(d.getUTCDate()).padStart(2,'0')} ${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`;
+        return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')} ${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`;
     };
 
     const utc8TickFormatter = (time, tickMarkType, locale) => {
         const d = new Date((time + 8 * 3600) * 1000);
-        return `${String(d.getUTCMonth()+1).padStart(2,'0')}/${String(d.getUTCDate()).padStart(2,'0')} ${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`;
+        return `${String(d.getUTCMonth() + 1).padStart(2, '0')}/${String(d.getUTCDate()).padStart(2, '0')} ${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`;
     };
 
     chart = LightweightCharts.createChart(chartDom, {
@@ -164,10 +164,10 @@ async function loadChartData(ticker, tf) {
     let dataLoaded = false;
     let stockData = null;
     let qqqData = null;
-    
+
     // Preserve zoom: save current visible range before loading new data
     let savedRange = null;
-    try { savedRange = chart.timeScale().getVisibleLogicalRange(); } catch(e) {}
+    try { savedRange = chart.timeScale().getVisibleLogicalRange(); } catch (e) { }
 
     try {
         const res = await fetch(`charts/${ticker}_${suffix}.json?t=${Date.now()}`);
@@ -214,7 +214,7 @@ async function loadChartData(ticker, tf) {
         const { stockMarkers, qqqMarkers } = calculateMarkers(stockData, qqqData, tf);
         candleSeries.setMarkers(stockMarkers);
         qqqSeries.setMarkers(qqqMarkers);
-        
+
         if (tf === '3m') {
             calculateVolumeProfile(stockData);
         } else {
@@ -230,7 +230,7 @@ async function loadChartData(ticker, tf) {
     if (savedRange && savedRange.from !== undefined) {
         try {
             chart.timeScale().setVisibleLogicalRange(savedRange);
-        } catch(e) {
+        } catch (e) {
             chart.timeScale().fitContent();
         }
     } else {
@@ -242,7 +242,7 @@ let vpLines = [];
 
 function clearVPLines() {
     vpLines.forEach(line => {
-        try { candleSeries.removePriceLine(line); } catch(e) {}
+        try { candleSeries.removePriceLine(line); } catch (e) { }
     });
     vpLines = [];
 }
@@ -250,12 +250,12 @@ function clearVPLines() {
 function calculateVolumeProfile(data) {
     clearVPLines();
     if (!data || data.length === 0) return;
-    
+
     // Split data into days based on > 12 hours gap
     let days = [];
     let currentDay = [];
     let lastTime = 0;
-    
+
     for (let i = 0; i < data.length; i++) {
         if (data[i].time - lastTime > 43200 && lastTime !== 0) {
             if (currentDay.length > 0) days.push(currentDay);
@@ -265,37 +265,37 @@ function calculateVolumeProfile(data) {
         lastTime = data[i].time;
     }
     if (currentDay.length > 0) days.push(currentDay);
-    
+
     function calcProfileForDay(dayData, isToday) {
         if (!dayData || dayData.length === 0) return;
         let high = -Infinity, low = Infinity, totalVol = 0;
-        
+
         dayData.forEach(d => {
             if (d.high > high) high = d.high;
             if (d.low < low) low = d.low;
             totalVol += (d.volume || 0);
         });
-        
+
         if (totalVol === 0 || high === low) return;
-        
+
         const BINS = 100;
         const binSize = (high - low) / BINS;
         let profile = new Array(BINS).fill(0);
-        
+
         dayData.forEach(d => {
             let topBin = Math.floor((d.high - low) / binSize);
             let botBin = Math.floor((d.low - low) / binSize);
             if (topBin >= BINS) topBin = BINS - 1;
             if (botBin < 0) botBin = 0;
-            
+
             let binsCovered = topBin - botBin + 1;
             let volPerBin = (d.volume || 0) / binsCovered;
-            
+
             for (let b = botBin; b <= topBin; b++) {
                 profile[b] += volPerBin;
             }
         });
-        
+
         let maxVol = -1, pocIdx = 0;
         for (let i = 0; i < BINS; i++) {
             if (profile[i] > maxVol) {
@@ -303,9 +303,9 @@ function calculateVolumeProfile(data) {
                 pocIdx = i;
             }
         }
-        
+
         let pocPrice = low + (pocIdx + 0.5) * binSize;
-        
+
         if (isToday) {
             vpLines.push(candleSeries.createPriceLine({ price: pocPrice, color: '#f97316', lineWidth: 2, lineStyle: 0, axisLabelVisible: true, title: 'POC (最大量)' }));
         } else {
@@ -325,20 +325,20 @@ function calculateVolumeProfile(data) {
 function calculateMarkers(stockData, qqqData, tf) {
     let qqqMarkers = [];
     let stockMarkers = [];
-    
+
     let qIndex = 0;
     let sHod = -Infinity, sLod = Infinity;
     let qHod = -Infinity, qLod = Infinity;
     let lastTime = 0;
-    
+
     for (let i = 0; i < stockData.length; i++) {
         let sCandle = stockData[i];
-        
+
         while (qIndex < qqqData.length && qqqData[qIndex].time < sCandle.time) qIndex++;
         if (qIndex >= qqqData.length || qqqData[qIndex].time !== sCandle.time) continue;
-        
+
         let qCandle = qqqData[qIndex];
-        
+
         // Setup initial HOD/LOD for the very first candle of daily chart
         if (tf === '1d' && lastTime === 0) {
             qHod = qCandle.high;
@@ -356,17 +356,17 @@ function calculateMarkers(stockData, qqqData, tf) {
             sHod = sCandle.high;
             sLod = sCandle.low;
             lastTime = sCandle.time;
-            continue; 
+            continue;
         }
         lastTime = sCandle.time;
-        
+
         let isQNewHigh = qCandle.high > qHod;
         let isQNewLow = qCandle.low < qLod;
-        
+
         if (isQNewHigh) {
             qHod = qCandle.high;
             qqqMarkers.push({ time: qCandle.time, position: 'aboveBar', color: '#ef4444', shape: 'arrowDown', text: 'HOD' });
-            
+
             let isSNewHigh = sCandle.high > sHod;
             if (isSNewHigh) {
                 stockMarkers.push({ time: sCandle.time, position: 'aboveBar', color: '#ef4444', shape: 'arrowDown', text: '強:過高' });
@@ -374,11 +374,11 @@ function calculateMarkers(stockData, qqqData, tf) {
                 stockMarkers.push({ time: sCandle.time, position: 'aboveBar', color: '#94a3b8', shape: 'arrowDown', text: '弱:未過高' });
             }
         }
-        
+
         if (isQNewLow) {
             qLod = qCandle.low;
             qqqMarkers.push({ time: qCandle.time, position: 'belowBar', color: '#10b981', shape: 'arrowUp', text: 'LOD' });
-            
+
             let isSNewLow = sCandle.low < sLod;
             if (isSNewLow) {
                 stockMarkers.push({ time: sCandle.time, position: 'belowBar', color: '#10b981', shape: 'arrowUp', text: '弱:破底' });
@@ -386,11 +386,11 @@ function calculateMarkers(stockData, qqqData, tf) {
                 stockMarkers.push({ time: sCandle.time, position: 'belowBar', color: '#f59e0b', shape: 'arrowUp', text: '強:未破底' });
             }
         }
-        
+
         sHod = Math.max(sHod, sCandle.high);
         sLod = Math.min(sLod, sCandle.low);
     }
-    
+
     return { stockMarkers, qqqMarkers };
 }
 
@@ -440,7 +440,7 @@ function updateChartTitle() {
     let mtfTrend60 = globalState.mtf[selectedStock] ? globalState.mtf[selectedStock]['60m'] : '震盪';
     let getDot = (trend) => trend === '多頭' ? '🔴' : trend === '空頭' ? '🟢' : '⚪';
     let dotsHtml = `<span style="font-size:12px; margin-left: 10px; opacity: 0.8;" title="15分K與60分K大環境趨勢">[15m:${getDot(mtfTrend15)} 60m:${getDot(mtfTrend60)}]</span>`;
-    
+
     let extraBadges = '';
     if (typeof momentumData !== 'undefined' && momentumData && momentumData.stocks) {
         let mStock = momentumData.stocks.find(s => s.ticker === selectedStock);
@@ -449,7 +449,7 @@ function updateChartTitle() {
             if (mStock.indicators.pe && mStock.indicators.pe < 20) extraBadges += `<span style="margin-left:6px; font-size:12px; padding:2px 6px; border-radius:4px; background:rgba(59, 130, 246, 0.2); color:#3b82f6; font-weight:600;" title="估值偏低 (PE < 20)">💰 PE ${mStock.indicators.pe}</span>`;
         }
     }
-    
+
     document.getElementById('chart-title').innerHTML =
         `個股分析圖表 — <span class="highlight">${selectedStock}</span>${dotsHtml}${extraBadges}`;
 }
@@ -502,32 +502,32 @@ async function quickSearch(ticker) {
             // Switch to it
             changeChartStock(ticker);
             searchInput.style.borderColor = 'rgba(16,185,129,0.6)';
-            setTimeout(function() { searchInput.style.borderColor = ''; }, 2000);
+            setTimeout(function () { searchInput.style.borderColor = ''; }, 2000);
         } else {
             searchInput.style.borderColor = 'rgba(239,68,68,0.6)';
             searchInput.value = '找不到 ' + ticker;
-            setTimeout(function() { searchInput.value = ''; searchInput.style.borderColor = ''; }, 2000);
+            setTimeout(function () { searchInput.value = ''; searchInput.style.borderColor = ''; }, 2000);
         }
-    } catch(e) {
+    } catch (e) {
         searchInput.style.borderColor = 'rgba(239,68,68,0.6)';
-        setTimeout(function() { searchInput.style.borderColor = ''; }, 2000);
+        setTimeout(function () { searchInput.style.borderColor = ''; }, 2000);
     }
 
     searchBtn.disabled = false;
     searchBtn.textContent = '🔍';
 }
 
-document.getElementById('btn-quick-search').addEventListener('click', function() {
+document.getElementById('btn-quick-search').addEventListener('click', function () {
     quickSearch(document.getElementById('quick-search').value);
 });
-document.getElementById('quick-search').addEventListener('keydown', function(e) {
+document.getElementById('quick-search').addEventListener('keydown', function (e) {
     if (e.key === 'Enter') quickSearch(this.value);
 });
 
 // ==========================================
 // Watchlist Management — 追蹤清單管理
 // ==========================================
-document.getElementById('btn-add-watchlist').addEventListener('click', async function() {
+document.getElementById('btn-add-watchlist').addEventListener('click', async function () {
     var ticker = selectedStock || document.getElementById('quick-search').value.toUpperCase().trim();
     if (!ticker) return;
 
@@ -544,10 +544,10 @@ document.getElementById('btn-add-watchlist').addEventListener('click', async fun
             // Refresh stock list
             refreshStockList(data.stocks);
         }
-    } catch(e) {}
+    } catch (e) { }
 });
 
-document.getElementById('btn-remove-watchlist').addEventListener('click', async function() {
+document.getElementById('btn-remove-watchlist').addEventListener('click', async function () {
     var ticker = selectedStock;
     if (!ticker) return;
 
@@ -563,17 +563,17 @@ document.getElementById('btn-remove-watchlist').addEventListener('click', async 
             setTimeout(() => { this.textContent = '−'; }, 1500);
             refreshStockList(data.stocks);
         }
-    } catch(e) {}
+    } catch (e) { }
 });
 
 function refreshStockList(stocks) {
     // Update the global list
     AI_TECH_STOCKS.length = 0;
-    stocks.forEach(function(s) { AI_TECH_STOCKS.push(s); });
+    stocks.forEach(function (s) { AI_TECH_STOCKS.push(s); });
 
     // Rebuild dropdown
     stockSelector.innerHTML = '';
-    AI_TECH_STOCKS.forEach(function(t) {
+    AI_TECH_STOCKS.forEach(function (t) {
         var opt = document.createElement('option');
         opt.value = t; opt.textContent = t;
         if (t === selectedStock) opt.selected = true;
@@ -677,7 +677,7 @@ function renderDashboard() {
     renderAlerts();
     highlightSelectedNode();
     renderStrengthRanking();
-    
+
     if (globalState.qqqStatus) {
         updateQQQSupportLines(globalState.qqqStatus);
     }
@@ -685,23 +685,23 @@ function renderDashboard() {
 
 function updateQQQSupportLines(status) {
     if (!status) return;
-    
+
     if (status.ma5) document.getElementById('ma5-val').textContent = status.ma5;
     if (status.ma10) document.getElementById('ma10-val').textContent = status.ma10;
     if (status.ma20) document.getElementById('ma20-val').textContent = status.ma20;
-    
+
     if (status.ma5 && !qqqMaLines.ma5) {
         qqqMaLines.ma5 = qqqSeries.createPriceLine({ price: status.ma5, color: '#f59e0b', lineWidth: 1, lineStyle: 2, title: '5MA', axisLabelVisible: true });
     } else if (status.ma5 && qqqMaLines.ma5) {
         qqqMaLines.ma5.applyOptions({ price: status.ma5 });
     }
-    
+
     if (status.ma10 && !qqqMaLines.ma10) {
         qqqMaLines.ma10 = qqqSeries.createPriceLine({ price: status.ma10, color: '#3b82f6', lineWidth: 1, lineStyle: 2, title: '10MA', axisLabelVisible: true });
     } else if (status.ma10 && qqqMaLines.ma10) {
         qqqMaLines.ma10.applyOptions({ price: status.ma10 });
     }
-    
+
     if (status.ma20 && !qqqMaLines.ma20) {
         qqqMaLines.ma20 = qqqSeries.createPriceLine({ price: status.ma20, color: '#8b5cf6', lineWidth: 1, lineStyle: 2, title: '20MA', axisLabelVisible: true });
     } else if (status.ma20 && qqqMaLines.ma20) {
@@ -791,14 +791,14 @@ function renderAlerts() {
     realAlerts.slice(0, 15).forEach(a => {
         let icon = a.type === 'up' ? '🛡️' : a.type === 'down' ? '🔴' : '🔥';
         let cardClass = `alert-card ${a.type || 'surge'}`;
-        
+
         let title = a.title || '';
         let mtfTrend = globalState.mtf[a.symbol] ? globalState.mtf[a.symbol]['60m'] : '震盪';
-        
+
         // Counter-trend logic
         let isBuySignal = title.includes('突破') || title.includes('動能') || title.includes('買');
         let isSellSignal = title.includes('破底') || title.includes('賣');
-        
+
         if (isBuySignal && mtfTrend !== '多頭') {
             title = '⚠️[逆勢] ' + title;
             cardClass += ' counter-trend';
@@ -1114,12 +1114,12 @@ async function updateChartRefreshTime() {
             var el = document.getElementById('chart-refresh-time');
             if (el) el.textContent = '更新: ' + meta.last_updated.split(' ')[1];
         }
-    } catch(e) {}
+    } catch (e) { }
 }
 updateChartRefreshTime();
 
 // Manual refresh button
-document.getElementById('btn-refresh-charts').addEventListener('click', async function() {
+document.getElementById('btn-refresh-charts').addEventListener('click', async function () {
     var btn = this;
     btn.disabled = true;
     btn.textContent = '⏳ 刷新中...';
@@ -1134,13 +1134,13 @@ document.getElementById('btn-refresh-charts').addEventListener('click', async fu
             loadIntradayRS();
             updateChartRefreshTime();
         }
-    } catch(e) { console.warn('Refresh failed:', e); }
+    } catch (e) { console.warn('Refresh failed:', e); }
     btn.disabled = false;
     btn.textContent = '🔄 刷新';
 });
 
 // Auto-reload chart data every 3 minutes (frontend side)
-setInterval(function() {
+setInterval(function () {
     loadChartData(selectedStock, currentTimeframe);
     cachedQQQ3m = null;
     loadIntradayRS();
@@ -1160,7 +1160,7 @@ document.getElementById('btn-send-line')?.addEventListener('click', async () => 
         alert('目前沒有即時警報可以發送');
         return;
     }
-    
+
     const btn = document.getElementById('btn-send-line');
     const originalText = btn.textContent;
     btn.textContent = '發送中...';
@@ -1173,7 +1173,7 @@ document.getElementById('btn-send-line')?.addEventListener('click', async () => 
         msg += `${icon} ${a.symbol} ${a.title} | ${a.desc} | 量: ${a.vol_ratio || '--'}x\n`;
     });
     if (realAlerts.length > 5) msg += `...及其他 ${realAlerts.length - 5} 筆\n`;
-    
+
     try {
         const res = await fetch('/api/send_line', {
             method: 'POST',
@@ -1204,8 +1204,8 @@ let fundamentalsData = {};
 async function downloadFundInstData() {
     var btnF = document.getElementById('btn-download-fund');
     var btnI = document.getElementById('btn-download-inst');
-    if(btnF) { btnF.disabled=true; btnF.textContent='⏳ 下載中...'; }
-    if(btnI) { btnI.disabled=true; btnI.textContent='⏳ 下載中...'; }
+    if (btnF) { btnF.disabled = true; btnF.textContent = '⏳ 下載中...'; }
+    if (btnI) { btnI.disabled = true; btnI.textContent = '⏳ 下載中...'; }
 
     try {
         var res = await fetch('/api/fund_inst', {
@@ -1217,10 +1217,10 @@ async function downloadFundInstData() {
             await loadFundamentalsData();
             await loadInstitutionalData();
         }
-    } catch(e) {}
+    } catch (e) { }
 
-    if(btnF) { btnF.disabled=false; btnF.textContent='⬇️ 下載數據'; }
-    if(btnI) { btnI.disabled=false; btnI.textContent='⬇️ 下載數據'; }
+    if (btnF) { btnF.disabled = false; btnF.textContent = '⬇️ 下載數據'; }
+    if (btnI) { btnI.disabled = false; btnI.textContent = '⬇️ 下載數據'; }
 }
 
 document.getElementById('btn-download-fund')?.addEventListener('click', downloadFundInstData);
@@ -1246,7 +1246,7 @@ function renderFundamentals() {
         if (n) n.textContent = '';
         const s = document.getElementById('fund-sector');
         if (s) s.textContent = '--';
-        ['fund-valuation-grid','fund-profit-grid','fund-growth-grid','fund-market-grid'].forEach(function(id) {
+        ['fund-valuation-grid', 'fund-profit-grid', 'fund-growth-grid', 'fund-market-grid'].forEach(function (id) {
             const e = document.getElementById(id);
             if (e) e.innerHTML = '<div class="fund-metric-card" style="grid-column:1/-1;text-align:center;padding:20px;border:1px dashed rgba(255,255,255,0.1);"><div class="fund-metric-label">尚未下載 (請按上方 ⬇️下載數據 按鈕)</div></div>';
         });
@@ -1259,41 +1259,41 @@ function renderFundamentals() {
     if (s2) s2.textContent = (d.sector || '--') + ' · ' + (d.industry || '');
 
     renderMetricGrid('fund-valuation-grid', [
-        mkM('P/E (TTM)', d.pe_ttm, 'x', {evalPE:true}),
-        mkM('P/E (FWD)', d.pe_fwd, 'x', {evalPE:true, sub: d.pe_ttm&&d.pe_fwd?(d.pe_fwd<d.pe_ttm?'↓ 低於TTM':'↑ 高於TTM'):null, subDir:d.pe_fwd<d.pe_ttm?'up':'down'}),
+        mkM('P/E (TTM)', d.pe_ttm, 'x', { evalPE: true }),
+        mkM('P/E (FWD)', d.pe_fwd, 'x', { evalPE: true, sub: d.pe_ttm && d.pe_fwd ? (d.pe_fwd < d.pe_ttm ? '↓ 低於TTM' : '↑ 高於TTM') : null, subDir: d.pe_fwd < d.pe_ttm ? 'up' : 'down' }),
         mkM('P/S', d.ps, 'x'), mkM('P/B', d.pb, 'x'),
         mkM('PEG', d.peg, ''), mkM('EV/EBITDA', d.ev_ebitda, 'x'),
     ]);
 
     renderMetricGrid('fund-profit-grid', [
-        mkM('EPS (TTM)', d.eps_ttm, '$', {color:d.eps_ttm>0?'up':'down'}),
-        mkM('EPS (FWD)', d.eps_fwd, '$', {sub:d.eps_ttm&&d.eps_fwd?'TTM→FWD '+(d.eps_fwd>d.eps_ttm?'↑':'↓'):null, subDir:d.eps_fwd>d.eps_ttm?'up':'down'}),
-        mkM('營收 (TTM)', d.rev_fmt, '', {raw:true}),
-        mkM('毛利率', d.gross_margin, '%', {evalMargin:true}),
-        mkM('營業利潤率', d.op_margin, '%', {color:d.op_margin>0?'':'down'}),
-        mkM('淨利率', d.net_margin, '%', {color:d.net_margin>0?'':'down'}),
-        mkM('ROE', d.roe, '%', {evalROE:true}),
+        mkM('EPS (TTM)', d.eps_ttm, '$', { color: d.eps_ttm > 0 ? 'up' : 'down' }),
+        mkM('EPS (FWD)', d.eps_fwd, '$', { sub: d.eps_ttm && d.eps_fwd ? 'TTM→FWD ' + (d.eps_fwd > d.eps_ttm ? '↑' : '↓') : null, subDir: d.eps_fwd > d.eps_ttm ? 'up' : 'down' }),
+        mkM('營收 (TTM)', d.rev_fmt, '', { raw: true }),
+        mkM('毛利率', d.gross_margin, '%', { evalMargin: true }),
+        mkM('營業利潤率', d.op_margin, '%', { color: d.op_margin > 0 ? '' : 'down' }),
+        mkM('淨利率', d.net_margin, '%', { color: d.net_margin > 0 ? '' : 'down' }),
+        mkM('ROE', d.roe, '%', { evalROE: true }),
         mkM('ROA', d.roa, '%'),
     ]);
 
     renderMetricGrid('fund-growth-grid', [
-        mkM('營收成長 YoY', d.rev_growth, '%', {sign:true, color:d.rev_growth>0?'up':'down'}),
-        mkM('盈餘成長 YoY', d.earn_growth, '%', {sign:true, color:d.earn_growth>0?'up':'down'}),
-        mkM('負債/權益比', d.de_ratio, '', {evalDE:true}),
-        mkM('流動比率', d.current_ratio, 'x', {evalCR:true}),
-        mkM('自由現金流', d.fcf_fmt, '', {raw:true, color:d.fcf>0?'up':'down'}),
-        mkM('FCF Yield', d.fcf_yield, '%', {color:d.fcf_yield>0?'up':'down'}),
+        mkM('營收成長 YoY', d.rev_growth, '%', { sign: true, color: d.rev_growth > 0 ? 'up' : 'down' }),
+        mkM('盈餘成長 YoY', d.earn_growth, '%', { sign: true, color: d.earn_growth > 0 ? 'up' : 'down' }),
+        mkM('負債/權益比', d.de_ratio, '', { evalDE: true }),
+        mkM('流動比率', d.current_ratio, 'x', { evalCR: true }),
+        mkM('自由現金流', d.fcf_fmt, '', { raw: true, color: d.fcf > 0 ? 'up' : 'down' }),
+        mkM('FCF Yield', d.fcf_yield, '%', { color: d.fcf_yield > 0 ? 'up' : 'down' }),
     ]);
 
     var mkt = [
-        mkM('市值', d.mcap_fmt, '', {raw:true}),
+        mkM('市值', d.mcap_fmt, '', { raw: true }),
         mkM('Beta', d.beta, ''),
-        mkM('距52W高', d.pct_h52, '%', {sign:true, color:'down'}),
-        mkM('距52W低', d.pct_l52, '%', {sign:true, color:'up'}),
+        mkM('距52W高', d.pct_h52, '%', { sign: true, color: 'down' }),
+        mkM('距52W低', d.pct_l52, '%', { sign: true, color: 'up' }),
         mkM('股息率', d.div_yield, '%'),
-        mkM('分析師目標', d.target, '$', {sub:d.upside!=null?'潛在 '+(d.upside>0?'+':'')+d.upside+'%':null, subDir:d.upside>0?'up':'down'}),
+        mkM('分析師目標', d.target, '$', { sub: d.upside != null ? '潛在 ' + (d.upside > 0 ? '+' : '') + d.upside + '%' : null, subDir: d.upside > 0 ? 'up' : 'down' }),
         mkM('分析師人數', d.analysts, '人'),
-        {label:'建議', value:d.rec, isBadge:true}
+        { label: '建議', value: d.rec, isBadge: true }
     ];
     renderMetricGrid('fund-market-grid', mkt);
 
@@ -1306,7 +1306,7 @@ function renderFundamentals() {
 }
 
 function mkM(label, value, fmt, opts) {
-    var m = {label:label, value:value, fmt:fmt||''};
+    var m = { label: label, value: value, fmt: fmt || '' };
     if (opts) Object.assign(m, opts);
     return m;
 }
@@ -1315,39 +1315,39 @@ function renderMetricGrid(cid, metrics) {
     var el = document.getElementById(cid);
     if (!el) return;
     el.innerHTML = '';
-    var recMap = {buy:'Buy',strong_buy:'Strong Buy',hold:'Hold',sell:'Sell',strong_sell:'Strong Sell',underperform:'Sell',outperform:'Buy'};
+    var recMap = { buy: 'Buy', strong_buy: 'Strong Buy', hold: 'Hold', sell: 'Sell', strong_sell: 'Strong Sell', underperform: 'Sell', outperform: 'Buy' };
 
-    metrics.forEach(function(m) {
+    metrics.forEach(function (m) {
         var card = document.createElement('div');
         card.className = 'fund-metric-card';
 
-        if (m.evalPE && m.value) card.className += m.value<20?' val-good':m.value>50?' val-bad':' val-warn';
-        if (m.evalMargin && m.value) card.className += m.value>=40?' val-good':m.value>=20?' val-warn':' val-bad';
-        if (m.evalROE && m.value) card.className += m.value>=20?' val-good':m.value>=10?' val-warn':' val-bad';
-        if (m.evalDE && m.value!=null) card.className += m.value<50?' val-good':m.value>150?' val-bad':' val-warn';
-        if (m.evalCR && m.value) card.className += m.value>=1.5?' val-good':m.value>=1?' val-warn':' val-bad';
+        if (m.evalPE && m.value) card.className += m.value < 20 ? ' val-good' : m.value > 50 ? ' val-bad' : ' val-warn';
+        if (m.evalMargin && m.value) card.className += m.value >= 40 ? ' val-good' : m.value >= 20 ? ' val-warn' : ' val-bad';
+        if (m.evalROE && m.value) card.className += m.value >= 20 ? ' val-good' : m.value >= 10 ? ' val-warn' : ' val-bad';
+        if (m.evalDE && m.value != null) card.className += m.value < 50 ? ' val-good' : m.value > 150 ? ' val-bad' : ' val-warn';
+        if (m.evalCR && m.value) card.className += m.value >= 1.5 ? ' val-good' : m.value >= 1 ? ' val-warn' : ' val-bad';
 
         if (m.isBadge) {
-            var rc = (m.value&&(m.value.includes('buy')||m.value==='outperform'))?'buy':(m.value&&(m.value.includes('sell')||m.value==='underperform'))?'sell':'hold';
-            card.innerHTML = '<div class="fund-metric-label">'+m.label+'</div><div style="margin-top:4px"><span class="fund-rec-badge '+rc+'">'+(recMap[m.value]||m.value||'--')+'</span></div>';
+            var rc = (m.value && (m.value.includes('buy') || m.value === 'outperform')) ? 'buy' : (m.value && (m.value.includes('sell') || m.value === 'underperform')) ? 'sell' : 'hold';
+            card.innerHTML = '<div class="fund-metric-label">' + m.label + '</div><div style="margin-top:4px"><span class="fund-rec-badge ' + rc + '">' + (recMap[m.value] || m.value || '--') + '</span></div>';
             el.appendChild(card);
             return;
         }
 
         var dv;
-        if (m.value==null) { dv='--'; }
-        else if (m.raw) { dv=m.value; }
+        if (m.value == null) { dv = '--'; }
+        else if (m.raw) { dv = m.value; }
         else {
-            var pre = m.fmt==='$'?'$':'';
-            var suf = m.fmt==='%'?'%':m.fmt==='x'?'x':m.fmt==='人'?'人':'';
-            var sg = m.sign&&m.value>0?'+':'';
-            if(m.fmt==='$') suf='';
-            dv = pre+sg+m.value+suf;
+            var pre = m.fmt === '$' ? '$' : '';
+            var suf = m.fmt === '%' ? '%' : m.fmt === 'x' ? 'x' : m.fmt === '人' ? '人' : '';
+            var sg = m.sign && m.value > 0 ? '+' : '';
+            if (m.fmt === '$') suf = '';
+            dv = pre + sg + m.value + suf;
         }
 
-        var vc = m.value==null?'muted':(m.color||'');
-        var sub = m.sub ? '<div class="fund-metric-sub '+(m.subDir||'')+'">' + m.sub + '</div>' : '';
-        card.innerHTML = '<div class="fund-metric-label">'+m.label+'</div><div class="fund-metric-value '+vc+'">'+dv+'</div>'+sub;
+        var vc = m.value == null ? 'muted' : (m.color || '');
+        var sub = m.sub ? '<div class="fund-metric-sub ' + (m.subDir || '') + '">' + m.sub + '</div>' : '';
+        card.innerHTML = '<div class="fund-metric-label">' + m.label + '</div><div class="fund-metric-value ' + vc + '">' + dv + '</div>' + sub;
         el.appendChild(card);
     });
 }
@@ -1356,38 +1356,38 @@ function renderFundBarChart(cid, quarters, field, fmtField, yoyField, suffix) {
     var el = document.getElementById(cid);
     if (!el) return;
     el.innerHTML = '';
-    if (!quarters || quarters.length===0) {
+    if (!quarters || quarters.length === 0) {
         el.innerHTML = '<div style="color:var(--text-muted);font-size:12px;text-align:center;padding:40px 0">暫無季度數據</div>';
         return;
     }
-    var qs = quarters.slice(0,8).reverse();
-    var values = qs.map(function(q){return q[field]}).filter(function(v){return v!=null});
-    if (values.length===0) { el.innerHTML='<div style="color:var(--text-muted);font-size:12px;text-align:center;padding:40px 0">暫無數據</div>'; return; }
-    var maxVal = Math.max.apply(null, values.map(function(v){return Math.abs(v)}));
+    var qs = quarters.slice(0, 8).reverse();
+    var values = qs.map(function (q) { return q[field] }).filter(function (v) { return v != null });
+    if (values.length === 0) { el.innerHTML = '<div style="color:var(--text-muted);font-size:12px;text-align:center;padding:40px 0">暫無數據</div>'; return; }
+    var maxVal = Math.max.apply(null, values.map(function (v) { return Math.abs(v) }));
 
-    qs.forEach(function(q) {
+    qs.forEach(function (q) {
         var val = q[field];
-        if (val==null) return;
+        if (val == null) return;
         var col = document.createElement('div');
         col.className = 'fund-bar-col';
-        var barH = maxVal>0 ? Math.max(3,(Math.abs(val)/maxVal)*100) : 3;
+        var barH = maxVal > 0 ? Math.max(3, (Math.abs(val) / maxVal) * 100) : 3;
         var bar = document.createElement('div');
-        bar.className = 'fund-bar '+(val>=0?'positive':'negative');
-        bar.style.height = barH+'%';
-        if (yoyField && q[yoyField]!=null) {
+        bar.className = 'fund-bar ' + (val >= 0 ? 'positive' : 'negative');
+        bar.style.height = barH + '%';
+        if (yoyField && q[yoyField] != null) {
             var yoy = document.createElement('span');
-            yoy.className = 'fund-bar-yoy '+(q[yoyField]>=0?'up':'down');
-            yoy.textContent = (q[yoyField]>0?'+':'')+q[yoyField]+'%';
+            yoy.className = 'fund-bar-yoy ' + (q[yoyField] >= 0 ? 'up' : 'down');
+            yoy.textContent = (q[yoyField] > 0 ? '+' : '') + q[yoyField] + '%';
             bar.appendChild(yoy);
         }
         var vl = document.createElement('div');
         vl.className = 'fund-bar-value';
-        if (fmtField && q[fmtField]) vl.textContent=q[fmtField];
-        else if (suffix) vl.textContent=val+suffix;
-        else vl.textContent=typeof val==='number'?(Math.abs(val)>=1e9?(val/1e9).toFixed(1)+'B':val.toFixed(2)):val;
+        if (fmtField && q[fmtField]) vl.textContent = q[fmtField];
+        else if (suffix) vl.textContent = val + suffix;
+        else vl.textContent = typeof val === 'number' ? (Math.abs(val) >= 1e9 ? (val / 1e9).toFixed(1) + 'B' : val.toFixed(2)) : val;
         var ql = document.createElement('div');
         ql.className = 'fund-bar-label';
-        ql.textContent = q.label||'';
+        ql.textContent = q.label || '';
         col.appendChild(vl); col.appendChild(bar); col.appendChild(ql);
         el.appendChild(col);
     });
@@ -1396,21 +1396,21 @@ function renderFundBarChart(cid, quarters, field, fmtField, yoyField, suffix) {
 function renderTargetBar(cid, lo, hi, cur, target, rec, analysts) {
     var el = document.getElementById(cid);
     if (!el) return;
-    if (!lo||!hi||!cur) { el.innerHTML='<div style="color:var(--text-muted);font-size:12px">暫無分析師數據</div>'; return; }
-    var range=hi-lo, curPct=range>0?Math.min(100,Math.max(0,((cur-lo)/range)*100)):50;
-    var tPct=target&&range>0?Math.min(100,Math.max(0,((target-lo)/range)*100)):null;
-    var recMap={buy:'Buy',strong_buy:'Strong Buy',hold:'Hold',sell:'Sell',strong_sell:'Strong Sell',underperform:'Sell',outperform:'Buy'};
-    var rc=(rec&&(rec.includes('buy')||rec==='outperform'))?'buy':(rec&&(rec.includes('sell')||rec==='underperform'))?'sell':'hold';
-    var tDot=tPct!=null?'<div style="position:absolute;top:50%;left:'+tPct+'%;transform:translate(-50%,-50%);width:10px;height:10px;border-radius:50%;background:var(--color-surge);border:2px solid #fff;z-index:1" title="目標價 $'+target+'"></div>':'';
-    el.innerHTML='<div class="fund-range-bar-wrap"><div class="fund-range-fill" style="left:0;width:100%"></div><div class="fund-range-dot" style="left:'+curPct+'%"><div class="fund-range-current">$'+cur+'</div></div>'+tDot+'</div><div class="fund-range-labels"><span>最低 $'+lo+'</span>'+(target?'<span style="color:var(--color-surge)">目標 $'+target+'</span>':'')+'<span>最高 $'+hi+'</span></div><div class="fund-range-info"><span class="fund-rec-badge '+rc+'">'+(recMap[rec]||rec||'--')+'</span><span>'+(analysts||0)+' 位分析師</span></div>';
+    if (!lo || !hi || !cur) { el.innerHTML = '<div style="color:var(--text-muted);font-size:12px">暫無分析師數據</div>'; return; }
+    var range = hi - lo, curPct = range > 0 ? Math.min(100, Math.max(0, ((cur - lo) / range) * 100)) : 50;
+    var tPct = target && range > 0 ? Math.min(100, Math.max(0, ((target - lo) / range) * 100)) : null;
+    var recMap = { buy: 'Buy', strong_buy: 'Strong Buy', hold: 'Hold', sell: 'Sell', strong_sell: 'Strong Sell', underperform: 'Sell', outperform: 'Buy' };
+    var rc = (rec && (rec.includes('buy') || rec === 'outperform')) ? 'buy' : (rec && (rec.includes('sell') || rec === 'underperform')) ? 'sell' : 'hold';
+    var tDot = tPct != null ? '<div style="position:absolute;top:50%;left:' + tPct + '%;transform:translate(-50%,-50%);width:10px;height:10px;border-radius:50%;background:var(--color-surge);border:2px solid #fff;z-index:1" title="目標價 $' + target + '"></div>' : '';
+    el.innerHTML = '<div class="fund-range-bar-wrap"><div class="fund-range-fill" style="left:0;width:100%"></div><div class="fund-range-dot" style="left:' + curPct + '%"><div class="fund-range-current">$' + cur + '</div></div>' + tDot + '</div><div class="fund-range-labels"><span>最低 $' + lo + '</span>' + (target ? '<span style="color:var(--color-surge)">目標 $' + target + '</span>' : '') + '<span>最高 $' + hi + '</span></div><div class="fund-range-info"><span class="fund-rec-badge ' + rc + '">' + (recMap[rec] || rec || '--') + '</span><span>' + (analysts || 0) + ' 位分析師</span></div>';
 }
 
 function render52WBar(cid, lo, hi, cur, pctH) {
     var el = document.getElementById(cid);
     if (!el) return;
-    if (!lo||!hi||!cur) { el.innerHTML='<div style="color:var(--text-muted);font-size:12px">暫無數據</div>'; return; }
-    var range=hi-lo, curPct=range>0?Math.min(100,Math.max(0,((cur-lo)/range)*100)):50;
-    el.innerHTML='<div class="fund-range-bar-wrap"><div class="fund-range-fill" style="left:0;width:'+curPct+'%"></div><div class="fund-range-dot" style="left:'+curPct+'%"><div class="fund-range-current">$'+cur+'</div></div></div><div class="fund-range-labels"><span>52W低 $'+lo+'</span><span>52W高 $'+hi+'</span></div><div class="fund-range-info"><span>距高點: '+(pctH!=null?pctH+'%':'--')+'</span><span>區間位置: '+curPct.toFixed(0)+'%</span></div>';
+    if (!lo || !hi || !cur) { el.innerHTML = '<div style="color:var(--text-muted);font-size:12px">暫無數據</div>'; return; }
+    var range = hi - lo, curPct = range > 0 ? Math.min(100, Math.max(0, ((cur - lo) / range) * 100)) : 50;
+    el.innerHTML = '<div class="fund-range-bar-wrap"><div class="fund-range-fill" style="left:0;width:' + curPct + '%"></div><div class="fund-range-dot" style="left:' + curPct + '%"><div class="fund-range-current">$' + cur + '</div></div></div><div class="fund-range-labels"><span>52W低 $' + lo + '</span><span>52W高 $' + hi + '</span></div><div class="fund-range-info"><span>距高點: ' + (pctH != null ? pctH + '%' : '--') + '</span><span>區間位置: ' + curPct.toFixed(0) + '%</span></div>';
 }
 
 // ==========================================
@@ -1436,7 +1436,7 @@ function renderInstitutional() {
     if (nEl) nEl.textContent = d ? (d.name || '') : '';
 
     if (!d) {
-        ['inst-ownership','inst-short','inst-insider-summary','inst-holders-table','inst-insider-table'].forEach(function(id){
+        ['inst-ownership', 'inst-short', 'inst-insider-summary', 'inst-holders-table', 'inst-insider-table'].forEach(function (id) {
             var e = document.getElementById(id);
             if (e) e.innerHTML = '<div style="color:var(--text-muted);font-size:12px;padding:30px;text-align:center;border:1px dashed rgba(255,255,255,0.1);border-radius:10px;">尚未下載 (請按上方 ⬇️下載數據 按鈕)</div>';
         });
@@ -1458,34 +1458,34 @@ function renderOwnership(own) {
     var ret = own.retail_pct || 0;
     var total = inst + ins + ret;
     if (total === 0) { el.innerHTML = '<div style="color:var(--text-muted);font-size:12px">暫無數據</div>'; return; }
-    var a1 = (inst/total)*360;
-    var a2 = (ins/total)*360;
-    var a3 = (ret/total)*360;
-    var g = 'conic-gradient(#3b82f6 0deg '+a1+'deg, #f59e0b '+a1+'deg '+(a1+a2)+'deg, #64748b '+(a1+a2)+'deg 360deg)';
-    el.innerHTML = '<div class="inst-donut-row"><div class="inst-donut" style="background:'+g+'"><div class="inst-donut-center"><span>持股</span><strong>'+total.toFixed(0)+'%</strong></div></div><div class="inst-legend"><div class="inst-legend-item"><div class="inst-legend-dot" style="background:#3b82f6"></div>機構 Institutional<span class="inst-legend-pct">'+inst+'%</span></div><div class="inst-legend-item"><div class="inst-legend-dot" style="background:#f59e0b"></div>內部人 Insider<span class="inst-legend-pct">'+ins+'%</span></div><div class="inst-legend-item"><div class="inst-legend-dot" style="background:#64748b"></div>散戶 Retail<span class="inst-legend-pct">'+ret+'%</span></div>'+(own.institutional_count?'<div style="font-size:11px;color:var(--text-muted);margin-top:4px">機構數: '+own.institutional_count+' 家</div>':'')+'</div></div>';
+    var a1 = (inst / total) * 360;
+    var a2 = (ins / total) * 360;
+    var a3 = (ret / total) * 360;
+    var g = 'conic-gradient(#3b82f6 0deg ' + a1 + 'deg, #f59e0b ' + a1 + 'deg ' + (a1 + a2) + 'deg, #64748b ' + (a1 + a2) + 'deg 360deg)';
+    el.innerHTML = '<div class="inst-donut-row"><div class="inst-donut" style="background:' + g + '"><div class="inst-donut-center"><span>持股</span><strong>' + total.toFixed(0) + '%</strong></div></div><div class="inst-legend"><div class="inst-legend-item"><div class="inst-legend-dot" style="background:#3b82f6"></div>機構 Institutional<span class="inst-legend-pct">' + inst + '%</span></div><div class="inst-legend-item"><div class="inst-legend-dot" style="background:#f59e0b"></div>內部人 Insider<span class="inst-legend-pct">' + ins + '%</span></div><div class="inst-legend-item"><div class="inst-legend-dot" style="background:#64748b"></div>散戶 Retail<span class="inst-legend-pct">' + ret + '%</span></div>' + (own.institutional_count ? '<div style="font-size:11px;color:var(--text-muted);margin-top:4px">機構數: ' + own.institutional_count + ' 家</div>' : '') + '</div></div>';
 }
 
 function renderShortInterest(s) {
     var el = document.getElementById('inst-short');
     if (!el || !s) return;
-    var sqMap = {high:'🔴 高風險 — 軋空可能',medium:'🟡 中等 — 持續觀察',low:'🟢 低風險'};
-    el.innerHTML = '<div class="inst-short-grid"><div class="inst-short-row"><span class="inst-short-label">放空股數</span><span class="inst-short-val">'+(s.shares_short_fmt||'--')+'</span></div><div class="inst-short-row"><span class="inst-short-label">放空佔流通股 %</span><span class="inst-short-val">'+(s.short_pct!=null?s.short_pct+'%':'--')+'</span></div><div class="inst-short-row"><span class="inst-short-label">空頭回補天數</span><span class="inst-short-val">'+(s.short_ratio!=null?s.short_ratio+'天':'--')+'</span></div><div class="inst-short-row"><span class="inst-short-label">流通股數</span><span class="inst-short-val" style="font-size:14px">'+(s.float_shares_fmt||'--')+'</span></div><div class="inst-squeeze-badge '+s.squeeze_risk+'">'+(sqMap[s.squeeze_risk]||'--')+'</div></div>';
+    var sqMap = { high: '🔴 高風險 — 軋空可能', medium: '🟡 中等 — 持續觀察', low: '🟢 低風險' };
+    el.innerHTML = '<div class="inst-short-grid"><div class="inst-short-row"><span class="inst-short-label">放空股數</span><span class="inst-short-val">' + (s.shares_short_fmt || '--') + '</span></div><div class="inst-short-row"><span class="inst-short-label">放空佔流通股 %</span><span class="inst-short-val">' + (s.short_pct != null ? s.short_pct + '%' : '--') + '</span></div><div class="inst-short-row"><span class="inst-short-label">空頭回補天數</span><span class="inst-short-val">' + (s.short_ratio != null ? s.short_ratio + '天' : '--') + '</span></div><div class="inst-short-row"><span class="inst-short-label">流通股數</span><span class="inst-short-val" style="font-size:14px">' + (s.float_shares_fmt || '--') + '</span></div><div class="inst-squeeze-badge ' + s.squeeze_risk + '">' + (sqMap[s.squeeze_risk] || '--') + '</div></div>';
 }
 
 function renderInsiderSummary(ins) {
     var el = document.getElementById('inst-insider-summary');
     if (!el || !ins) return;
-    var sentMap = {bullish:'🟢 偏多 — 內部人淨買入',bearish:'🔴 偏空 — 內部人淨賣出',neutral:'⚪ 中性'};
-    el.innerHTML = '<div class="inst-insider-stat"><div class="inst-stat-box"><div class="stat-label">買入</div><div class="stat-val up">'+ins.buy_count+'</div><div class="stat-sub">'+(ins.buy_total_fmt||'$0')+'</div></div><div class="inst-stat-box"><div class="stat-label">賣出</div><div class="stat-val down">'+ins.sell_count+'</div><div class="stat-sub">'+(ins.sell_total_fmt||'$0')+'</div></div></div><div class="inst-sentiment-badge '+ins.net_sentiment+'">'+(sentMap[ins.net_sentiment]||'--')+'</div>';
+    var sentMap = { bullish: '🟢 偏多 — 內部人淨買入', bearish: '🔴 偏空 — 內部人淨賣出', neutral: '⚪ 中性' };
+    el.innerHTML = '<div class="inst-insider-stat"><div class="inst-stat-box"><div class="stat-label">買入</div><div class="stat-val up">' + ins.buy_count + '</div><div class="stat-sub">' + (ins.buy_total_fmt || '$0') + '</div></div><div class="inst-stat-box"><div class="stat-label">賣出</div><div class="stat-val down">' + ins.sell_count + '</div><div class="stat-sub">' + (ins.sell_total_fmt || '$0') + '</div></div></div><div class="inst-sentiment-badge ' + ins.net_sentiment + '">' + (sentMap[ins.net_sentiment] || '--') + '</div>';
 }
 
 function renderTopHolders(holders) {
     var el = document.getElementById('inst-holders-table');
     if (!el) return;
-    if (!holders || holders.length===0) { el.innerHTML='<div style="color:var(--text-muted);font-size:12px;padding:16px">暫無機構持股數據</div>'; return; }
+    if (!holders || holders.length === 0) { el.innerHTML = '<div style="color:var(--text-muted);font-size:12px;padding:16px">暫無機構持股數據</div>'; return; }
     var html = '<table class="inst-table"><thead><tr><th>#</th><th>機構名稱</th><th>持股數</th><th>持股金額</th><th>佔比</th><th>申報日</th></tr></thead><tbody>';
-    holders.forEach(function(h,i) {
-        html += '<tr><td>'+(i+1)+'</td><td>'+h.name+'</td><td>'+(h.shares_fmt||'--')+'</td><td>'+(h.value_fmt||'--')+'</td><td>'+(h.pct!=null?h.pct+'%':'--')+'</td><td>'+(h.date||'--')+'</td></tr>';
+    holders.forEach(function (h, i) {
+        html += '<tr><td>' + (i + 1) + '</td><td>' + h.name + '</td><td>' + (h.shares_fmt || '--') + '</td><td>' + (h.value_fmt || '--') + '</td><td>' + (h.pct != null ? h.pct + '%' : '--') + '</td><td>' + (h.date || '--') + '</td></tr>';
     });
     html += '</tbody></table>';
     el.innerHTML = html;
@@ -1494,12 +1494,12 @@ function renderTopHolders(holders) {
 function renderInsiderTable(ins) {
     var el = document.getElementById('inst-insider-table');
     if (!el) return;
-    if (!ins || !ins.trades || ins.trades.length===0) { el.innerHTML='<div style="color:var(--text-muted);font-size:12px;padding:16px">暫無內部人交易紀錄</div>'; return; }
+    if (!ins || !ins.trades || ins.trades.length === 0) { el.innerHTML = '<div style="color:var(--text-muted);font-size:12px;padding:16px">暫無內部人交易紀錄</div>'; return; }
     var html = '<table class="inst-table"><thead><tr><th>日期</th><th>內部人</th><th>買/賣</th><th>股數</th><th>金額</th><th>說明</th></tr></thead><tbody>';
-    ins.trades.forEach(function(t) {
-        var ac = t.action==='buy'?'inst-trade-buy':t.action==='sell'?'inst-trade-sell':'inst-trade-other';
-        var labelMap = {buy:'買入',sell:'賣出',exercise:'行權',grant:'授予',gift:'贈予',other:'其他'};
-        html += '<tr><td>'+t.date+'</td><td style="max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+t.insider+'">'+t.insider+'</td><td class="'+ac+'">'+(labelMap[t.action]||'其他')+'</td><td>'+(t.shares_fmt||'--')+'</td><td>'+(t.value_fmt||'--')+'</td><td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+t.desc+'">'+t.desc+'</td></tr>';
+    ins.trades.forEach(function (t) {
+        var ac = t.action === 'buy' ? 'inst-trade-buy' : t.action === 'sell' ? 'inst-trade-sell' : 'inst-trade-other';
+        var labelMap = { buy: '買入', sell: '賣出', exercise: '行權', grant: '授予', gift: '贈予', other: '其他' };
+        html += '<tr><td>' + t.date + '</td><td style="max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + t.insider + '">' + t.insider + '</td><td class="' + ac + '">' + (labelMap[t.action] || '其他') + '</td><td>' + (t.shares_fmt || '--') + '</td><td>' + (t.value_fmt || '--') + '</td><td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + t.desc + '">' + t.desc + '</td></tr>';
     });
     html += '</tbody></table>';
     el.innerHTML = html;
@@ -1515,78 +1515,80 @@ async function loadIntradayRS() {
         try {
             var qRes = await fetch('charts/QQQ_3m.json?t=' + Date.now());
             if (qRes.ok) cachedQQQ3m = await qRes.json();
-        } catch(e) {}
+        } catch (e) { }
     }
     if (!cachedQQQ3m || cachedQQQ3m.length < 2) return;
     var qqqData = cachedQQQ3m;
     var todayQQQ = qqqData.slice(findTodayStart(qqqData));
-    var promises = AI_TECH_STOCKS.map(function(ticker) {
+    var promises = AI_TECH_STOCKS.map(function (ticker) {
         return fetch('charts/' + ticker + '_3m.json?t=' + Date.now())
-            .then(function(r) { return r.ok ? r.json() : null; })
-            .then(function(data) {
+            .then(function (r) { return r.ok ? r.json() : null; })
+            .then(function (data) {
                 if (!data || data.length < 2) return null;
                 var ts = findTodayStart(data);
                 var todayData = data.slice(ts);
                 var a = analyzeStrength(todayData, todayQQQ);
-                var ret = todayData.length > 0 ? ((todayData[todayData.length-1].close - todayData[0].open) / todayData[0].open * 100) : 0;
-                return { ticker:ticker, ret:ret, strong:a.strong, weak:a.weak, net:a.strong-a.weak,
-                    label: a.strong>a.weak?'強':a.weak>a.strong?'弱':'中' };
-            }).catch(function() { return null; });
+                var ret = todayData.length > 0 ? ((todayData[todayData.length - 1].close - todayData[0].open) / todayData[0].open * 100) : 0;
+                return {
+                    ticker: ticker, ret: ret, strong: a.strong, weak: a.weak, net: a.strong - a.weak,
+                    label: a.strong > a.weak ? '強' : a.weak > a.strong ? '弱' : '中'
+                };
+            }).catch(function () { return null; });
     });
     var all = await Promise.all(promises);
-    intradayRS = all.filter(function(x) { return x !== null; });
-    intradayRS.sort(function(a, b) { return b.net !== a.net ? b.net - a.net : b.ret - a.ret; });
+    intradayRS = all.filter(function (x) { return x !== null; });
+    intradayRS.sort(function (a, b) { return b.net !== a.net ? b.net - a.net : b.ret - a.ret; });
     renderStrengthRanking();
     renderSectorStrength();
 }
 
 function analyzeStrength(sData, qData) {
-    var strong=0, weak=0, qi=0, sH=-Infinity, sL=Infinity, qH=-Infinity, qL=Infinity, lt=0;
-    for (var i=0; i<sData.length; i++) {
-        var s=sData[i];
-        while (qi<qData.length && qData[qi].time<s.time) qi++;
-        if (qi>=qData.length || qData[qi].time!==s.time) continue;
-        var q=qData[qi];
-        if (s.time-lt>43200) { qH=q.high; qL=q.low; sH=s.high; sL=s.low; lt=s.time; continue; }
-        lt=s.time;
-        if (q.high>qH) { qH=q.high; if(s.high>sH) strong++; else weak++; }
-        if (q.low<qL) { qL=q.low; if(s.low<sL) weak++; else strong++; }
-        sH=Math.max(sH,s.high); sL=Math.min(sL,s.low);
+    var strong = 0, weak = 0, qi = 0, sH = -Infinity, sL = Infinity, qH = -Infinity, qL = Infinity, lt = 0;
+    for (var i = 0; i < sData.length; i++) {
+        var s = sData[i];
+        while (qi < qData.length && qData[qi].time < s.time) qi++;
+        if (qi >= qData.length || qData[qi].time !== s.time) continue;
+        var q = qData[qi];
+        if (s.time - lt > 43200) { qH = q.high; qL = q.low; sH = s.high; sL = s.low; lt = s.time; continue; }
+        lt = s.time;
+        if (q.high > qH) { qH = q.high; if (s.high > sH) strong++; else weak++; }
+        if (q.low < qL) { qL = q.low; if (s.low < sL) weak++; else strong++; }
+        sH = Math.max(sH, s.high); sL = Math.min(sL, s.low);
     }
-    return {strong:strong, weak:weak};
+    return { strong: strong, weak: weak };
 }
 
 function findTodayStart(data) {
-    for (var i=data.length-1; i>0; i--) { if(data[i].time-data[i-1].time>43200) return i; }
+    for (var i = data.length - 1; i > 0; i--) { if (data[i].time - data[i - 1].time > 43200) return i; }
     return 0;
 }
 
 function renderStrengthRanking() {
     var el = document.getElementById('rs-strength-list');
     if (!el) return;
-    if (intradayRS.length===0) { el.innerHTML='<div style="color:var(--text-muted);font-size:12px;padding:12px;text-align:center">載入中...</div>'; return; }
+    if (intradayRS.length === 0) { el.innerHTML = '<div style="color:var(--text-muted);font-size:12px;padding:12px;text-align:center">載入中...</div>'; return; }
     el.innerHTML = '';
-    intradayRS.forEach(function(item, i) {
+    intradayRS.forEach(function (item, i) {
         var div = document.createElement('div');
         div.className = 'rs-item';
-        div.onclick = function() { changeChartStock(item.ticker); };
-        var retClass = item.ret>=0?'up':'down';
+        div.onclick = function () { changeChartStock(item.ticker); };
+        var retClass = item.ret >= 0 ? 'up' : 'down';
         var badge = '';
-        if (item.label==='強') badge='<span class="rs-hod-badge" style="background:rgba(239,68,68,0.15);color:#ef4444">強'+item.strong+'</span>';
-        else if (item.label==='弱') badge='<span class="rs-hod-badge" style="background:rgba(16,185,129,0.15);color:#10b981">弱'+item.weak+'</span>';
-        else badge='<span class="rs-hod-badge">中</span>';
-        var netClass = item.net>0?'up':item.net<0?'down':'';
-        var netText = item.net>0?'+'+item.net:item.net===0?'0':''+item.net;
-        
+        if (item.label === '強') badge = '<span class="rs-hod-badge" style="background:rgba(239,68,68,0.15);color:#ef4444">強' + item.strong + '</span>';
+        else if (item.label === '弱') badge = '<span class="rs-hod-badge" style="background:rgba(16,185,129,0.15);color:#10b981">弱' + item.weak + '</span>';
+        else badge = '<span class="rs-hod-badge">中</span>';
+        var netClass = item.net > 0 ? 'up' : item.net < 0 ? 'down' : '';
+        var netText = item.net > 0 ? '+' + item.net : item.net === 0 ? '0' : '' + item.net;
+
         var mtfTrend15 = globalState.mtf[item.ticker] ? globalState.mtf[item.ticker]['15m'] : '震盪';
         var mtfTrend60 = globalState.mtf[item.ticker] ? globalState.mtf[item.ticker]['60m'] : '震盪';
-        var getDot = function(t) { return t === '多頭' ? '🔴' : t === '空頭' ? '🟢' : '⚪'; };
-        var trendDots = '<span style="font-size:8px; margin-left:4px;" title="15m/60m">'+getDot(mtfTrend15)+getDot(mtfTrend60)+'</span>';
+        var getDot = function (t) { return t === '多頭' ? '🔴' : t === '空頭' ? '🟢' : '⚪'; };
+        var trendDots = '<span style="font-size:8px; margin-left:4px;" title="15m/60m">' + getDot(mtfTrend15) + getDot(mtfTrend60) + '</span>';
 
-        div.innerHTML = '<span class="rs-rank">'+(i+1)+'</span><span class="rs-ticker">'+item.ticker+trendDots+'</span>'+badge+
-            '<span class="rs-ret '+retClass+'">'+(item.ret>=0?'+':'')+item.ret.toFixed(1)+'%</span>'+
-            '<span class="rs-rs '+netClass+'">'+netText+'</span>';
-        if (item.ticker===selectedStock) { div.style.background='rgba(139,92,246,0.1)'; div.style.border='1px solid rgba(139,92,246,0.3)'; }
+        div.innerHTML = '<span class="rs-rank">' + (i + 1) + '</span><span class="rs-ticker">' + item.ticker + trendDots + '</span>' + badge +
+            '<span class="rs-ret ' + retClass + '">' + (item.ret >= 0 ? '+' : '') + item.ret.toFixed(1) + '%</span>' +
+            '<span class="rs-rs ' + netClass + '">' + netText + '</span>';
+        if (item.ticker === selectedStock) { div.style.background = 'rgba(139,92,246,0.1)'; div.style.border = '1px solid rgba(139,92,246,0.3)'; }
         el.appendChild(div);
     });
 }
@@ -1632,23 +1634,23 @@ function renderSectorStrength() {
                 avgRet: avgRet,
                 strong: sectorData[sector].strong,
                 weak: sectorData[sector].weak,
-                stocks: sectorData[sector].stocks.sort((a,b) => b.ret - a.ret)
+                stocks: sectorData[sector].stocks.sort((a, b) => b.ret - a.ret)
             });
         }
     });
 
-    sortedSectors.sort((a,b) => b.avgRet - a.avgRet);
+    sortedSectors.sort((a, b) => b.avgRet - a.avgRet);
 
     grid.innerHTML = '';
     sortedSectors.forEach(sec => {
         var card = document.createElement('div');
         card.className = 'glass-panel';
         card.style.padding = '16px';
-        
+
         var headerColor = sec.avgRet >= 0 ? 'rgba(239, 68, 68, 0.15)' : 'rgba(16, 185, 129, 0.15)';
         var titleColor = sec.avgRet >= 0 ? '#ef4444' : '#10b981';
         var retSign = sec.avgRet > 0 ? '+' : '';
-        
+
         var html = '<div style="display:flex; justify-content:space-between; align-items:center; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 12px; margin-bottom: 12px;">' +
             '<h3 style="margin:0; font-size:16px; color:var(--text-primary); display:flex; align-items:center; gap:8px;">' +
             sec.name +
@@ -1658,17 +1660,17 @@ function renderSectorStrength() {
             '<span style="color:#ef4444">強 ' + sec.strong + '</span> / <span style="color:#10b981">弱 ' + sec.weak + '</span>' +
             '</div></div>' +
             '<div style="display:flex; flex-direction:column; gap:4px; max-height: 250px; overflow-y: auto; padding-right: 4px;">';
-        
+
         sec.stocks.forEach(s => {
             var sRetColor = s.ret >= 0 ? '#ef4444' : '#10b981';
             var sRetSign = s.ret > 0 ? '+' : '';
-            var sLabel = s.label === '強' ? '<span style="background:rgba(239,68,68,0.15); color:#ef4444; padding:0 4px; border-radius:2px; font-size:10px;">強' + s.strong + '</span>' : 
-                         s.label === '弱' ? '<span style="background:rgba(16,185,129,0.15); color:#10b981; padding:0 4px; border-radius:2px; font-size:10px;">弱' + s.weak + '</span>' : '<span style="color:#64748b; font-size:10px;">中</span>';
-                         
+            var sLabel = s.label === '強' ? '<span style="background:rgba(239,68,68,0.15); color:#ef4444; padding:0 4px; border-radius:2px; font-size:10px;">強' + s.strong + '</span>' :
+                s.label === '弱' ? '<span style="background:rgba(16,185,129,0.15); color:#10b981; padding:0 4px; border-radius:2px; font-size:10px;">弱' + s.weak + '</span>' : '<span style="color:#64748b; font-size:10px;">中</span>';
+
 
             var mtfTrend15 = globalState.mtf[s.ticker] ? globalState.mtf[s.ticker]['15m'] : '震盪';
             var mtfTrend60 = globalState.mtf[s.ticker] ? globalState.mtf[s.ticker]['60m'] : '震盪';
-            var getDot = function(t) { return t === '多頭' ? '🔴' : t === '空頭' ? '🟢' : '⚪'; };
+            var getDot = function (t) { return t === '多頭' ? '🔴' : t === '空頭' ? '🟢' : '⚪'; };
             var dots = '<span style="font-size:8px;">' + getDot(mtfTrend15) + getDot(mtfTrend60) + '</span>';
 
             html += '<div style="display:flex; justify-content:space-between; align-items:center; padding:6px; background:rgba(255,255,255,0.02); border-radius:4px; font-family:var(--font-mono); font-size:12px; cursor:pointer;" onmouseover="this.style.background=\'rgba(255,255,255,0.05)\'" onmouseout="this.style.background=\'rgba(255,255,255,0.02)\'" onclick="document.querySelector(\'.nav-link[data-view=dashboard]\').click(); setTimeout(function(){changeChartStock(\'' + s.ticker + '\')}, 100);">' +
@@ -1679,7 +1681,7 @@ function renderSectorStrength() {
                 '<span style="color:' + sRetColor + ';">' + sRetSign + s.ret.toFixed(2) + '%</span>' +
                 '</div>';
         });
-        
+
         html += '</div>';
         card.innerHTML = html;
         grid.appendChild(card);
@@ -1700,7 +1702,7 @@ async function loadSectorHistory() {
             drawSectorChart();
             renderSectorMomentum();
         }
-    } catch(e) { console.warn('Sector history load failed:', e); }
+    } catch (e) { console.warn('Sector history load failed:', e); }
 }
 
 function drawSectorChart() {
@@ -1729,17 +1731,17 @@ function drawSectorChart() {
 
     // Recalculate cumulative returns relative to the start of the visible window
     var sectorEntries = [];
-    Object.keys(sectors).forEach(function(name) {
+    Object.keys(sectors).forEach(function (name) {
         var s = sectors[name];
         var cum = s.cumulative.slice(startIdx);
         var baseVal = cum[0] || 0;
-        var rebased = cum.map(function(v) { return v - baseVal; });
+        var rebased = cum.map(function (v) { return v - baseVal; });
         sectorEntries.push({ name: name, data: rebased, color: s.color });
     });
 
     // Find global min/max
     var allVals = [];
-    sectorEntries.forEach(function(s) { s.data.forEach(function(v) { allVals.push(v); }); });
+    sectorEntries.forEach(function (s) { s.data.forEach(function (v) { allVals.push(v); }); });
     var minVal = Math.min.apply(null, allVals);
     var maxVal = Math.max.apply(null, allVals);
     var padding = Math.max((maxVal - minVal) * 0.1, 0.5);
@@ -1787,10 +1789,10 @@ function drawSectorChart() {
         ctx.fillText(lbl, xPos(d), H - padB + 18);
     }
     // Always show last date
-    ctx.fillText(visibleDates[N-1].substring(5), xPos(N-1), H - padB + 18);
+    ctx.fillText(visibleDates[N - 1].substring(5), xPos(N - 1), H - padB + 18);
 
     // Draw lines
-    sectorEntries.forEach(function(sec) {
+    sectorEntries.forEach(function (sec) {
         ctx.strokeStyle = sec.color;
         ctx.lineWidth = 2;
         ctx.globalAlpha = 0.85;
@@ -1805,7 +1807,7 @@ function drawSectorChart() {
         ctx.globalAlpha = 1;
 
         // Draw endpoint dot
-        var lastX = xPos(N-1), lastY = yPos(sec.data[N-1]);
+        var lastX = xPos(N - 1), lastY = yPos(sec.data[N - 1]);
         ctx.fillStyle = sec.color;
         ctx.beginPath();
         ctx.arc(lastX, lastY, 3, 0, Math.PI * 2);
@@ -1816,14 +1818,14 @@ function drawSectorChart() {
     var legendEl = document.getElementById('sector-legend');
     if (legendEl) {
         legendEl.innerHTML = '';
-        sectorEntries.sort(function(a,b) { return b.data[b.data.length-1] - a.data[a.data.length-1]; });
-        sectorEntries.forEach(function(sec) {
+        sectorEntries.sort(function (a, b) { return b.data[b.data.length - 1] - a.data[a.data.length - 1]; });
+        sectorEntries.forEach(function (sec) {
             var val = sec.data[sec.data.length - 1];
             var sign = val > 0 ? '+' : '';
             var item = document.createElement('span');
             item.style.cssText = 'display:flex; align-items:center; gap:4px; cursor:pointer; padding:2px 6px; border-radius:4px; transition:background 0.2s;';
-            item.onmouseover = function() { this.style.background = 'rgba(255,255,255,0.06)'; };
-            item.onmouseout = function() { this.style.background = 'transparent'; };
+            item.onmouseover = function () { this.style.background = 'rgba(255,255,255,0.06)'; };
+            item.onmouseout = function () { this.style.background = 'transparent'; };
             item.innerHTML = '<span style="display:inline-block;width:10px;height:3px;background:' + sec.color + ';border-radius:2px;"></span>' +
                 '<span style="color:var(--text-muted)">' + sec.name.split('(')[0].trim() + '</span>' +
                 '<span style="color:' + sec.color + '; font-family:var(--font-mono);">' + sign + val.toFixed(1) + '%</span>';
@@ -1838,7 +1840,7 @@ function renderSectorMomentum() {
     var sectors = sectorHistoryData.sectors;
 
     var items = [];
-    Object.keys(sectors).forEach(function(name) {
+    Object.keys(sectors).forEach(function (name) {
         var s = sectors[name];
         items.push({
             name: name,
@@ -1849,21 +1851,21 @@ function renderSectorMomentum() {
             count: s.stock_count
         });
     });
-    items.sort(function(a,b) { return b.ret5d - a.ret5d; });
+    items.sort(function (a, b) { return b.ret5d - a.ret5d; });
 
     el.innerHTML = '';
-    items.forEach(function(item, idx) {
+    items.forEach(function (item, idx) {
         var card = document.createElement('div');
         card.style.cssText = 'background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.06); border-radius:8px; padding:12px; display:flex; justify-content:space-between; align-items:center;';
         if (item.ret5d > 0) card.style.borderLeftColor = 'rgba(239,68,68,0.4)';
         else card.style.borderLeftColor = 'rgba(16,185,129,0.4)';
         card.style.borderLeftWidth = '3px';
 
-        var fmtRet = function(v) { return (v > 0 ? '+' : '') + v.toFixed(1) + '%'; };
-        var retColor = function(v) { return v >= 0 ? '#ef4444' : '#10b981'; };
+        var fmtRet = function (v) { return (v > 0 ? '+' : '') + v.toFixed(1) + '%'; };
+        var retColor = function (v) { return v >= 0 ? '#ef4444' : '#10b981'; };
 
         card.innerHTML = '<div style="display:flex; align-items:center; gap:10px;">' +
-            '<span style="font-size:16px; font-weight:bold; color:#94a3b8; width:24px;">' + (idx+1) + '</span>' +
+            '<span style="font-size:16px; font-weight:bold; color:#94a3b8; width:24px;">' + (idx + 1) + '</span>' +
             '<div>' +
             '<div style="font-size:13px; color:var(--text-primary); font-weight:600;">' + item.name.split('(')[0].trim() + '</div>' +
             '<div style="font-size:10px; color:var(--text-muted); margin-top:2px;">' + item.count + ' 檔</div>' +
@@ -1878,9 +1880,9 @@ function renderSectorMomentum() {
 }
 
 // Range button handlers
-document.querySelectorAll('.sector-range-btn').forEach(function(btn) {
-    btn.addEventListener('click', function() {
-        document.querySelectorAll('.sector-range-btn').forEach(function(b) { b.classList.remove('active'); });
+document.querySelectorAll('.sector-range-btn').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+        document.querySelectorAll('.sector-range-btn').forEach(function (b) { b.classList.remove('active'); });
         btn.classList.add('active');
         sectorChartRange = parseInt(btn.dataset.range);
         drawSectorChart();
@@ -1888,7 +1890,7 @@ document.querySelectorAll('.sector-range-btn').forEach(function(btn) {
 });
 
 // Redraw on resize
-window.addEventListener('resize', function() {
+window.addEventListener('resize', function () {
     if (sectorHistoryData) drawSectorChart();
 });
 
@@ -1906,37 +1908,37 @@ async function loadMomentumData() {
             updateChartTitle();
             renderStockGrid();
         }
-    } catch(e) { console.warn('Momentum data load failed:', e); }
+    } catch (e) { console.warn('Momentum data load failed:', e); }
 }
 
 function renderMomentumData() {
     var grid = document.getElementById('momentum-grid');
     if (!grid) return;
-    
+
     if (!momentumData || !momentumData.stocks || momentumData.stocks.length === 0) {
         grid.innerHTML = '<div style="color:var(--text-muted); padding:20px;">目前沒有符合動能篩選條件的標的。</div>';
         return;
     }
 
     grid.innerHTML = '';
-    
-    momentumData.stocks.forEach(function(stock) {
+
+    momentumData.stocks.forEach(function (stock) {
         var card = document.createElement('div');
         card.className = 'glass-panel';
         card.style.cssText = 'padding:16px; border-top:3px solid #6366f1; display:flex; flex-direction:column; gap:12px; cursor:pointer; transition:transform 0.2s, box-shadow 0.2s;';
-        card.onmouseover = function() { this.style.transform = 'translateY(-2px)'; this.style.boxShadow = '0 8px 16px rgba(0,0,0,0.4)'; };
-        card.onmouseout = function() { this.style.transform = 'none'; this.style.boxShadow = 'none'; };
-        card.onclick = function() {
+        card.onmouseover = function () { this.style.transform = 'translateY(-2px)'; this.style.boxShadow = '0 8px 16px rgba(0,0,0,0.4)'; };
+        card.onmouseout = function () { this.style.transform = 'none'; this.style.boxShadow = 'none'; };
+        card.onclick = function () {
             document.querySelector('.nav-link[data-view=dashboard]').click();
-            setTimeout(function(){ changeChartStock(stock.ticker); }, 100);
+            setTimeout(function () { changeChartStock(stock.ticker); }, 100);
         };
-        
+
         var setupBg = 'rgba(99, 102, 241, 0.15)';
         var setupColor = '#818cf8';
         if (stock.setup.includes('EP')) { setupBg = 'rgba(239, 68, 68, 0.15)'; setupColor = '#f87171'; card.style.borderTopColor = '#ef4444'; }
         else if (stock.setup.includes('突破')) { setupBg = 'rgba(245, 158, 11, 0.15)'; setupColor = '#fbbf24'; card.style.borderTopColor = '#f59e0b'; }
         else if (stock.setup.includes('強勢')) { setupBg = 'rgba(16, 185, 129, 0.15)'; setupColor = '#34d399'; card.style.borderTopColor = '#10b981'; }
-        
+
         var badgesHtml = '<span style="font-size:11px; padding:3px 8px; border-radius:4px; background:' + setupBg + '; color:' + setupColor + '; font-weight:600;">' + stock.setup + '</span>';
         if (stock.indicators) {
             if (stock.indicators.is_squeezed) {
@@ -1946,10 +1948,10 @@ function renderMomentumData() {
                 badgesHtml += '<span style="margin-left:6px; font-size:11px; padding:3px 8px; border-radius:4px; background:rgba(59, 130, 246, 0.15); color:#3b82f6; font-weight:600;" title="估值偏低 (本益比 < 20)">💰 PE ' + stock.indicators.pe + '</span>';
             }
         }
-        
-        var reasonsHtml = stock.reasons.map(function(r) { 
+
+        var reasonsHtml = stock.reasons.map(function (r) {
             return '<div style="font-size:11px; color:var(--text-muted); display:flex; align-items:center; gap:4px;">' +
-                   '<span style="color:#64748b;">\u2022</span> ' + r + '</div>'; 
+                '<span style="color:#64748b;">\u2022</span> ' + r + '</div>';
         }).join('');
 
         var html = '<div style="display:flex; justify-content:space-between; align-items:flex-start;">' +
@@ -1961,19 +1963,19 @@ function renderMomentumData() {
             '<div style="font-size:16px; font-weight:bold; color:var(--text-primary); font-family:var(--font-mono);">' + stock.price.toFixed(2) + '</div>' +
             '</div>' +
             '</div>' +
-            
+
             // Reasons
             '<div style="background:rgba(0,0,0,0.2); border-radius:6px; padding:8px 12px;">' +
             reasonsHtml +
             '</div>' +
-            
+
             // Returns
             '<div style="display:flex; justify-content:space-between; background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.05); border-radius:6px; padding:10px;">' +
-            '<div style="text-align:center;"><div style="font-size:10px; color:var(--text-muted); margin-bottom:2px;">1M 漲幅</div><div style="font-size:13px; color:' + (stock.returns['1M']>0?'#10b981':'#ef4444') + '; font-family:var(--font-mono);">' + (stock.returns['1M']>0?'+':'') + stock.returns['1M'] + '%</div></div>' +
-            '<div style="text-align:center;"><div style="font-size:10px; color:var(--text-muted); margin-bottom:2px;">3M 漲幅</div><div style="font-size:13px; color:' + (stock.returns['3M']>0?'#10b981':'#ef4444') + '; font-family:var(--font-mono);">' + (stock.returns['3M']>0?'+':'') + stock.returns['3M'] + '%</div></div>' +
+            '<div style="text-align:center;"><div style="font-size:10px; color:var(--text-muted); margin-bottom:2px;">1M 漲幅</div><div style="font-size:13px; color:' + (stock.returns['1M'] > 0 ? '#10b981' : '#ef4444') + '; font-family:var(--font-mono);">' + (stock.returns['1M'] > 0 ? '+' : '') + stock.returns['1M'] + '%</div></div>' +
+            '<div style="text-align:center;"><div style="font-size:10px; color:var(--text-muted); margin-bottom:2px;">3M 漲幅</div><div style="font-size:13px; color:' + (stock.returns['3M'] > 0 ? '#10b981' : '#ef4444') + '; font-family:var(--font-mono);">' + (stock.returns['3M'] > 0 ? '+' : '') + stock.returns['3M'] + '%</div></div>' +
             '<div style="text-align:center;"><div style="font-size:10px; color:var(--text-muted); margin-bottom:2px;">ADR(日波)</div><div style="font-size:13px; color:#f59e0b; font-family:var(--font-mono);">' + stock.volatility.ADR_pct + '%</div></div>' +
             '</div>' +
-            
+
             // Action Plan
             '<div style="border-top:1px dashed rgba(255,255,255,0.1); padding-top:12px;">' +
             '<div style="font-size:12px; color:var(--text-primary); font-weight:bold; margin-bottom:8px; display:flex; align-items:center; gap:6px;"><span>🎯</span> 交易計畫建議</div>' +
@@ -2001,14 +2003,14 @@ async function loadScreenerData() {
             screenerData = await res.json();
             renderScreener();
         }
-    } catch(e) { console.warn('Screener data load failed:', e); }
+    } catch (e) { console.warn('Screener data load failed:', e); }
 }
 
 function renderScreener() {
     var grid = document.getElementById('screener-grid');
     var countEl = document.getElementById('screener-count');
     if (!grid) return;
-    
+
     if (!screenerData || !screenerData.stocks || screenerData.stocks.length === 0) {
         grid.innerHTML = '<div class="bt-loading">尚未產生篩選資料，請執行 generate_screener.py</div>';
         if (countEl) countEl.textContent = '';
@@ -2018,7 +2020,7 @@ function renderScreener() {
     var filterSqueeze = document.getElementById('filter-squeeze')?.checked;
     var filterPE = document.getElementById('filter-pe')?.checked;
 
-    var filtered = screenerData.stocks.filter(function(s) {
+    var filtered = screenerData.stocks.filter(function (s) {
         if (!s.indicators) return false;
         var pass = true;
         if (filterSqueeze && !s.indicators.is_squeezed) pass = false;
@@ -2034,18 +2036,18 @@ function renderScreener() {
     }
 
     grid.innerHTML = '';
-    
-    filtered.forEach(function(stock) {
+
+    filtered.forEach(function (stock) {
         var card = document.createElement('div');
         card.className = 'glass-panel';
         card.style.cssText = 'padding:16px; border-top:3px solid #6366f1; display:flex; flex-direction:column; gap:12px; cursor:pointer; transition:transform 0.2s, box-shadow 0.2s;';
-        card.onmouseover = function() { this.style.transform = 'translateY(-2px)'; this.style.boxShadow = '0 8px 16px rgba(0,0,0,0.4)'; };
-        card.onmouseout = function() { this.style.transform = 'none'; this.style.boxShadow = 'none'; };
-        card.onclick = function() {
+        card.onmouseover = function () { this.style.transform = 'translateY(-2px)'; this.style.boxShadow = '0 8px 16px rgba(0,0,0,0.4)'; };
+        card.onmouseout = function () { this.style.transform = 'none'; this.style.boxShadow = 'none'; };
+        card.onclick = function () {
             document.querySelector('.nav-link[data-view=dashboard]').click();
-            setTimeout(function(){ changeChartStock(stock.ticker); }, 100);
+            setTimeout(function () { changeChartStock(stock.ticker); }, 100);
         };
-        
+
         var badgesHtml = '';
         if (stock.indicators.is_squeezed) {
             badgesHtml += '<span style="font-size:11px; padding:3px 8px; border-radius:4px; background:rgba(236, 72, 153, 0.15); color:#ec4899; font-weight:600; margin-right:6px;">⚡ Squeeze</span>';
@@ -2056,7 +2058,7 @@ function renderScreener() {
 
         var mtfTrend15 = globalState.mtf[stock.ticker] ? globalState.mtf[stock.ticker]['15m'] : '震盪';
         var mtfTrend60 = globalState.mtf[stock.ticker] ? globalState.mtf[stock.ticker]['60m'] : '震盪';
-        var getDot = function(t) { return t === '多頭' ? '🔴' : t === '空頭' ? '🟢' : '⚪'; };
+        var getDot = function (t) { return t === '多頭' ? '🔴' : t === '空頭' ? '🟢' : '⚪'; };
         var dots = '<span style="font-size:10px; opacity:0.8;">' + getDot(mtfTrend15) + getDot(mtfTrend60) + '</span>';
 
         var html = '<div style="display:flex; justify-content:space-between; align-items:flex-start;">' +
@@ -2070,7 +2072,7 @@ function renderScreener() {
             '</div>' +
             '<div style="display:flex; flex-wrap:wrap; margin-top:4px;">' + badgesHtml + '</div>' +
             '<div style="display:flex; justify-content:space-between; background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.05); border-radius:6px; padding:10px; margin-top:4px;">' +
-            '<div style="text-align:center;"><div style="font-size:10px; color:var(--text-muted); margin-bottom:2px;">1M 漲幅</div><div style="font-size:13px; color:' + (stock.returns['1M']>0?'#10b981':'#ef4444') + '; font-family:var(--font-mono);">' + (stock.returns['1M']>0?'+':'') + stock.returns['1M'] + '%</div></div>' +
+            '<div style="text-align:center;"><div style="font-size:10px; color:var(--text-muted); margin-bottom:2px;">1M 漲幅</div><div style="font-size:13px; color:' + (stock.returns['1M'] > 0 ? '#10b981' : '#ef4444') + '; font-family:var(--font-mono);">' + (stock.returns['1M'] > 0 ? '+' : '') + stock.returns['1M'] + '%</div></div>' +
             '</div>';
 
         card.innerHTML = html;
@@ -2132,13 +2134,13 @@ function saveAIPrompt(prompt) {
 var promptTextarea = document.getElementById('ai-prompt-textarea');
 if (promptTextarea) {
     promptTextarea.value = loadAIPrompt();
-    promptTextarea.addEventListener('input', function() {
+    promptTextarea.addEventListener('input', function () {
         saveAIPrompt(this.value);
     });
 }
 
 // Toggle Prompt Editor
-document.getElementById('btn-toggle-prompt')?.addEventListener('click', function() {
+document.getElementById('btn-toggle-prompt')?.addEventListener('click', function () {
     var editor = document.getElementById('ai-prompt-editor');
     var manual = document.getElementById('ai-manual-editor');
     if (editor) {
@@ -2148,7 +2150,7 @@ document.getElementById('btn-toggle-prompt')?.addEventListener('click', function
 });
 
 // Reset Prompt
-document.getElementById('btn-reset-prompt')?.addEventListener('click', function() {
+document.getElementById('btn-reset-prompt')?.addEventListener('click', function () {
     if (confirm('確定要重置 Prompt 為預設模板嗎？')) {
         localStorage.removeItem('ai_report_prompt');
         if (promptTextarea) promptTextarea.value = AI_DEFAULT_PROMPT;
@@ -2156,7 +2158,7 @@ document.getElementById('btn-reset-prompt')?.addEventListener('click', function(
 });
 
 // Toggle Manual Editor
-document.getElementById('btn-toggle-editor')?.addEventListener('click', function() {
+document.getElementById('btn-toggle-editor')?.addEventListener('click', function () {
     var manual = document.getElementById('ai-manual-editor');
     var prompt = document.getElementById('ai-prompt-editor');
     if (manual) {
@@ -2166,7 +2168,7 @@ document.getElementById('btn-toggle-editor')?.addEventListener('click', function
 });
 
 // 生成報告 (呼叫 Gemini API)
-document.getElementById('btn-generate-report')?.addEventListener('click', async function() {
+document.getElementById('btn-generate-report')?.addEventListener('click', async function () {
     var btn = this;
     var statusEl = document.getElementById('ai-report-status');
     var contentEl = document.getElementById('ai-report-content');
@@ -2200,7 +2202,7 @@ document.getElementById('btn-generate-report')?.addEventListener('click', async 
                 contentEl.innerHTML = '<div style="text-align:center; padding:60px 20px; color:#ef4444;"><div style="font-size:36px; margin-bottom:12px;">⚠️</div><h3>報告生成失敗</h3><p style="font-size:13px; color:var(--text-muted); margin-top:8px;">' + (data.message || '未知錯誤') + '</p></div>';
             }
         }
-    } catch(e) {
+    } catch (e) {
         if (statusEl) statusEl.textContent = '❌ 網路錯誤';
         if (contentEl) {
             contentEl.innerHTML = '<div style="text-align:center; padding:60px 20px; color:#ef4444;"><div style="font-size:36px; margin-bottom:12px;">⚠️</div><h3>連線失敗</h3><p style="font-size:13px; color:var(--text-muted); margin-top:8px;">' + e.message + '</p></div>';
@@ -2212,7 +2214,7 @@ document.getElementById('btn-generate-report')?.addEventListener('click', async 
 });
 
 // 儲存手動報告
-document.getElementById('btn-save-manual')?.addEventListener('click', async function() {
+document.getElementById('btn-save-manual')?.addEventListener('click', async function () {
     var btn = this;
     var content = document.getElementById('ai-manual-textarea')?.value;
     var title = document.getElementById('ai-manual-title')?.value || 'AI 深度投研報告';
@@ -2247,7 +2249,7 @@ document.getElementById('btn-save-manual')?.addEventListener('click', async func
         } else {
             alert('⚠️ 儲存失敗: ' + (data.message || ''));
         }
-    } catch(e) {
+    } catch (e) {
         alert('⚠️ 連線失敗: ' + e.message);
     }
 
@@ -2275,7 +2277,7 @@ async function loadAIReport(filename) {
             // Fallback: 基本 pre 格式
             contentEl.innerHTML = '<pre style="white-space:pre-wrap; color:var(--text-primary); line-height:1.8;">' + md.replace(/</g, '&lt;') + '</pre>';
         }
-    } catch(e) {
+    } catch (e) {
         contentEl.innerHTML = '<div style="text-align:center; padding:40px; color:#ef4444;">⚠️ 無法載入報告: ' + e.message + '</div>';
     }
 }
@@ -2291,7 +2293,7 @@ async function loadAIReportIndex() {
         aiReportIndex = await res.json();
 
         select.innerHTML = '<option value="">選擇歷史報告 (' + aiReportIndex.reports.length + ' 份)...</option>';
-        aiReportIndex.reports.forEach(function(r) {
+        aiReportIndex.reports.forEach(function (r) {
             var opt = document.createElement('option');
             opt.value = r.filename;
             var modelTag = r.model === 'manual' ? '[手動]' : '[' + r.model + ']';
@@ -2306,13 +2308,13 @@ async function loadAIReportIndex() {
             if (statusEl && !statusEl.textContent) statusEl.textContent = '最新: ' + latest.date.substring(0, 16);
             loadAIReport(latest.filename);
         }
-    } catch(e) {
+    } catch (e) {
         // 尚無報告索引，靜默跳過
     }
 }
 
 // 歷史報告切換
-document.getElementById('ai-report-history')?.addEventListener('change', function() {
+document.getElementById('ai-report-history')?.addEventListener('change', function () {
     if (this.value) {
         loadAIReport(this.value);
         var statusEl = document.getElementById('ai-report-status');
@@ -2343,8 +2345,8 @@ function drawMiniRadar(canvas, dims, size) {
     var ctx = canvas.getContext('2d');
     var w = size || 48;
     canvas.width = w; canvas.height = w;
-    var cx = w/2, cy = w/2, r = w/2 - 4;
-    var labels = ['momentum','technical','fundamental','consensus','risk'];
+    var cx = w / 2, cy = w / 2, r = w / 2 - 4;
+    var labels = ['momentum', 'technical', 'fundamental', 'consensus', 'risk'];
     var n = labels.length;
     var angle = Math.PI * 2 / n;
     var startAngle = -Math.PI / 2;
@@ -2390,7 +2392,7 @@ async function loadAndRenderPowerGauge() {
         }
         pgData = await res.json();
         renderPowerGauge();
-    } catch(e) {
+    } catch (e) {
         console.error('Power Gauge load error:', e);
     }
 }
@@ -2401,18 +2403,18 @@ function renderPowerGauge() {
 
     // Sort
     if (pgSortKey === 'total') {
-        stocks.sort(function(a,b) { return b.total_score - a.total_score; });
+        stocks.sort(function (a, b) { return b.total_score - a.total_score; });
     } else {
-        stocks.sort(function(a,b) { return (b.dimensions[pgSortKey]||0) - (a.dimensions[pgSortKey]||0); });
+        stocks.sort(function (a, b) { return (b.dimensions[pgSortKey] || 0) - (a.dimensions[pgSortKey] || 0); });
     }
 
     // Re-assign display rank
-    stocks.forEach(function(s, i) { s._displayRank = i + 1; });
+    stocks.forEach(function (s, i) { s._displayRank = i + 1; });
 
     // Summary stats
-    var sGrades = {S:0, A:0, B:0, C:0, D:0};
-    stocks.forEach(function(s) { sGrades[s.grade] = (sGrades[s.grade]||0) + 1; });
-    var avgScore = stocks.reduce(function(sum,s) { return sum + s.total_score; }, 0) / stocks.length;
+    var sGrades = { S: 0, A: 0, B: 0, C: 0, D: 0 };
+    stocks.forEach(function (s) { sGrades[s.grade] = (sGrades[s.grade] || 0) + 1; });
+    var avgScore = stocks.reduce(function (sum, s) { return sum + s.total_score; }, 0) / stocks.length;
 
     var summaryEl = document.getElementById('pg-summary');
     summaryEl.innerHTML =
@@ -2430,7 +2432,7 @@ function renderPowerGauge() {
     html += '<th>1M %</th><th>RSI</th><th>信號</th>';
     html += '</tr></thead><tbody>';
 
-    stocks.forEach(function(s) {
+    stocks.forEach(function (s) {
         var d = s.dimensions;
         var rankClass = s._displayRank <= 10 ? 'pg-rank-top' : (s._displayRank <= 30 ? 'pg-rank-mid' : 'pg-rank-low');
 
@@ -2442,7 +2444,7 @@ function renderPowerGauge() {
         html += '<td><span class="pg-grade pg-grade-' + s.grade + '">' + s.grade + '</span></td>';
 
         // 五維分數條
-        ['momentum','technical','fundamental','consensus','risk'].forEach(function(dim) {
+        ['momentum', 'technical', 'fundamental', 'consensus', 'risk'].forEach(function (dim) {
             var v = d[dim] || 0;
             html += '<td><span style="font-family:var(--font-mono); font-size:12px; color:' + scoreColor(v) + ';">' + v.toFixed(0) + '</span>';
             html += '<div class="pg-score-bar"><div class="pg-score-bar-fill" style="width:' + v + '%; background:' + scoreColor(v) + ';"></div></div></td>';
@@ -2456,7 +2458,7 @@ function renderPowerGauge() {
 
         // Signals
         html += '<td>';
-        (s.signals || []).forEach(function(sig) {
+        (s.signals || []).forEach(function (sig) {
             html += '<span class="pg-signal-badge ' + sig.type + '">' + sig.label + '</span>';
         });
         html += '</td>';
@@ -2467,19 +2469,19 @@ function renderPowerGauge() {
     document.getElementById('pg-leaderboard').innerHTML = html;
 
     // Draw mini radars
-    setTimeout(function() {
-        document.querySelectorAll('.pg-mini-radar').forEach(function(canvas) {
+    setTimeout(function () {
+        document.querySelectorAll('.pg-mini-radar').forEach(function (canvas) {
             var ticker = canvas.getAttribute('data-ticker');
-            var stock = pgData.stocks.find(function(s) { return s.ticker === ticker; });
+            var stock = pgData.stocks.find(function (s) { return s.ticker === ticker; });
             if (stock) drawMiniRadar(canvas, stock.dimensions, 48);
         });
     }, 50);
 }
 
 // Sort buttons
-document.querySelectorAll('.pg-sort-btn').forEach(function(btn) {
-    btn.addEventListener('click', function() {
-        document.querySelectorAll('.pg-sort-btn').forEach(function(b) { b.classList.remove('active'); });
+document.querySelectorAll('.pg-sort-btn').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+        document.querySelectorAll('.pg-sort-btn').forEach(function (b) { b.classList.remove('active'); });
         btn.classList.add('active');
         pgSortKey = btn.getAttribute('data-sort');
         renderPowerGauge();
@@ -2494,8 +2496,8 @@ var xrayCandleSeries = null;
 var xrayVolumeSeries = null;
 
 function switchToView(viewName) {
-    document.querySelectorAll('.nav-link').forEach(function(l) { l.classList.remove('active'); });
-    document.querySelectorAll('.view-panel').forEach(function(v) { v.classList.remove('active'); });
+    document.querySelectorAll('.nav-link').forEach(function (l) { l.classList.remove('active'); });
+    document.querySelectorAll('.view-panel').forEach(function (v) { v.classList.remove('active'); });
     var panel = document.getElementById('view-' + viewName);
     if (panel) panel.classList.add('active');
     document.getElementById('view-title').textContent = viewTitles[viewName] || '';
@@ -2506,7 +2508,7 @@ function openStockXray(ticker) {
 
     // 從 pgData 找到該股票
     if (!pgData || !pgData.stocks) return;
-    var stock = pgData.stocks.find(function(s) { return s.ticker === ticker; });
+    var stock = pgData.stocks.find(function (s) { return s.ticker === ticker; });
     if (!stock) return;
 
     var d = stock.dimensions;
@@ -2547,32 +2549,74 @@ function openStockXray(ticker) {
 
     // Trade Plan
     var rrColor = tp.rr_ratio >= 3 ? '#10b981' : (tp.rr_ratio >= 1.5 ? '#f59e0b' : '#ef4444');
-    var rrLabel = tp.rr_ratio >= 3 ? '🟢 極佳進場點 (R/R > 3)' : (tp.rr_ratio >= 1.5 ? '🟡 可小注試單 (R/R 1.5~3)' : '🔴 追高風險大 (R/R < 1.5)');
-    document.getElementById('xray-trade-plan').innerHTML = 
-        '<div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px;">' +
-        '  <div>' +
-        '    <div style="font-size:12px; color:var(--text-muted); margin-bottom:4px;">防守底線 (Stop Loss)</div>' +
-        '    <div style="font-size:20px; font-weight:700; font-family:var(--font-mono); color:#ef4444;">$' + (tp.stop_loss || '--') + ' <span style="font-size:12px;">(' + (tp.risk_pct || 0) + '%)</span></div>' +
+    var sizeColor = tp.suggested_size_pct >= 7.5 ? '#10b981' : (tp.suggested_size_pct > 0 ? '#3b82f6' : '#ef4444');
+    
+    var tradePlanHtml = 
+        '<div style="display:flex; flex-direction:column; gap:16px;">' +
+        // Row 1: Current Verdict & Recommended Sizing
+        '  <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; border-bottom:1px solid rgba(255,255,255,0.08); padding-bottom:12px;">' +
+        '    <div>' +
+        '      <span style="font-size:12px; color:var(--text-muted); display:block; margin-bottom:2px;">現價交易決策 (Current Price Verdict)</span>' +
+        '      <span style="font-size:16px; font-weight:700;">' + (tp.verdict_label || 'N/A') + '</span>' +
+        '    </div>' +
+        '    <div style="text-align:right;">' +
+        '      <span style="font-size:12px; color:var(--text-muted); display:block; margin-bottom:2px;">風控部位建議 (Recommended Position Size)</span>' +
+        '      <span style="font-size:16px; font-weight:700; color:' + sizeColor + ';">' + (tp.sizing_label || 'N/A') + '</span>' +
+        '    </div>' +
         '  </div>' +
-        '  <div>' +
-        '    <div style="font-size:12px; color:var(--text-muted); margin-bottom:4px;">獲利目標 (Target)</div>' +
-        '    <div style="font-size:20px; font-weight:700; font-family:var(--font-mono); color:#10b981;">$' + (tp.target || '--') + ' <span style="font-size:12px;">(+' + (tp.reward_pct || 0) + '%)</span></div>' +
-        '  </div>' +
-        '  <div style="text-align:right;">' +
-        '    <div style="font-size:12px; color:var(--text-muted); margin-bottom:4px;">進場盈虧比 (R/R Ratio)</div>' +
-        '    <div style="font-size:24px; font-weight:800; font-family:var(--font-mono); color:' + rrColor + ';">' + (tp.rr_ratio || 0).toFixed(2) + '</div>' +
-        '    <div style="font-size:12px; color:' + rrColor + ';">' + rrLabel + '</div>' +
+        // Row 2: Standard Trade Plan (Current Entry) vs Pullback Setup
+        '  <div style="display:grid; grid-template-columns: 1fr 1fr; gap:20px; flex-wrap:wrap;">' +
+        // Left Column: Current Setup
+        '    <div style="background:rgba(255,255,255,0.02); border-radius:8px; padding:12px; border:1px solid rgba(255,255,255,0.04);">' +
+        '      <div style="font-size:11px; font-weight:700; text-transform:uppercase; color:#3b82f6; margin-bottom:10px; display:flex; justify-content:space-between;">' +
+        '        <span>現價進場點 (Current Price Entry)</span>' +
+        '        <span>$' + (stock.price || '--') + '</span>' +
+        '      </div>' +
+        '      <div style="display:flex; justify-content:space-between; margin-bottom:6px;">' +
+        '        <span style="font-size:12px; color:var(--text-muted);">防守底線 (Stop Loss)</span>' +
+        '        <span style="font-size:13px; font-weight:600; font-family:var(--font-mono); color:#ef4444;">$' + (tp.stop_loss || '--') + ' (' + (tp.risk_pct || 0) + '%)</span>' +
+        '      </div>' +
+        '      <div style="display:flex; justify-content:space-between; margin-bottom:6px;">' +
+        '        <span style="font-size:12px; color:var(--text-muted);">獲利目標 (Target)</span>' +
+        '        <span style="font-size:13px; font-weight:600; font-family:var(--font-mono); color:#10b981;">$' + (tp.target || '--') + ' (+' + (tp.reward_pct || 0) + '%)</span>' +
+        '      </div>' +
+        '      <div style="display:flex; justify-content:space-between; border-top:1px solid rgba(255,255,255,0.05); padding-top:6px; margin-top:6px;">' +
+        '        <span style="font-size:12px; color:var(--text-muted); font-weight:600;">盈虧比 (R/R Ratio)</span>' +
+        '        <span style="font-size:14px; font-weight:800; font-family:var(--font-mono); color:' + rrColor + ';">' + (tp.rr_ratio || 0).toFixed(2) + '</span>' +
+        '      </div>' +
+        '    </div>' +
+        // Right Column: Pullback Setup
+        '    <div style="background:rgba(255,255,255,0.02); border-radius:8px; padding:12px; border:1px solid rgba(255,255,255,0.04);">' +
+        '      <div style="font-size:11px; font-weight:700; text-transform:uppercase; color:#f59e0b; margin-bottom:10px; display:flex; justify-content:space-between;">' +
+        '        <span>建議拉回買點 (Pullback Entry)</span>' +
+        '        <span style="color:#f59e0b;">$' + (tp.pullback_entry || '--') + '</span>' +
+        '      </div>' +
+        '      <div style="display:flex; justify-content:space-between; margin-bottom:6px;">' +
+        '        <span style="font-size:12px; color:var(--text-muted);">拉回防守線 (Stop Loss)</span>' +
+        '        <span style="font-size:13px; font-weight:600; font-family:var(--font-mono); color:#ef4444;">$' + (tp.pullback_stop || '--') + '</span>' +
+        '      </div>' +
+        '      <div style="display:flex; justify-content:space-between; margin-bottom:6px;">' +
+        '        <span style="font-size:12px; color:var(--text-muted);">獲利目標 (Target)</span>' +
+        '        <span style="font-size:13px; font-weight:600; font-family:var(--font-mono); color:#10b981;">$' + (tp.target || '--') + '</span>' +
+        '      </div>' +
+        '      <div style="display:flex; justify-content:space-between; border-top:1px solid rgba(255,255,255,0.05); padding-top:6px; margin-top:6px;">' +
+        '        <span style="font-size:12px; color:var(--text-muted); font-weight:600;">拉回盈虧比 (Pullback R/R)</span>' +
+        '        <span style="font-size:14px; font-weight:800; font-family:var(--font-mono); color:#10b981;">' + (tp.pullback_rr || 0).toFixed(2) + '</span>' +
+        '      </div>' +
+        '    </div>' +
         '  </div>' +
         '</div>';
+
+    document.getElementById('xray-trade-plan').innerHTML = tradePlanHtml;
 
     // Radar chart
     drawXrayRadar(d);
 
     // Dimension bars
-    var dimLabels = {momentum:'🚀 動能', technical:'📐 技術', fundamental:'💼 基本面', consensus:'🏛️ 共識', risk:'🛡️ 風險'};
-    var dimColors = {momentum:'#f59e0b', technical:'#3b82f6', fundamental:'#10b981', consensus:'#8b5cf6', risk:'#06b6d4'};
+    var dimLabels = { momentum: '🚀 動能', technical: '📐 技術', fundamental: '💼 基本面', consensus: '🏛️ 共識', risk: '🛡️ 風險' };
+    var dimColors = { momentum: '#f59e0b', technical: '#3b82f6', fundamental: '#10b981', consensus: '#8b5cf6', risk: '#06b6d4' };
     var dimHtml = '';
-    Object.keys(dimLabels).forEach(function(key) {
+    Object.keys(dimLabels).forEach(function (key) {
         var val = d[key] || 0;
         dimHtml += '<div class="xray-dim-row">' +
             '<div class="xray-dim-label">' + dimLabels[key] + '</div>' +
@@ -2584,23 +2628,23 @@ function openStockXray(ticker) {
 
     // Fundamentals cards
     var metrics = [
-        {label: 'Forward P/E', value: km.pe_fwd != null ? km.pe_fwd.toFixed(1) : '--'},
-        {label: 'RSI (14)', value: km.rsi != null ? km.rsi.toFixed(0) : '--'},
-        {label: '機構持股', value: sm.inst_holders != null ? sm.inst_holders.toFixed(1) + '%' : '--', color: '#8b5cf6'},
-        {label: '空單比率', value: sm.short_ratio != null ? sm.short_ratio.toFixed(1) + '%' : '--', color: '#ef4444'},
-        {label: '大戶動向(OBV)', value: sm.obv_accumulating ? '📈 正在吃貨' : '📉 正在出貨', color: sm.obv_accumulating ? '#10b981' : '#ef4444'},
-        {label: 'Options P/C', value: sm.options_pc_ratio != null ? sm.options_pc_ratio.toFixed(2) : '--', color: sm.options_pc_ratio < 0.7 ? '#10b981' : (sm.options_pc_ratio > 1.2 ? '#ef4444' : '')},
-        {label: 'EPS近30日上/下修', value: (sm.eps_up_30d || 0) + ' / ' + (sm.eps_down_30d || 0), color: sm.eps_up_30d > sm.eps_down_30d ? '#10b981' : (sm.eps_down_30d > sm.eps_up_30d ? '#ef4444' : '')},
-        {label: '營收成長 YoY', value: km.rev_growth != null ? km.rev_growth.toFixed(1) + '%' : '--'},
-        {label: '毛利率', value: km.gross_margin != null ? km.gross_margin.toFixed(1) + '%' : '--'},
-        {label: 'ROE', value: km.roe != null ? km.roe.toFixed(1) + '%' : '--'},
-        {label: '分析師上檔', value: km.target_upside != null ? (km.target_upside > 0 ? '+' : '') + km.target_upside.toFixed(1) + '%' : '--'},
-        {label: '推薦評級', value: km.rec || '--'},
-        {label: 'Beta', value: km.beta != null ? km.beta.toFixed(2) : '--'},
-        {label: '均線排列', value: km.ma_aligned ? '✅ 多頭' : '❌ 空頭'},
+        { label: '主力資金流 (CMF/OBV)', value: sm.inst_sentiment_label || '⚖️ 籌碼均衡', color: sm.inst_sentiment === 'HEAVY_ACCUMULATION' || sm.inst_sentiment === 'ACCUMULATING' ? '#10b981' : (sm.inst_sentiment === 'DISTRIBUTION' ? '#ef4444' : '#fff') },
+        { label: '選擇權金流 (PCR)', value: sm.options_sentiment_label || '⚖️ 量能均衡', color: sm.options_sentiment === 'BULLISH' ? '#10b981' : (sm.options_sentiment === 'BEARISH' ? '#ef4444' : '#fff') },
+        { label: '財報預期修正 (EPS Revision)', value: sm.revisions_sentiment_label || '⚖️ 持平無變動', color: sm.revisions_sentiment === 'BULLISH' ? '#10b981' : (sm.revisions_sentiment === 'BEARISH' ? '#ef4444' : '#fff') },
+        { label: '20MA 乖離率', value: (tp.deviation_20ma != null ? (tp.deviation_20ma > 0 ? '+' : '') + tp.deviation_20ma.toFixed(1) + '%' : '--'), color: tp.is_overextended ? '#ef4444' : '#10b981' },
+        
+        { label: 'Forward P/E', value: km.pe_fwd != null ? km.pe_fwd.toFixed(1) : '--' },
+        { label: 'RSI (14)', value: km.rsi != null ? km.rsi.toFixed(0) : '--' },
+        { label: '機構持股比率', value: sm.inst_holders != null ? sm.inst_holders.toFixed(1) + '%' : '--', color: '#8b5cf6' },
+        { label: '空單比率 (Short Ratio)', value: sm.short_ratio != null ? sm.short_ratio.toFixed(1) + '%' : '--', color: '#ef4444' },
+        
+        { label: '營收成長 YoY', value: km.rev_growth != null ? km.rev_growth.toFixed(1) + '%' : '--' },
+        { label: '毛利率', value: km.gross_margin != null ? km.gross_margin.toFixed(1) + '%' : '--' },
+        { label: 'ROE', value: km.roe != null ? km.roe.toFixed(1) + '%' : '--' },
+        { label: '均線排列', value: km.ma_aligned ? '✅ 多頭排列' : '❌ 多頭破壞', color: km.ma_aligned ? '#10b981' : '#ef4444' },
     ];
     var fundHtml = '';
-    metrics.forEach(function(m) {
+    metrics.forEach(function (m) {
         var vColor = m.color ? 'color:' + m.color + ';' : '';
         fundHtml += '<div class="xray-metric-card"><div class="metric-value" style="' + vColor + '">' + m.value + '</div><div class="metric-label">' + m.label + '</div></div>';
     });
@@ -2608,17 +2652,17 @@ function openStockXray(ticker) {
 
     // Signals
     var allPossibleSignals = [
-        {type: 'squeeze', label: '⚡ TTM Squeeze'},
-        {type: 'td9_sell', label: '🔴 TD9 賣出竭盡'},
-        {type: 'td9_buy', label: '🟢 TD9 買入竭盡'},
-        {type: 'ma_touch', label: '🔵 均線回測'},
-        {type: 'momentum', label: '🚀 動能突破'},
+        { type: 'squeeze', label: '⚡ TTM Squeeze' },
+        { type: 'td9_sell', label: '🔴 TD9 賣出竭盡' },
+        { type: 'td9_buy', label: '🟢 TD9 買入竭盡' },
+        { type: 'ma_touch', label: '🔵 均線回測' },
+        { type: 'momentum', label: '🚀 動能突破' },
     ];
-    var activeTypes = (stock.signals || []).map(function(s) { return s.type; });
+    var activeTypes = (stock.signals || []).map(function (s) { return s.type; });
     var sigHtml = '';
-    allPossibleSignals.forEach(function(ps) {
+    allPossibleSignals.forEach(function (ps) {
         var isActive = activeTypes.indexOf(ps.type) >= 0;
-        var activeSignal = isActive ? stock.signals.find(function(s) { return s.type === ps.type; }) : null;
+        var activeSignal = isActive ? stock.signals.find(function (s) { return s.type === ps.type; }) : null;
         sigHtml += '<div class="xray-signal ' + (isActive ? 'active' : 'inactive') + '">' +
             (isActive ? '✅' : '⬜') + ' ' + (activeSignal ? activeSignal.label : ps.label) + '</div>';
     });
@@ -2634,19 +2678,19 @@ function openStockXray(ticker) {
 function drawXrayRadar(dims) {
     var canvas = document.getElementById('xray-radar');
     var ctx = canvas.getContext('2d');
-    var w = 280, cx = w/2, cy = w/2, r = 110;
+    var w = 280, cx = w / 2, cy = w / 2, r = 110;
     canvas.width = w; canvas.height = w;
     ctx.clearRect(0, 0, w, w);
 
-    var labels = ['momentum','technical','fundamental','consensus','risk'];
-    var labelNames = ['動能','技術','基本面','共識','風險'];
-    var colors = ['#f59e0b','#3b82f6','#10b981','#8b5cf6','#06b6d4'];
+    var labels = ['momentum', 'technical', 'fundamental', 'consensus', 'risk'];
+    var labelNames = ['動能', '技術', '基本面', '共識', '風險'];
+    var colors = ['#f59e0b', '#3b82f6', '#10b981', '#8b5cf6', '#06b6d4'];
     var n = labels.length;
     var angle = Math.PI * 2 / n;
     var startAngle = -Math.PI / 2;
 
     // Draw grid rings
-    [0.2, 0.4, 0.6, 0.8, 1.0].forEach(function(scale) {
+    [0.2, 0.4, 0.6, 0.8, 1.0].forEach(function (scale) {
         ctx.beginPath();
         for (var i = 0; i < n; i++) {
             var a = startAngle + i * angle;
@@ -2753,12 +2797,12 @@ async function loadXrayChart(ticker) {
         xrayVolumeSeries.priceScale().applyOptions({ scaleMargins: { top: 0.78, bottom: 0 } });
 
         xrayCandleSeries.setData(data);
-        xrayVolumeSeries.setData(data.map(function(d) {
+        xrayVolumeSeries.setData(data.map(function (d) {
             return { time: d.time, value: d.volume, color: d.close >= d.open ? 'rgba(239,68,68,0.3)' : 'rgba(16,185,129,0.3)' };
         }));
 
         xrayChart.timeScale().fitContent();
-    } catch(e) {
+    } catch (e) {
         container.innerHTML = '<div style="text-align:center; padding:40px; color:var(--text-muted);">K 線載入失敗</div>';
     }
 }
@@ -2785,11 +2829,11 @@ async function loadXrayQuarterly(ticker) {
 
         // Margin line chart
         drawLineChart(marginCanvas, quarters, '毛利率 vs 營業利潤率', [
-            {key: 'gross_margin', label: '毛利率', color: '#10b981'},
-            {key: 'op_margin', label: '營業利潤率', color: '#f59e0b'},
+            { key: 'gross_margin', label: '毛利率', color: '#10b981' },
+            { key: 'op_margin', label: '營業利潤率', color: '#f59e0b' },
         ]);
 
-    } catch(e) {
+    } catch (e) {
         console.error('Quarterly load error:', e);
     }
 }
@@ -2800,7 +2844,7 @@ function drawBarChart(canvas, quarters, fmtKey, valKey, title, color) {
     var h = 200;
     canvas.width = w; canvas.height = h;
 
-    var padding = {top: 30, right: 10, bottom: 40, left: 10};
+    var padding = { top: 30, right: 10, bottom: 40, left: 10 };
     var cw = w - padding.left - padding.right;
     var ch = h - padding.top - padding.bottom;
 
@@ -2812,12 +2856,12 @@ function drawBarChart(canvas, quarters, fmtKey, valKey, title, color) {
     ctx.textAlign = 'left';
     ctx.fillText(title, padding.left, 18);
 
-    var vals = quarters.map(function(q) { return q[valKey] || 0; });
+    var vals = quarters.map(function (q) { return q[valKey] || 0; });
     var maxVal = Math.max.apply(null, vals) * 1.1 || 1;
     var barW = cw / quarters.length * 0.6;
     var gap = cw / quarters.length;
 
-    quarters.forEach(function(q, i) {
+    quarters.forEach(function (q, i) {
         var val = q[valKey] || 0;
         var barH = (val / maxVal) * ch;
         var x = padding.left + i * gap + (gap - barW) / 2;
@@ -2835,13 +2879,13 @@ function drawBarChart(canvas, quarters, fmtKey, valKey, title, color) {
         ctx.font = '500 9px Inter, sans-serif';
         ctx.fillStyle = 'rgba(255,255,255,0.5)';
         ctx.textAlign = 'center';
-        ctx.fillText(q.label || '', x + barW/2, h - padding.bottom + 14);
+        ctx.fillText(q.label || '', x + barW / 2, h - padding.bottom + 14);
 
         // Value
         if (q[fmtKey]) {
             ctx.font = '600 9px JetBrains Mono, monospace';
             ctx.fillStyle = 'rgba(255,255,255,0.7)';
-            ctx.fillText(q[fmtKey], x + barW/2, y - 6);
+            ctx.fillText(q[fmtKey], x + barW / 2, y - 6);
         }
     });
 }
@@ -2852,7 +2896,7 @@ function drawLineChart(canvas, quarters, title, series) {
     var h = 200;
     canvas.width = w; canvas.height = h;
 
-    var padding = {top: 30, right: 10, bottom: 40, left: 40};
+    var padding = { top: 30, right: 10, bottom: 40, left: 40 };
     var cw = w - padding.left - padding.right;
     var ch = h - padding.top - padding.bottom;
 
@@ -2866,8 +2910,8 @@ function drawLineChart(canvas, quarters, title, series) {
 
     // Find min/max across all series
     var allVals = [];
-    series.forEach(function(s) {
-        quarters.forEach(function(q) { if (q[s.key] != null) allVals.push(q[s.key]); });
+    series.forEach(function (s) {
+        quarters.forEach(function (q) { if (q[s.key] != null) allVals.push(q[s.key]); });
     });
     if (allVals.length === 0) return;
     var minVal = Math.min.apply(null, allVals) - 5;
@@ -2893,17 +2937,17 @@ function drawLineChart(canvas, quarters, title, series) {
     // X axis labels
     var gap = cw / (quarters.length - 1 || 1);
     ctx.textAlign = 'center';
-    quarters.forEach(function(q, i) {
+    quarters.forEach(function (q, i) {
         ctx.fillStyle = 'rgba(255,255,255,0.4)';
         ctx.font = '500 9px Inter, sans-serif';
         ctx.fillText(q.label || '', padding.left + i * gap, h - padding.bottom + 14);
     });
 
     // Draw lines
-    series.forEach(function(s) {
+    series.forEach(function (s) {
         ctx.beginPath();
         var started = false;
-        quarters.forEach(function(q, i) {
+        quarters.forEach(function (q, i) {
             var val = q[s.key];
             if (val == null) return;
             var x = padding.left + i * gap;
@@ -2916,7 +2960,7 @@ function drawLineChart(canvas, quarters, title, series) {
         ctx.stroke();
 
         // Dots
-        quarters.forEach(function(q, i) {
+        quarters.forEach(function (q, i) {
             var val = q[s.key];
             if (val == null) return;
             var x = padding.left + i * gap;
@@ -2931,7 +2975,7 @@ function drawLineChart(canvas, quarters, title, series) {
     // Legend
     var legendX = w - padding.right - 10;
     ctx.textAlign = 'right';
-    series.forEach(function(s, i) {
+    series.forEach(function (s, i) {
         var ly = padding.top + 6 + i * 16;
         ctx.beginPath();
         ctx.arc(legendX - ctx.measureText(s.label).width - 12, ly, 4, 0, Math.PI * 2);
@@ -2944,7 +2988,7 @@ function drawLineChart(canvas, quarters, title, series) {
 }
 
 // Back button
-document.getElementById('xray-back-btn')?.addEventListener('click', function() {
+document.getElementById('xray-back-btn')?.addEventListener('click', function () {
     switchToView('power-gauge');
     loadAndRenderPowerGauge();
 });

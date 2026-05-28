@@ -279,10 +279,12 @@ def fetch_fundamentals(ticker):
         try:
             rev_df = stock.eps_revisions
             if rev_df is not None and not rev_df.empty:
-                # '0y' 代表今年度
                 if '0y' in rev_df.index:
                     eps_up = int(rev_df.loc['0y', 'upLast30days'])
                     eps_down = int(rev_df.loc['0y', 'downLast30days'])
+                elif len(rev_df) > 0:
+                    eps_up = int(rev_df.iloc[0].get('upLast30days', 0))
+                    eps_down = int(rev_df.iloc[0].get('downLast30days', 0))
         except Exception:
             pass
         data['eps_up_30d'] = eps_up
@@ -290,20 +292,34 @@ def fetch_fundamentals(ticker):
 
         # --- 選擇權金流 (Options Put/Call Ratio) ---
         pc_ratio = None
+        oi_pc_ratio = None
         try:
             dates = stock.options
             if dates:
-                # 取最近一個到期日
-                chain = stock.option_chain(dates[0])
-                c_vol = chain.calls['volume'].sum() if not chain.calls.empty else 0
-                p_vol = chain.puts['volume'].sum() if not chain.puts.empty else 0
-                if c_vol > 0:
-                    pc_ratio = round(float(p_vol) / float(c_vol), 2)
-                elif p_vol > 0:
-                    pc_ratio = 9.99  # Put 壓倒性多
+                total_c_vol = 0
+                total_p_vol = 0
+                total_c_oi = 0
+                total_p_oi = 0
+                for d in dates[:2]:
+                    chain = stock.option_chain(d)
+                    if chain.calls is not None and not chain.calls.empty:
+                        total_c_vol += chain.calls['volume'].fillna(0).sum()
+                        total_c_oi += chain.calls['openInterest'].fillna(0).sum()
+                    if chain.puts is not None and not chain.puts.empty:
+                        total_p_vol += chain.puts['volume'].fillna(0).sum()
+                        total_p_oi += chain.puts['openInterest'].fillna(0).sum()
+                
+                if total_c_vol > 0:
+                    pc_ratio = round(float(total_p_vol) / float(total_c_vol), 2)
+                elif total_p_vol > 0:
+                    pc_ratio = 9.99
+                
+                if total_c_oi > 0:
+                    oi_pc_ratio = round(float(total_p_oi) / float(total_c_oi), 2)
         except Exception:
             pass
         data['options_pc_ratio'] = pc_ratio
+        data['options_oi_pc_ratio'] = oi_pc_ratio
 
         # 季度趨勢
         data['quarters'] = get_quarterly_trends(stock)
