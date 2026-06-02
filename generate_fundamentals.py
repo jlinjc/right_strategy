@@ -80,6 +80,24 @@ def safe_pct(val, digits=1):
         return None
 
 
+def safe_int(val, default=0):
+    if val is None or (isinstance(val, float) and np.isnan(val)):
+        return default
+    try:
+        return int(val)
+    except (TypeError, ValueError):
+        return default
+
+
+def safe_float(val, default=0.0):
+    if val is None or (isinstance(val, float) and np.isnan(val)):
+        return default
+    try:
+        return float(val)
+    except (TypeError, ValueError):
+        return default
+
+
 # ============================================================
 # 季度趨勢數據
 # ============================================================
@@ -320,6 +338,193 @@ def fetch_fundamentals(ticker):
             pass
         data['options_pc_ratio'] = pc_ratio
         data['options_oi_pc_ratio'] = oi_pc_ratio
+
+        # --- 選擇權合約推薦與損益模擬 (Long Call Options Selection & Simulation) ---
+        options_analysis = None
+        try:
+            dates = stock.options
+            if dates:
+                from options_pricing import BlackScholes, PnLSimulator
+                bs = BlackScholes()
+                simulator = PnLSimulator()
+                
+                all_calls = []
+                today_date = datetime.now().date()
+                r_rate = 0.043
+                
+                # 下載日線歷史波動率作為 sigma 備用
+                daily_close = stock.history(period="1mo")['Close']
+                log_ret = np.log(daily_close / daily_close.shift(1)).dropna()
+                hv_20 = float(log_ret.std() * np.sqrt(252)) if len(log_ret) >= 5 else 0.35
+                if np.isnan(hv_20) or hv_20 <= 0:
+                    hv_20 = 0.35
+                
+                # 掃描前 5 個到期日，以保證下載速度與流動性
+                for d in dates[:5]:
+                    expiry_date = datetime.strptime(d, '%Y-%m-%d').date()
+                    dte = (expiry_date - today_date).days
+                    if dte < 3 or dte > 120:
+                        continue
+                    T_years = dte / 365.0
+                    
+                    try:
+                        chain = stock.option_chain(d)
+                        calls = chain.calls
+                        if calls is None or calls.empty:
+                            continue
+                    except Exception:
+                        continue
+                    
+                    # 估算這期到期的 ATM IV
+                    closest_atm_df = calls.copy()
+                    closest_atm_df['_dist'] = abs(closest_atm_df['strike'] - price)
+                    valid_chain = closest_atm_df.nsmallest(3, '_dist')
+                    valid_ivs = valid_chain['impliedVolatility'].dropna()
+                    valid_ivs = valid_ivs[valid_ivs > 0.01]
+                    current_iv = float(valid_ivs.mean()) if not valid_ivs.empty else hv_20
+                    if np.isnan(current_iv) or current_iv <= 0:
+                        current_iv = hv_20
+                        
+                    for _, row in calls.iterrows():
+                        strike = row.get('strike')
+                        bid = safe_float(row.get('bid', 0))
+                        ask = safe_float(row.get('ask', 0))
+                        vol = safe_int(row.get('volume', 0))
+                        oi = safe_int(row.get('openInterest', 0))
+                        mkt_iv = safe_float(row.get('impliedVolatility', 0))
+                        
+                        if bid <= 0 or ask <= 0 or ask < bid:
+                            continue
+                        mid = (bid + ask) / 2
+                        if mid < 0.05:
+                            continue
+                            
+                        spread_pct = (ask - bid) / mid
+                        # 流動性適度過濾，排除極端不流動合約
+                        if vol < 5 and oi < 10:
+                            continue
+                        if spread_pct > 0.35:
+                            continue
+                            
+                        sigma_val = mkt_iv if mkt_iv > 0.01 else current_iv
+                        if np.isnan(sigma_val) or sigma_val <= 0:
+                            sigma_val = current_iv
+                            
+                        # 計算 Greeks
+                        g = bs.call_greeks(price, strike, T_years, r_rate, sigma_val)
+                        if g.delta < 0.20 or g.delta > 0.85:
+                            continue
+                            
+                        premium = ask
+                        breakeven = strike + premium
+                        
+                        # 模擬價格上漲 10% 的報酬率
+                        target_price = price * 1.10
+                        profit_at_target = max(target_price - strike, 0) - premium
+                        rr_ratio = profit_at_target / premium if premium > 0 else 0
+                        
+                        # 評分系統
+                        score = 0
+                        # 1. 盈虧比 (0~25)
+                        score += min(25, rr_ratio * 8)
+                        # 2. Delta 甜蜜點 (0~15) -> 0.40~0.60 最佳
+                        score += max(0, 15 - abs(g.delta - 0.50) * 40)
+                        # 3. DTE 甜蜜點 (0~15) -> 25~60 天最佳
+                        if 25 <= dte <= 60:
+                            score += 15
+                        elif 14 <= dte <= 90:
+                            score += 10
+                        elif 7 <= dte <= 120:
+                            score += 5
+                        # 4. Spread 流動性 (0~15)
+                        score += max(0, 15 - spread_pct * 45)
+                        # 5. Volume & OI (0~15)
+                        score += min(15, (vol + oi) / 150)
+                        # 6. Delta/Theta 效率 (0~15)
+                        dt_ratio = abs(g.delta / g.theta) if g.theta != 0 else 0
+                        score += min(15, dt_ratio * 3)
+                        
+                        all_calls.append({
+                            'expiry': d,
+                            'dte': dte,
+                            'strike': float(strike),
+                            'bid': float(bid),
+                            'ask': float(ask),
+                            'mid': float(mid),
+                            'volume': int(vol),
+                            'oi': int(oi),
+                            'spread_pct': float(spread_pct),
+                            'iv': float(sigma_val),
+                            'delta': float(g.delta),
+                            'theta': float(g.theta),
+                            'breakeven': float(breakeven),
+                            'breakeven_pct': float((breakeven / price - 1) * 100),
+                            'rr_ratio': float(rr_ratio),
+                            'score': float(score),
+                        })
+                
+                if all_calls:
+                    # 排序
+                    all_calls.sort(key=lambda x: x['score'], reverse=True)
+                    
+                    # 找出短、中、長天期的最佳合約
+                    short_best = None
+                    mid_best = None
+                    far_best = None
+                    
+                    for c in all_calls:
+                        if c['dte'] <= 21 and short_best is None:
+                            short_best = c
+                        elif 25 <= c['dte'] <= 60 and mid_best is None:
+                            mid_best = c
+                        elif c['dte'] > 60 and far_best is None:
+                            far_best = c
+                            
+                    best_overall = all_calls[0]
+                    
+                    # 生成損益模擬矩陣
+                    price_changes = [-0.10, -0.05, 0.0, 0.05, 0.10, 0.20]
+                    hold_days = [1, 7, max(1, best_overall['dte'] // 2), best_overall['dte']]
+                    hold_days = sorted(list(set(hold_days)))
+                    
+                    pnl_matrix = []
+                    for pct in price_changes:
+                        tgt_p = price * (1 + pct)
+                        row_pnl = {
+                            'change_pct': round(pct * 100, 1),
+                            'target_price': round(tgt_p, 2),
+                            'scenarios': []
+                        }
+                        for days in hold_days:
+                            rem_T = max((best_overall['dte'] - days) / 365.0, 0.0001)
+                            if rem_T > 0.0001:
+                                value = bs.call_price(tgt_p, best_overall['strike'], rem_T, r_rate, best_overall['iv'])
+                            else:
+                                value = max(tgt_p - best_overall['strike'], 0)
+                                
+                            pnl_share = value - best_overall['ask']
+                            pnl_pct = (pnl_share / best_overall['ask']) * 100 if best_overall['ask'] > 0 else 0
+                            
+                            row_pnl['scenarios'].append({
+                                'days_held': int(days),
+                                'pnl_per_share': round(float(pnl_share), 2),
+                                'pnl_pct': round(float(pnl_pct), 1),
+                                'pnl_contract_usd': round(float(pnl_share) * 100, 1)
+                            })
+                        pnl_matrix.append(row_pnl)
+                        
+                    options_analysis = {
+                        'best_overall': best_overall,
+                        'short_best': short_best or best_overall,
+                        'mid_best': mid_best or best_overall,
+                        'far_best': far_best or best_overall,
+                        'pnl_matrix': pnl_matrix,
+                        'hold_days': hold_days,
+                    }
+        except Exception as e:
+            print(f"  ⚠️ Options Analysis 計算失敗: {e}")
+            
+        data['options_analysis'] = options_analysis
 
         # 季度趨勢
         data['quarters'] = get_quarterly_trends(stock)

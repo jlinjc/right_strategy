@@ -274,6 +274,7 @@ def generate_power_gauge():
             eps_down_30d = fund.get('eps_down_30d', 0)
             options_pc_ratio = fund.get('options_pc_ratio')
             options_oi_pc_ratio = fund.get('options_oi_pc_ratio')
+            options_analysis = fund.get('options_analysis')
 
             # --- 交易規劃 (Trade Plan) ---
             swing_low_5d = float(low.tail(5).min())
@@ -342,6 +343,7 @@ def generate_power_gauge():
                 'options_oi_pc_ratio': options_oi_pc_ratio,
                 'cmf_5d': cmf_5d,
                 'deviation_20ma': deviation_20ma,
+                'options_analysis': options_analysis,
                 # Trade Plan parameters
                 'swing_low_5d': swing_low_5d,
                 'swing_low_20d': swing_low_20d,
@@ -701,6 +703,7 @@ def generate_power_gauge():
                 'pct_from_high': round(m['pct_from_high'], 1),
             },
             'signals': signals,
+            'options_analysis': m['options_analysis'],
         })
 
     # 按總分排序

@@ -9,11 +9,15 @@ backtest_signals.py - 個股訊號勝率回測引擎
 
 import json
 import os
+import sys
 import numpy as np
 import yfinance as yf
 import pandas as pd
 from datetime import datetime
 from scanner_base import AI_TECH_STOCKS, BENCHMARK, DASHBOARD_DIR
+
+if sys.stdout.encoding and sys.stdout.encoding.lower() != 'utf-8':
+    sys.stdout.reconfigure(encoding='utf-8')
 
 FORWARD_DAYS = [1, 3, 5, 10]
 

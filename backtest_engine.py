@@ -291,17 +291,17 @@ class RiskManager:
         self.max_daily_loss_pct = max_daily_loss_pct
         self.max_sector_positions = max_sector_positions
 
-        # 板塊對照表
-        self._sector_map = {
-            'semiconductor': ['NVDA', 'AMD', 'TSM', 'AVGO', 'MU', 'QCOM', 'ARM',
-                              'MRVL', 'AMAT', 'LRCX', 'KLAC', 'TXN', 'INTC', 'MPWR'],
-            'cloud_software': ['MSFT', 'GOOGL', 'AMZN', 'META', 'AAPL', 'IBM',
-                               'PLTR', 'CRM', 'ORCL', 'NOW', 'SNOW', 'DDOG', 'MDB',
-                               'ADBE', 'INTU', 'PATH', 'APP'],
-            'cybersecurity': ['NET', 'CRWD', 'PANW', 'FTNT', 'ZS', 'OKTA'],
-            'servers_network': ['SMCI', 'DELL', 'HPE', 'ANET', 'PSTG', 'NTAP'],
-            'power_infra': ['VRT', 'ETN', 'PWR', 'CEG', 'NEE', 'GE', 'DUK'],
-            'other': ['TSLA', 'UBER', 'SYM'],
+                self._sector_map = {
+            'semiconductor': ['NVDA', 'AMD', 'TSM', 'AVGO', 'ARM'],
+            'optics_connect': ['COHR', 'LITE', 'CLS', 'FN', 'CAMT'],
+            'servers_storage': ['SMCI', 'DELL', 'ANET', 'PSTG', 'WDC'],
+            'cooling_infra': ['VRT', 'MOD', 'FIX', 'EME', 'JCI'],
+            'power_grid': ['CEG', 'VST', 'GEV', 'ETN', 'SMR'],
+            'cloud_software': ['PLTR', 'APP', 'MSFT', 'GOOGL', 'META'],
+            'biotech_glp1': ['LLY', 'NVO', 'VKTX', 'TMDX', 'CRSP'],
+            'space_defense': ['RKLB', 'LUNR', 'ASTS', 'GE', 'LMT'],
+            'robotics_autonomous': ['TSLA', 'UBER', 'SYM', 'ISRG', 'ROK'],
+            'cybersecurity_fintech': ['CRWD', 'PANW', 'NET', 'COIN', 'HOOD'],
         }
         # 反向對照
         self._ticker_sector = {}

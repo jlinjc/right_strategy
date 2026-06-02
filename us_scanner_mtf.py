@@ -3,11 +3,11 @@ import pandas as pd
 import json
 import os
 import time
-from scanner_base import USStockScanner
+from scanner_base import AI_TECH_STOCKS
 
-class MTFScanner(USStockScanner):
+class MTFScanner:
     def __init__(self):
-        super().__init__()
+        self.tracked_tickers = AI_TECH_STOCKS
         self.output_file = os.path.join("Web_Dashboard", "mtf_trend.json")
 
     def run(self):

@@ -99,21 +99,27 @@ def save_dashboard_data(filename, data):
 BENCHMARK = "QQQ"
 
 _DEFAULT_STOCKS = [
-    # 半導體
-    "NVDA", "AMD", "TSM", "AVGO", "MU", "QCOM", "ARM", "MRVL",
-    "AMAT", "LRCX", "KLAC", "TXN", "INTC", "MPWR",
-    # 軟體 & 雲端
-    "MSFT", "GOOGL", "AMZN", "META", "AAPL", "IBM",
-    "PLTR", "CRM", "ORCL", "NOW", "SNOW", "DDOG", "MDB",
-    "ADBE", "INTU", "PATH", "APP",
-    # 資安
-    "NET", "CRWD", "PANW", "FTNT", "ZS", "OKTA",
-    # 伺服器 & 網通
-    "SMCI", "DELL", "HPE", "ANET", "PSTG", "NTAP",
-    # AI 電力 & 基建
-    "VRT", "ETN", "PWR", "CEG", "NEE", "GE", "DUK",
-    # 其他
-    "TSLA", "UBER", "SYM",
+    # 1. 先進半導體與封裝 (AI Semiconductors & Packaging)
+    # 1. 先進半導體與封裝 (AI Semiconductors & Packaging)
+    "NVDA", "AMD", "TSM", "AVGO", "ARM",
+    # 2. 矽光子與高速光通信 (Silicon Photonics & Optics)
+    "COHR", "LITE", "CLS", "FN", "CAMT",
+    # 3. AI伺服器與高速存儲 (AI Servers & Storage)
+    "SMCI", "DELL", "ANET", "PSTG", "WDC",
+    # 4. 液冷基建與精密空調 (Cooling & HVAC Infrastructure)
+    "VRT", "MOD", "FIX", "EME", "JCI",
+    # 5. AI電力、核能與SMR (AI Power & Grid & SMR)
+    "CEG", "VST", "GEV", "ETN", "SMR",
+    # 6. AI軟體、智慧代理與超大市值 (AI SaaS & Hyperscalers)
+    "PLTR", "APP", "MSFT", "GOOGL", "META",
+    # 7. 減肥藥與生技巨頭 (GLP-1 Weight Loss & Biotech)
+    "LLY", "NVO", "VKTX", "TMDX", "CRSP",
+    # 8. 低軌衛星與太空軍工 (Space & Satellites & Defense)
+    "RKLB", "LUNR", "ASTS", "GE", "LMT",
+    # 9. 自動駕駛與智慧機器人 (Autonomous & Robotics)
+    "TSLA", "UBER", "SYM", "ISRG", "ROK",
+    # 10. 網路安全與未來金融科技 (Cybersecurity & Fintech & Crypto)
+    "CRWD", "PANW", "NET", "COIN", "HOOD",
 ]
 
 WATCHLIST_FILE = os.path.join(os.path.dirname(__file__), 'watchlist.json')
@@ -274,5 +280,82 @@ def calculate_position(entry_price, stop_loss_price, custom_risk_pct=None):
     actual_risk = shares * stop_distance
     
     return shares, total_cost, actual_risk
+
+
+def get_market_regime():
+    """
+    整合大盤廣度 + QQQ 均線判斷，回傳統一的市場環境物件。
+    用於所有策略的進場前環境檢查。
+    """
+    import yfinance as yf
+
+    result = {
+        'breadth': 50.0,
+        'breadth_label': '🟡 震盪',
+        'qqq_price': 0,
+        'qqq_20ma': 0,
+        'qqq_50ma': 0,
+        'qqq_vs_20ma': 'unknown',
+        'qqq_vs_50ma': 'unknown',
+        'regime': 'half_risk',
+        'risk_per_trade': 0.01,
+        'max_positions': 3,
+        'message': '計算中...',
+    }
+
+    # 1. 計算大盤廣度
+    breadth = calculate_market_breadth()
+    result['breadth'] = breadth
+
+    # 2. 下載 QQQ 日線計算均線
+    try:
+        qqq_df = yf.download(BENCHMARK, period="75d", interval="1d", progress=False)
+        if qqq_df is not None and not qqq_df.empty:
+            if isinstance(qqq_df.columns, pd.MultiIndex):
+                qqq_df.columns = qqq_df.columns.get_level_values(0)
+            qqq_close = float(qqq_df['Close'].iloc[-1])
+            qqq_20ma = float(qqq_df['Close'].rolling(20).mean().iloc[-1]) if len(qqq_df) >= 20 else 0
+            qqq_50ma = float(qqq_df['Close'].rolling(50).mean().iloc[-1]) if len(qqq_df) >= 50 else 0
+
+            result['qqq_price'] = round(qqq_close, 2)
+            result['qqq_20ma'] = round(qqq_20ma, 2)
+            result['qqq_50ma'] = round(qqq_50ma, 2)
+            result['qqq_vs_20ma'] = 'above' if qqq_close > qqq_20ma else 'below'
+            result['qqq_vs_50ma'] = 'above' if (qqq_50ma > 0 and qqq_close > qqq_50ma) else 'below'
+    except Exception as e:
+        print(f"⚠️ QQQ 均線計算失敗: {e}")
+
+    # 3. 綜合判定
+    qqq_below_50ma = result['qqq_vs_50ma'] == 'below'
+
+    if breadth > 60 and not qqq_below_50ma:
+        result['breadth_label'] = '🟢 強勢多頭'
+        result['regime'] = 'full_risk'
+        result['risk_per_trade'] = 0.02
+        result['max_positions'] = 6
+        result['message'] = '大盤環境良好，正常交易 (單筆風險 2%，最多 6 檔)'
+    elif breadth >= 40 and not qqq_below_50ma:
+        result['breadth_label'] = '🟡 震盪行情'
+        result['regime'] = 'half_risk'
+        result['risk_per_trade'] = 0.01
+        result['max_positions'] = 3
+        result['message'] = '震盪行情，減半交易 (單筆風險 1%，最多 3 檔)'
+    else:
+        result['breadth_label'] = '🔴 防守行情'
+        result['regime'] = 'no_risk'
+        result['risk_per_trade'] = 0.0
+        result['max_positions'] = 0
+        result['message'] = '大盤弱勢，暫停做多！持有現金等待轉強。'
+
+    # QQQ < 50MA 強制降級
+    if qqq_below_50ma and result['regime'] != 'no_risk':
+        result['regime'] = 'no_risk'
+        result['risk_per_trade'] = 0.0
+        result['max_positions'] = 0
+        result['message'] = '⚠️ QQQ 跌破 50MA，暫停所有新倉！'
+        result['breadth_label'] = '🔴 QQQ < 50MA'
+
+    print(f"✅ 市場環境判定: {result['breadth_label']} | 廣度 {breadth:.1f}% | QQQ ${result['qqq_price']} vs 20MA ${result['qqq_20ma']} / 50MA ${result['qqq_50ma']}")
+    return result
 
 

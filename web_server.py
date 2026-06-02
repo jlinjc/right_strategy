@@ -372,9 +372,34 @@ class APIHandler(http.server.SimpleHTTPRequestHandler):
                 self.end_headers()
                 self.wfile.write(json.dumps({'status': 'error', 'message': str(e)}).encode('utf-8'))
 
+        elif self.path == '/api/generate_trade_plan':
+            # 背景執行 trade_planner.py
+            try:
+                import subprocess
+                def run_planner():
+                    subprocess.run(
+                        [sys.executable, os.path.join(SCRIPT_DIR, 'trade_planner.py')],
+                        cwd=SCRIPT_DIR,
+                        timeout=300,
+                    )
+                    print(f"[{datetime.now().strftime('%H:%M:%S')}] ✅ 交易計劃已重新產生")
+                threading.Thread(target=run_planner, daemon=True).start()
+                self.send_response(200)
+                self.send_header('Content-type', 'application/json')
+                self.end_headers()
+                self.wfile.write(json.dumps({
+                    'status': 'ok',
+                    'message': '交易計劃掃描已在背景啟動，請稍候約 30 秒後重新載入',
+                    'time': datetime.now().strftime('%H:%M:%S')
+                }).encode('utf-8'))
+            except Exception as e:
+                self.send_response(500)
+                self.send_header('Content-type', 'application/json')
+                self.end_headers()
+                self.wfile.write(json.dumps({'status': 'error', 'message': str(e)}).encode('utf-8'))
+
         else:
             self.send_error(404, "Not Found")
-
     def do_GET(self):
         # GET /api/watchlist — 讀取追蹤清單
         if self.path == '/api/watchlist':
@@ -390,6 +415,29 @@ class APIHandler(http.server.SimpleHTTPRequestHandler):
                 self.send_header('Content-type', 'application/json')
                 self.end_headers()
                 self.wfile.write(b'{"status": "error"}')
+
+        elif self.path == '/api/trade_plan':
+            # GET /api/trade_plan — 讀取交易計劃 JSON
+            try:
+                plan_path = os.path.join(WEB_DIR, 'trade_plan.json')
+                if os.path.exists(plan_path):
+                    with open(plan_path, 'r', encoding='utf-8') as f:
+                        data = json.load(f)
+                    self.send_response(200)
+                    self.send_header('Content-type', 'application/json')
+                    self.end_headers()
+                    self.wfile.write(json.dumps(data, ensure_ascii=False).encode('utf-8'))
+                else:
+                    self.send_response(200)
+                    self.send_header('Content-type', 'application/json')
+                    self.end_headers()
+                    self.wfile.write(json.dumps({'status': 'no_plan', 'message': '尚未產生交易計劃，請點擊重新掃描'}).encode('utf-8'))
+            except Exception as e:
+                self.send_response(500)
+                self.send_header('Content-type', 'application/json')
+                self.end_headers()
+                self.wfile.write(json.dumps({'status': 'error', 'message': str(e)}).encode('utf-8'))
+
         else:
             # 靜態檔案
             super().do_GET()

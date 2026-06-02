@@ -1196,3 +1196,209 @@ nav { flex: 1; display: flex; flex-direction: column; gap: 4px; }
     }
 }
 
+/* ============================================================
+   VIEW 0: 今日交易計劃 (Trade Plan)
+   ============================================================ */
+
+/* 市場環境燈號 */
+.tp-regime-light {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    width: 110px; height: 110px; border-radius: 20px;
+    transition: all 0.5s; flex-shrink: 0;
+}
+.tp-regime-light .tp-light-emoji { font-size: 36px; margin-bottom: 4px; }
+.tp-regime-light .tp-light-text { font-size: 11px; font-weight: 700; letter-spacing: 0.5px; }
+
+.tp-regime-light.regime-green {
+    background: linear-gradient(135deg, rgba(16,185,129,0.2), rgba(16,185,129,0.08));
+    border: 2px solid rgba(16,185,129,0.5);
+    box-shadow: 0 0 30px rgba(16,185,129,0.15);
+    color: #10b981;
+}
+.tp-regime-light.regime-yellow {
+    background: linear-gradient(135deg, rgba(245,158,11,0.2), rgba(245,158,11,0.08));
+    border: 2px solid rgba(245,158,11,0.5);
+    box-shadow: 0 0 30px rgba(245,158,11,0.15);
+    color: #f59e0b;
+}
+.tp-regime-light.regime-red {
+    background: linear-gradient(135deg, rgba(239,68,68,0.2), rgba(239,68,68,0.08));
+    border: 2px solid rgba(239,68,68,0.5);
+    box-shadow: 0 0 30px rgba(239,68,68,0.15);
+    color: #ef4444;
+}
+.tp-regime-light.regime-loading {
+    background: rgba(100,116,139,0.12);
+    border: 2px solid rgba(100,116,139,0.3);
+    color: var(--text-muted);
+}
+
+/* 參數卡片 */
+.tp-param-card {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    padding: 12px 20px; border-radius: 12px;
+    background: var(--bg-card); border: 1px solid var(--border-glow);
+    min-width: 100px;
+}
+.tp-param-card .tp-param-label {
+    font-size: 10px; color: var(--text-muted); text-transform: uppercase;
+    letter-spacing: 0.5px; margin-bottom: 4px; font-weight: 600;
+}
+.tp-param-card .tp-param-value {
+    font-size: 22px; font-weight: 700; font-family: var(--font-mono);
+}
+
+/* 買入訊號卡片 */
+.tp-signal-card {
+    background: var(--bg-panel); border: 1px solid var(--border-glow);
+    border-radius: 14px; padding: 0; overflow: hidden;
+    transition: all 0.2s; position: relative;
+}
+.tp-signal-card:hover { border-color: var(--border-highlight); transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,0.3); }
+
+.tp-signal-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 18px; border-bottom: 1px solid rgba(255,255,255,0.04);
+    background: linear-gradient(90deg, rgba(16,185,129,0.08), transparent);
+}
+.tp-signal-ticker {
+    font-size: 20px; font-weight: 800; font-family: var(--font-mono);
+    color: var(--text-main);
+}
+.tp-signal-strategy {
+    font-size: 11px; padding: 4px 10px; border-radius: 6px;
+    font-weight: 700; letter-spacing: 0.3px;
+}
+.tp-signal-strategy.td9 { background: rgba(16,185,129,0.15); color: #10b981; border: 1px solid rgba(16,185,129,0.3); }
+.tp-signal-strategy.ma { background: rgba(59,130,246,0.15); color: #3b82f6; border: 1px solid rgba(59,130,246,0.3); }
+.tp-signal-strategy.momentum { background: rgba(245,158,11,0.15); color: #f59e0b; border: 1px solid rgba(245,158,11,0.3); }
+
+.tp-signal-body { padding: 16px 18px; }
+
+.tp-signal-prices {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;
+    margin-bottom: 14px;
+}
+.tp-price-cell {
+    text-align: center; padding: 10px; border-radius: 10px;
+    background: var(--bg-card); border: 1px solid var(--border-glow);
+}
+.tp-price-cell .tp-price-label {
+    font-size: 10px; color: var(--text-muted); text-transform: uppercase;
+    letter-spacing: 0.5px; margin-bottom: 4px; font-weight: 600;
+}
+.tp-price-cell .tp-price-value {
+    font-size: 18px; font-weight: 700; font-family: var(--font-mono);
+}
+.tp-price-cell .tp-price-sub {
+    font-size: 10px; margin-top: 2px; font-family: var(--font-mono);
+}
+.tp-price-cell.entry .tp-price-value { color: var(--text-main); }
+.tp-price-cell.stop .tp-price-value { color: #ef4444; }
+.tp-price-cell.stop .tp-price-sub { color: #ef4444; }
+.tp-price-cell.target .tp-price-value { color: #10b981; }
+
+.tp-signal-meta {
+    display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px;
+}
+.tp-meta-tag {
+    font-size: 10px; padding: 3px 8px; border-radius: 4px;
+    background: rgba(139,92,246,0.12); color: var(--accent-purple);
+    font-weight: 600; font-family: var(--font-mono);
+}
+
+.tp-signal-position {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 10px 14px; border-radius: 10px;
+    background: rgba(59,130,246,0.06); border: 1px solid rgba(59,130,246,0.15);
+    margin-bottom: 14px;
+}
+.tp-position-item {
+    display: flex; flex-direction: column; align-items: center;
+}
+.tp-position-item .tp-pos-label {
+    font-size: 9px; color: var(--text-muted); text-transform: uppercase;
+    letter-spacing: 0.5px; font-weight: 600;
+}
+.tp-position-item .tp-pos-value {
+    font-size: 15px; font-weight: 700; font-family: var(--font-mono);
+    color: var(--text-primary);
+}
+
+/* Schwab 下單指令 */
+.tp-order-block {
+    background: rgba(0,0,0,0.4); border-radius: 10px;
+    padding: 12px 14px; position: relative;
+    border: 1px solid rgba(255,255,255,0.06);
+}
+.tp-order-block .tp-order-label {
+    font-size: 10px; color: var(--text-muted); font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;
+    display: flex; align-items: center; gap: 6px;
+}
+.tp-order-line {
+    font-size: 12px; font-family: var(--font-mono); color: #93c5fd;
+    line-height: 1.8; word-break: break-all;
+}
+.tp-order-line.stop { color: #fca5a5; }
+.tp-copy-btn {
+    position: absolute; top: 10px; right: 10px;
+    background: rgba(59,130,246,0.2); border: 1px solid rgba(59,130,246,0.4);
+    color: #93c5fd; padding: 4px 10px; border-radius: 6px;
+    font-size: 11px; cursor: pointer; transition: all 0.15s;
+    font-weight: 600;
+}
+.tp-copy-btn:hover { background: rgba(59,130,246,0.4); }
+.tp-copy-btn.copied { background: rgba(16,185,129,0.3); border-color: rgba(16,185,129,0.5); color: #6ee7b7; }
+
+/* 賣出竭盡卡片 */
+.tp-sell-card {
+    background: var(--bg-panel); border: 1px solid rgba(239,68,68,0.2);
+    border-radius: 12px; padding: 14px 18px;
+    border-left: 3px solid #ef4444;
+    display: flex; align-items: center; gap: 14px;
+}
+.tp-sell-card .tp-sell-ticker {
+    font-size: 18px; font-weight: 800; font-family: var(--font-mono);
+    color: var(--text-main); min-width: 60px;
+}
+.tp-sell-card .tp-sell-td {
+    font-size: 14px; font-weight: 700; font-family: var(--font-mono);
+    color: #ef4444; min-width: 50px;
+}
+.tp-sell-card .tp-sell-msg {
+    font-size: 12px; color: var(--text-muted); flex: 1;
+}
+.tp-sell-card .tp-sell-price {
+    font-size: 13px; font-weight: 600; font-family: var(--font-mono);
+    color: var(--text-secondary);
+}
+
+/* 資金配置 */
+.tp-capital-item {
+    display: flex; flex-direction: column; align-items: center;
+    padding: 12px 20px; border-radius: 10px;
+    background: var(--bg-card); border: 1px solid var(--border-glow);
+    min-width: 120px;
+}
+.tp-capital-item .tp-cap-label {
+    font-size: 10px; color: var(--text-muted); text-transform: uppercase;
+    letter-spacing: 0.5px; margin-bottom: 4px; font-weight: 600;
+}
+.tp-capital-item .tp-cap-value {
+    font-size: 18px; font-weight: 700; font-family: var(--font-mono);
+}
+
+/* 空狀態 */
+.tp-no-signals {
+    padding: 40px; text-align: center; color: var(--text-muted);
+    font-size: 13px; grid-column: 1 / -1;
+}
+.tp-no-signals .tp-no-emoji { font-size: 36px; margin-bottom: 10px; opacity: 0.5; }
+
+/* 閃動動畫 for rescan button */
+@keyframes tpPulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(59,130,246,0.4); }
+    50% { box-shadow: 0 0 20px 4px rgba(59,130,246,0.2); }
+}
+#btn-rescan-plan:hover { animation: tpPulse 1.5s infinite; }

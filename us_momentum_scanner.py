@@ -31,10 +31,21 @@ try:
         calculate_position, TOTAL_CAPITAL, RISK_PER_TRADE
     )
 except ImportError:
-    AI_TECH_STOCKS = ["NVDA", "AMD", "TSM", "MSFT", "GOOGL", "META", "AAPL", "PLTR", "SMCI"]
+    AI_TECH_STOCKS = [
+        "NVDA", "AMD", "TSM", "AVGO", "ARM",
+        "COHR", "LITE", "CLS", "FN", "CAMT",
+        "SMCI", "DELL", "ANET", "PSTG", "WDC",
+        "VRT", "MOD", "FIX", "EME", "JCI",
+        "CEG", "VST", "GEV", "ETN", "SMR",
+        "PLTR", "APP", "MSFT", "GOOGL", "META",
+        "LLY", "NVO", "VKTX", "TMDX", "CRSP",
+        "RKLB", "LUNR", "ASTS", "GE", "LMT",
+        "TSLA", "UBER", "SYM", "ISRG", "ROK",
+        "CRWD", "PANW", "NET", "COIN", "HOOD",
+    ]
     def send_line_notify(msg): pass
     def calculate_position(entry, stop): return 0, 0, 0
-    TOTAL_CAPITAL = 10000
+    TOTAL_CAPITAL = 1000000
     RISK_PER_TRADE = 0.02
 
 

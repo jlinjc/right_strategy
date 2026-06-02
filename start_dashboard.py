@@ -100,6 +100,13 @@ if __name__ == '__main__':
         cwd=SCRIPT_DIR,
     )
 
+    # 2.8. 產出每日交易計劃
+    print("📋 正在產出每日交易計劃...")
+    subprocess.run(
+        [sys.executable, os.path.join(SCRIPT_DIR, 'trade_planner.py')],
+        cwd=SCRIPT_DIR,
+    )
+
     # 基本面與籌碼面改為前端按需下載 (On-demand)
 
     # 3. 啟動網頁伺服器

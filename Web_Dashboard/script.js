@@ -4,12 +4,16 @@
 // ==========================================
 
 const AI_TECH_STOCKS = [
-    "NVDA", "AMD", "TSM", "AVGO", "MU", "QCOM", "ARM", "MRVL", "AMAT", "LRCX", "KLAC", "TXN", "INTC", "MPWR",
-    "MSFT", "GOOGL", "AMZN", "META", "AAPL", "IBM", "PLTR", "CRM", "ORCL", "NOW", "SNOW", "DDOG", "MDB", "ADBE", "INTU", "PATH", "APP",
-    "NET", "CRWD", "PANW", "FTNT", "ZS", "OKTA",
-    "SMCI", "DELL", "HPE", "ANET", "PSTG", "NTAP",
-    "VRT", "ETN", "PWR", "CEG", "NEE", "GE", "DUK",
-    "TSLA", "UBER", "SYM"
+    "NVDA", "AMD", "TSM", "AVGO", "ARM",
+    "COHR", "LITE", "CLS", "FN", "CAMT",
+    "SMCI", "DELL", "ANET", "PSTG", "WDC",
+    "VRT", "MOD", "FIX", "EME", "JCI",
+    "CEG", "VST", "GEV", "ETN", "SMR",
+    "PLTR", "APP", "MSFT", "GOOGL", "META",
+    "LLY", "NVO", "VKTX", "TMDX", "CRSP",
+    "RKLB", "LUNR", "ASTS", "GE", "LMT",
+    "TSLA", "UBER", "SYM", "ISRG", "ROK",
+    "CRWD", "PANW", "NET", "COIN", "HOOD"
 ];
 
 let selectedStock = "NVDA";
@@ -23,10 +27,12 @@ let intradayRS = []; // sorted array of {ticker, ret, label}
 // 1. Navigation
 // ==========================================
 const viewTitles = {
+    'trade-plan': '今日交易計劃',
     'dashboard': '市場監控中心',
     'heatmap': 'TD9 陣列熱力圖',
     'sectors': '產業板塊強弱',
     'momentum': '暴風動能選股',
+    'screener': '策略篩選器',
     'power-gauge': '綜合戰力評分',
     'stock-xray': '個股深度 X 光',
     'ai-report': 'AI 深度投研報告',
@@ -35,19 +41,16 @@ const viewTitles = {
 };
 
 const SECTOR_MAP = {
-    "雲端巨頭 (Hyperscalers)": ["MSFT", "GOOGL", "AMZN", "META", "AAPL"],
-    "晶片設計 (IC Design)": ["NVDA", "AMD", "QCOM", "ARM"],
-    "晶圓代工與IDM (Foundry)": ["TSM", "INTC"],
-    "特用晶片 (Memory/Net/Power)": ["AVGO", "MRVL", "MU", "TXN", "MPWR"],
-    "半導體設備 (Semi Equipment)": ["AMAT", "LRCX", "KLAC"],
-    "AI伺服器與硬體 (AI Servers)": ["SMCI", "DELL", "HPE"],
-    "網通與儲存設備 (Network & Storage)": ["ANET", "NTAP", "PSTG"],
-    "資料中心基建與散熱 (Infra & Cooling)": ["VRT", "ETN", "PWR"],
-    "公用事業與電力 (Utilities & Power)": ["CEG", "NEE", "GE", "DUK"],
-    "資料庫與AI分析 (Data & AI Platforms)": ["PLTR", "SNOW", "MDB", "DDOG"],
-    "企業軟體 (Enterprise SaaS)": ["CRM", "NOW", "ORCL", "ADBE", "INTU", "IBM"],
-    "網路安全 (Cybersecurity)": ["CRWD", "PANW", "FTNT", "ZS", "NET", "OKTA"],
-    "自動化與應用 (Automation & Apps)": ["TSLA", "PATH", "APP", "SYM", "UBER"]
+    "先進半導體與封裝 (AI Semiconductors & Packaging)": ["NVDA", "AMD", "TSM", "AVGO", "ARM"],
+    "矽光子與高速光通信 (Silicon Photonics & Optics)": ["COHR", "LITE", "CLS", "FN", "CAMT"],
+    "AI伺服器與高速存儲 (AI Servers & Storage)": ["SMCI", "DELL", "ANET", "PSTG", "WDC"],
+    "液冷基建與精密空調 (Cooling & HVAC Infrastructure)": ["VRT", "MOD", "FIX", "EME", "JCI"],
+    "AI電力、核能與SMR (AI Power & Grid & SMR)": ["CEG", "VST", "GEV", "ETN", "SMR"],
+    "AI軟體、智慧代理與超大市值 (AI SaaS & Hyperscalers)": ["PLTR", "APP", "MSFT", "GOOGL", "META"],
+    "減肥藥與生技巨頭 (GLP-1 Weight Loss & Biotech)": ["LLY", "NVO", "VKTX", "TMDX", "CRSP"],
+    "低軌衛星與太空軍工 (Space & Satellites & Defense)": ["RKLB", "LUNR", "ASTS", "GE", "LMT"],
+    "自動駕駛與智慧機器人 (Autonomous & Robotics)": ["TSLA", "UBER", "SYM", "ISRG", "ROK"],
+    "網路安全與未來金融科技 (Cybersecurity & Fintech & Crypto)": ["CRWD", "PANW", "NET", "COIN", "HOOD"]
 };
 
 document.querySelectorAll('.nav-link').forEach(link => {
@@ -68,6 +71,7 @@ document.querySelectorAll('.nav-link').forEach(link => {
         document.getElementById('view-title').textContent = viewTitles[target] || '';
 
         // Render view-specific content
+        if (target === 'trade-plan') loadTradePlan();
         if (target === 'heatmap') renderHeatmap();
         if (target === 'alerts-history') renderAlertsHistory();
         if (target === 'power-gauge') loadAndRenderPowerGauge();
@@ -2591,7 +2595,7 @@ function openStockXray(ticker) {
         '        <span>建議拉回買點 (Pullback Entry)</span>' +
         '        <span style="color:#f59e0b;">$' + (tp.pullback_entry || '--') + '</span>' +
         '      </div>' +
-        '      <div style="display:flex; justify-content:space-between; margin-bottom:6px;">' +
+    '      <div style="display:flex; justify-content:space-between; margin-bottom:6px;">' +
         '        <span style="font-size:12px; color:var(--text-muted);">拉回防守線 (Stop Loss)</span>' +
         '        <span style="font-size:13px; font-weight:600; font-family:var(--font-mono); color:#ef4444;">$' + (tp.pullback_stop || '--') + '</span>' +
         '      </div>' +
@@ -2667,6 +2671,120 @@ function openStockXray(ticker) {
             (isActive ? '✅' : '⬜') + ' ' + (activeSignal ? activeSignal.label : ps.label) + '</div>';
     });
     document.getElementById('xray-signals').innerHTML = sigHtml;
+
+    // 渲染選擇權分析與損益模擬器 (Long Call Option recommendations & P&L scenario matrix)
+    var optSection = document.getElementById('xray-options-section');
+    var optRecsContainer = document.getElementById('xray-option-recs');
+    var pnlTable = document.getElementById('xray-pnl-table');
+    
+    if (stock.options_analysis && optSection && optRecsContainer && pnlTable) {
+        optSection.style.display = 'block';
+        var oa = stock.options_analysis;
+        var bo = oa.best_overall;
+        
+        // 1. 渲染期權推薦 (3個合約卡片)
+        var recs = [
+            { label: '⚡ 短天期首選 (≤21天)', data: oa.short_best },
+            { label: '📌 中天期首選 (25~60天)', data: oa.mid_best },
+            { label: '🔭 遠月首選 (>60天)', data: oa.far_best }
+        ];
+        
+        var recsHtml = '';
+        recs.forEach(function(r) {
+            var c = r.data;
+            if (!c) return;
+            var isOverall = bo && c.strike === bo.strike && c.expiry === bo.expiry;
+            recsHtml += '<div style="background:rgba(255,255,255,0.02); border:1px solid ' + (isOverall ? 'rgba(16,185,129,0.3)' : 'rgba(255,255,255,0.05)') + '; border-radius:8px; padding:10px; display:flex; flex-direction:column; gap:4px; position:relative;">' +
+                (isOverall ? '<span style="position:absolute; right:8px; top:8px; background:#10b981; color:#000; font-size:8px; font-weight:700; padding:2px 6px; border-radius:10px; text-transform:uppercase;">綜合最佳</span>' : '') +
+                '  <div style="font-size:11px; font-weight:700; color:var(--text-secondary);">' + r.label + '</div>' +
+                '  <div style="font-size:13px; font-weight:700; font-family:var(--font-mono); display:flex; gap:8px; align-items:center;">' +
+                '    <span style="color:#f59e0b;">' + c.expiry + '</span>' +
+                '    <span>K=$' + c.strike.toFixed(1) + '</span>' +
+                '    <span style="color:#3b82f6;">Ask=$' + c.ask.toFixed(2) + '</span>' +
+                '  </div>' +
+                '  <div style="font-size:10px; color:var(--text-muted); display:flex; gap:10px; flex-wrap:wrap;">' +
+                '    <span>Delta: ' + c.delta.toFixed(2) + '</span>' +
+                '    <span>Theta: ' + c.theta.toFixed(3) + '</span>' +
+                '    <span>損益平衡: $' + c.breakeven.toFixed(2) + ' (+' + c.breakeven_pct.toFixed(1) + '%)</span>' +
+                '    <span style="color:#10b981; font-weight:600;">R:R: ' + c.rr_ratio.toFixed(1) + 'x</span>' +
+                '  </div>' +
+                '</div>';
+        });
+        optRecsContainer.innerHTML = recsHtml;
+        
+        // 2. 損益情境模擬表
+        document.getElementById('xray-pnl-title').innerHTML = '💹 最佳綜合合約損益情境模擬 (' + bo.expiry + ' K=$' + bo.strike.toFixed(1) + ' Ask=$' + bo.ask.toFixed(2) + ')';
+        
+        function renderPnlTable(mode) {
+            var hd = oa.hold_days;
+            var html = '<thead><tr>' +
+                '<th style="padding:6px; border-bottom:1px solid rgba(255,255,255,0.1); text-align:left;">股價變動</th>';
+            hd.forEach(function(day) {
+                html += '<th style="padding:6px; border-bottom:1px solid rgba(255,255,255,0.1);">持有 ' + day + ' 天</th>';
+            });
+            html += '</tr></thead><tbody>';
+            
+            oa.pnl_matrix.forEach(function(row) {
+                html += '<tr>' +
+                    '<td style="padding:6px; text-align:left; font-weight:600; font-family:var(--font-mono); border-bottom:1px solid rgba(255,255,255,0.03);">' +
+                    '  <div style="font-size:11px; color:#fff;">$' + row.target_price.toFixed(2) + '</div>' +
+                    '  <div style="font-size:9px; color:' + (row.change_pct > 0 ? '#10b981' : (row.change_pct < 0 ? '#ef4444' : 'var(--text-muted)')) + ';">' + (row.change_pct > 0 ? '+' : '') + row.change_pct.toFixed(1) + '%</div>' +
+                    '</td>';
+                
+                row.scenarios.forEach(function(s) {
+                    var valStr = '';
+                    var color = 'var(--text-muted)';
+                    var pnlVal = mode === 'pct' ? s.pnl_pct : s.pnl_contract_usd;
+                    
+                    if (pnlVal > 0) {
+                        valStr = (mode === 'pct' ? '+' : '+$') + pnlVal.toLocaleString('en-US', {maximumFractionDigits: (mode==='pct'?1:0)}) + (mode === 'pct' ? '%' : '');
+                        color = '#10b981';
+                    } else if (pnlVal < 0) {
+                        valStr = (mode === 'pct' ? '' : '-$') + Math.abs(pnlVal).toLocaleString('en-US', {maximumFractionDigits: (mode==='pct'?1:0)}) + (mode === 'pct' ? '%' : '');
+                        color = '#ef4444';
+                    } else {
+                        valStr = (mode === 'pct' ? '0.0%' : '$0');
+                        color = 'var(--text-muted)';
+                    }
+                    
+                    var bg = 'transparent';
+                    if (pnlVal > 30) bg = 'rgba(16,185,129,0.12)';
+                    else if (pnlVal > 0) bg = 'rgba(16,185,129,0.06)';
+                    else if (pnlVal <= -90) bg = 'rgba(239,68,68,0.15)';
+                    else if (pnlVal < 0) bg = 'rgba(239,68,68,0.07)';
+                    
+                    html += '<td style="padding:6px; font-weight:600; font-family:var(--font-mono); color:' + color + '; background:' + bg + '; border-bottom:1px solid rgba(255,255,255,0.03);">' + valStr + '</td>';
+                });
+                html += '</tr>';
+            });
+            html += '</tbody>';
+            pnlTable.innerHTML = html;
+        }
+        
+        renderPnlTable('pct');
+        
+        var btnPct = document.getElementById('pnl-toggle-pct');
+        var btnUsd = document.getElementById('pnl-toggle-usd');
+        
+        var newBtnPct = btnPct.cloneNode(true);
+        var newBtnUsd = btnUsd.cloneNode(true);
+        btnPct.parentNode.replaceChild(newBtnPct, btnPct);
+        btnUsd.parentNode.replaceChild(newBtnUsd, btnUsd);
+        
+        newBtnPct.addEventListener('click', function() {
+            newBtnPct.classList.add('active');
+            newBtnUsd.classList.remove('active');
+            renderPnlTable('pct');
+        });
+        newBtnUsd.addEventListener('click', function() {
+            newBtnUsd.classList.add('active');
+            newBtnPct.classList.remove('active');
+            renderPnlTable('usd');
+        });
+        
+    } else {
+        if (optSection) optSection.style.display = 'none';
+    }
 
     // Load K-line chart
     loadXrayChart(ticker);
@@ -2991,4 +3109,251 @@ function drawLineChart(canvas, quarters, title, series) {
 document.getElementById('xray-back-btn')?.addEventListener('click', function () {
     switchToView('power-gauge');
     loadAndRenderPowerGauge();
+});
+
+// ==========================================
+// TRADE PLAN VIEW — 今日交易計劃
+// ==========================================
+async function loadTradePlan() {
+    try {
+        const res = await fetch('/api/trade_plan');
+        const data = await res.json();
+        if (data.status === 'no_plan' || data.status === 'error') {
+            document.getElementById('tp-regime-message').textContent = data.message || '尚未產生交易計劃';
+            return;
+        }
+        renderTradePlan(data);
+    } catch (e) {
+        // Fallback: try static file
+        try {
+            const res = await fetch('trade_plan.json?t=' + Date.now());
+            if (res.ok) {
+                const data = await res.json();
+                renderTradePlan(data);
+            }
+        } catch (e2) {
+            document.getElementById('tp-regime-message').textContent = '無法載入交易計劃';
+        }
+    }
+}
+
+function renderTradePlan(plan) {
+    // 1. 時間戳
+    document.getElementById('tp-generated-time').textContent = '掃描時間: ' + (plan.generated_at || '--');
+
+    // 2. 市場環境燈號
+    const regime = plan.market_regime || {};
+    const lightEl = document.getElementById('tp-regime-light');
+    lightEl.className = 'tp-regime-light';
+
+    if (regime.regime === 'full_risk') {
+        lightEl.classList.add('regime-green');
+        lightEl.innerHTML = '<span class="tp-light-emoji">🟢</span><span class="tp-light-text">全速交易</span>';
+    } else if (regime.regime === 'half_risk') {
+        lightEl.classList.add('regime-yellow');
+        lightEl.innerHTML = '<span class="tp-light-emoji">🟡</span><span class="tp-light-text">減半交易</span>';
+    } else {
+        lightEl.classList.add('regime-red');
+        lightEl.innerHTML = '<span class="tp-light-emoji">🔴</span><span class="tp-light-text">暫停交易</span>';
+    }
+
+    document.getElementById('tp-regime-message').textContent = regime.message || '';
+
+    const qqqAbove20 = regime.qqq_vs_20ma === 'above' ? '🟢 Above' : '🔴 Below';
+    const qqqAbove50 = regime.qqq_vs_50ma === 'above' ? '🟢 Above' : '🔴 Below';
+    document.getElementById('tp-regime-details').innerHTML =
+        `QQQ: $${regime.qqq_price || '--'} | 20MA: $${regime.qqq_20ma || '--'} ${qqqAbove20} | 50MA: $${regime.qqq_50ma || '--'} ${qqqAbove50}<br>` +
+        `大盤廣度: ${(regime.breadth || 0).toFixed(1)}% (股價 > 50MA 比例)`;
+
+    // 參數卡片
+    const paramsEl = document.getElementById('tp-regime-params');
+    paramsEl.innerHTML = `
+        <div class="tp-param-card">
+            <div class="tp-param-label">本金</div>
+            <div class="tp-param-value">$${(plan.capital || 10000).toLocaleString()}</div>
+        </div>
+        <div class="tp-param-card">
+            <div class="tp-param-label">單筆風險</div>
+            <div class="tp-param-value" style="color:${regime.regime === 'no_risk' ? '#ef4444' : regime.regime === 'full_risk' ? '#10b981' : '#f59e0b'}">${((regime.risk_per_trade || 0) * 100).toFixed(0)}%</div>
+        </div>
+        <div class="tp-param-card">
+            <div class="tp-param-label">最多持倉</div>
+            <div class="tp-param-value">${regime.max_positions || 0} 檔</div>
+        </div>
+    `;
+
+    // 3. 買入訊號
+    const buyContainer = document.getElementById('tp-buy-signals');
+    const buyCount = plan.buy_signals ? plan.buy_signals.length : 0;
+    document.getElementById('tp-buy-count').textContent = buyCount + ' 檔';
+
+    if (buyCount === 0) {
+        const noMsg = regime.regime === 'no_risk'
+            ? '大盤環境為防守模式，已暫停掃描買入訊號'
+            : '今日無符合條件的買入訊號';
+        buyContainer.innerHTML = `<div class="tp-no-signals" style="grid-column:1/-1;"><div class="tp-no-emoji">⚪</div>${noMsg}</div>`;
+    } else {
+        buyContainer.innerHTML = plan.buy_signals.map((s, i) => {
+            const stratClass = s.strategy === 'td9_buy' ? 'td9' : s.strategy === 'ma_pullback' ? 'ma' : 'momentum';
+            const filtersHtml = (s.filters_passed || []).map(f => `<span class="tp-meta-tag">${f}</span>`).join('');
+            const order = s.schwab_order || {};
+            const orderId = 'tp-order-' + i;
+            return `
+                <div class="tp-signal-card">
+                    <div class="tp-signal-header">
+                        <span class="tp-signal-ticker">${s.ticker}</span>
+                        <span class="tp-signal-strategy ${stratClass}">${s.strategy_label || s.strategy}</span>
+                    </div>
+                    <div class="tp-signal-body">
+                        <div class="tp-signal-prices">
+                            <div class="tp-price-cell entry">
+                                <div class="tp-price-label">進場價</div>
+                                <div class="tp-price-value">$${s.entry_price}</div>
+                                <div class="tp-price-sub" style="color:var(--text-muted);">限價買入</div>
+                            </div>
+                            <div class="tp-price-cell stop">
+                                <div class="tp-price-label">停損價</div>
+                                <div class="tp-price-value">$${s.stop_loss}</div>
+                                <div class="tp-price-sub">${s.stop_pct}%</div>
+                            </div>
+                            <div class="tp-price-cell target">
+                                <div class="tp-price-label">目標 1R</div>
+                                <div class="tp-price-value">$${s.target_1r}</div>
+                                <div class="tp-price-sub" style="color:#10b981;">2R: $${s.target_2r}</div>
+                            </div>
+                        </div>
+                        <div class="tp-signal-meta">${filtersHtml}</div>
+                        <div class="tp-signal-position">
+                            <div class="tp-position-item">
+                                <span class="tp-pos-label">股數</span>
+                                <span class="tp-pos-value">${s.shares}</span>
+                            </div>
+                            <div class="tp-position-item">
+                                <span class="tp-pos-label">投入資金</span>
+                                <span class="tp-pos-value">$${(s.position_cost || 0).toLocaleString()}</span>
+                            </div>
+                            <div class="tp-position-item">
+                                <span class="tp-pos-label">風險金額</span>
+                                <span class="tp-pos-value" style="color:#ef4444;">$${(s.risk_amount || 0).toFixed(0)}</span>
+                            </div>
+                            <div class="tp-position-item">
+                                <span class="tp-pos-label">風險佔比</span>
+                                <span class="tp-pos-value" style="color:#f59e0b;">${s.risk_pct_of_capital || 0}%</span>
+                            </div>
+                        </div>
+                        <div class="tp-order-block" id="${orderId}">
+                            <div class="tp-order-label">🏦 Schwab 下單指令</div>
+                            <div class="tp-order-line">📥 ${order.buy_order || '--'}</div>
+                            <div class="tp-order-line stop">🛡️ ${order.stop_order || '--'}</div>
+                            <button class="tp-copy-btn" onclick="copyOrder('${orderId}')">📋 複製</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    // 4. 賣出竭盡
+    const sellContainer = document.getElementById('tp-sell-signals');
+    const sellCount = plan.sell_signals ? plan.sell_signals.length : 0;
+    document.getElementById('tp-sell-count').textContent = sellCount + ' 檔';
+
+    if (sellCount === 0) {
+        sellContainer.innerHTML = '<div style="grid-column:1/-1; padding:16px; text-align:center; color:var(--text-muted); font-size:12px;">目前無上漲竭盡股票</div>';
+    } else {
+        sellContainer.innerHTML = plan.sell_signals.map(s => `
+            <div class="tp-sell-card">
+                <span class="tp-sell-ticker">${s.ticker}</span>
+                <span class="tp-sell-td">TD+${s.td_count}</span>
+                <span class="tp-sell-msg">${s.message}</span>
+                <span class="tp-sell-price">$${s.close}</span>
+            </div>
+        `).join('');
+    }
+
+    // 5. 資金配置摘要
+    if (buyCount > 0) {
+        const capSection = document.getElementById('tp-capital-summary');
+        capSection.style.display = 'block';
+        const totalCost = plan.buy_signals.reduce((sum, s) => sum + (s.position_cost || 0), 0);
+        const totalRisk = plan.buy_signals.reduce((sum, s) => sum + (s.risk_amount || 0), 0);
+        const capital = plan.capital || 10000;
+        document.getElementById('tp-capital-details').innerHTML = `
+            <div class="tp-capital-item">
+                <div class="tp-cap-label">買入訊號數</div>
+                <div class="tp-cap-value" style="color:#10b981;">${buyCount} 檔</div>
+            </div>
+            <div class="tp-capital-item">
+                <div class="tp-cap-label">總投入資金</div>
+                <div class="tp-cap-value">$${totalCost.toLocaleString(undefined, {maximumFractionDigits: 0})}</div>
+            </div>
+            <div class="tp-capital-item">
+                <div class="tp-cap-label">總風險金額</div>
+                <div class="tp-cap-value" style="color:#ef4444;">$${totalRisk.toFixed(0)}</div>
+            </div>
+            <div class="tp-capital-item">
+                <div class="tp-cap-label">資金使用率</div>
+                <div class="tp-cap-value" style="color:#f59e0b;">${(totalCost / capital * 100).toFixed(1)}%</div>
+            </div>
+            <div class="tp-capital-item">
+                <div class="tp-cap-label">剩餘現金</div>
+                <div class="tp-cap-value">$${(capital - totalCost).toLocaleString(undefined, {maximumFractionDigits: 0})}</div>
+            </div>
+        `;
+    } else {
+        document.getElementById('tp-capital-summary').style.display = 'none';
+    }
+}
+
+// Copy order to clipboard
+function copyOrder(orderId) {
+    const block = document.getElementById(orderId);
+    if (!block) return;
+    const lines = block.querySelectorAll('.tp-order-line');
+    const text = Array.from(lines).map(l => l.textContent.trim()).join('\n');
+    navigator.clipboard.writeText(text).then(() => {
+        const btn = block.querySelector('.tp-copy-btn');
+        btn.textContent = '✅ 已複製';
+        btn.classList.add('copied');
+        setTimeout(() => {
+            btn.textContent = '📋 複製';
+            btn.classList.remove('copied');
+        }, 2000);
+    });
+}
+
+// Rescan button
+document.getElementById('btn-rescan-plan')?.addEventListener('click', async function() {
+    this.disabled = true;
+    this.textContent = '⏳ 掃描中...';
+    document.getElementById('tp-regime-message').textContent = '正在重新掃描所有策略，請稍候約 30 秒...';
+    try {
+        await fetch('/api/generate_trade_plan', { method: 'POST' });
+        // Poll until file is updated (max 60s)
+        let attempts = 0;
+        const poll = setInterval(async () => {
+            attempts++;
+            if (attempts > 12) {
+                clearInterval(poll);
+                this.disabled = false;
+                this.textContent = '🔄 重新掃描';
+                return;
+            }
+            try {
+                const res = await fetch('trade_plan.json?t=' + Date.now());
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.generated_at && data.generated_at !== document.getElementById('tp-generated-time').textContent.replace('掃描時間: ', '')) {
+                        clearInterval(poll);
+                        renderTradePlan(data);
+                        this.disabled = false;
+                        this.textContent = '🔄 重新掃描';
+                    }
+                }
+            } catch (e) {}
+        }, 5000);
+    } catch (e) {
+        this.disabled = false;
+        this.textContent = '🔄 重新掃描';
+    }
 });

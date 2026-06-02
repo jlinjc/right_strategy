@@ -19,6 +19,9 @@
                 <h1>Anti-Gravity</h1>
             </div>
             <nav>
+                <a href="#" class="nav-link" data-view="trade-plan">
+                    <span class="nav-icon">📋</span> 今日交易計劃
+                </a>
                 <a href="#" class="nav-link active" data-view="dashboard">
                     <span class="nav-icon">📡</span> 即時儀表板
                 </a>
@@ -79,6 +82,63 @@
                     </div>
                 </div>
             </header>
+
+            <!-- ========== VIEW 0: 今日交易計劃 ========== -->
+            <div class="view-panel" id="view-trade-plan">
+                <div class="view-header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+                    <h2>今日交易計劃 <span class="subtitle">精確進出場指令 × 自動倉位計算</span></h2>
+                    <div style="display:flex; align-items:center; gap:10px;">
+                        <span id="tp-generated-time" style="font-size:11px; color:var(--text-muted); font-family:var(--font-mono);">--</span>
+                        <button class="btn-tf" id="btn-rescan-plan" style="padding:8px 16px; background:linear-gradient(135deg, rgba(59,130,246,0.3), rgba(16,185,129,0.3)); border-color:rgba(59,130,246,0.5); font-size:13px; font-weight:600;">
+                            🔄 重新掃描
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 市場環境燈號 -->
+                <section class="glass-panel" id="tp-regime-section" style="margin-top:16px; padding:24px; border-radius:14px;">
+                    <div style="display:flex; align-items:center; gap:16px; flex-wrap:wrap;">
+                        <div id="tp-regime-light" class="tp-regime-light regime-loading">
+                            <span class="tp-light-emoji">⏳</span>
+                            <span class="tp-light-text">載入中...</span>
+                        </div>
+                        <div style="flex:1; min-width:200px;">
+                            <div id="tp-regime-message" style="font-size:15px; font-weight:600; color:var(--text-primary); margin-bottom:6px;">等待掃描結果...</div>
+                            <div id="tp-regime-details" style="font-size:12px; color:var(--text-muted); font-family:var(--font-mono); line-height:1.8;"></div>
+                        </div>
+                        <div id="tp-regime-params" style="display:flex; gap:16px; flex-wrap:wrap;"></div>
+                    </div>
+                </section>
+
+                <!-- 買入訊號清單 -->
+                <section style="margin-top:20px;">
+                    <div style="display:flex; align-items:center; gap:10px; margin-bottom:12px;">
+                        <h3 style="margin:0; font-size:16px; color:var(--text-primary);">🟢 買入訊號</h3>
+                        <span id="tp-buy-count" class="badge-count" style="font-size:12px;">0 檔</span>
+                    </div>
+                    <div id="tp-buy-signals" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(400px, 1fr)); gap:16px;">
+                        <div class="tp-empty-state glass-panel" style="padding:40px; text-align:center; grid-column:1/-1;">
+                            <div style="font-size:40px; margin-bottom:12px; opacity:0.5;">📋</div>
+                            <div style="color:var(--text-muted); font-size:13px;">點擊「🔄 重新掃描」產生今日交易計劃</div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 賣出竭盡警示 -->
+                <section style="margin-top:20px;">
+                    <div style="display:flex; align-items:center; gap:10px; margin-bottom:12px;">
+                        <h3 style="margin:0; font-size:16px; color:var(--text-primary);">🔴 賣出竭盡警示</h3>
+                        <span id="tp-sell-count" class="badge-count" style="font-size:12px;">0 檔</span>
+                    </div>
+                    <div id="tp-sell-signals" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(300px, 1fr)); gap:12px;"></div>
+                </section>
+
+                <!-- 資金配置摘要 -->
+                <section class="glass-panel" id="tp-capital-summary" style="margin-top:20px; padding:20px; border-radius:14px; display:none;">
+                    <h3 style="margin:0 0 12px 0; font-size:14px; color:var(--text-primary);">💰 資金配置摘要</h3>
+                    <div id="tp-capital-details" style="display:flex; gap:20px; flex-wrap:wrap;"></div>
+                </section>
+            </div>
 
             <!-- ========== VIEW 1: 即時儀表板 ========== -->
             <div class="view-panel active" id="view-dashboard">
@@ -598,6 +658,37 @@
                 <section class="glass-panel" style="margin-top:16px; padding:20px;">
                     <h3 style="font-size:14px; color:var(--text-main); margin-bottom:12px;">💼 核心指標 & 🐋 大戶籌碼</h3>
                     <div id="xray-fundamentals" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap:12px;"></div>
+                </section>
+
+                <!-- 🐋 買方期權推薦與損益模擬器 -->
+                <section class="glass-panel" id="xray-options-section" style="margin-top:16px; padding:20px; display:none;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; flex-wrap:wrap; gap:8px;">
+                        <h3 style="font-size:14px; color:var(--text-main); margin:0;">🐋 Long Call 期權推薦 & 損益模擬器</h3>
+                        <div style="display:flex; align-items:center; gap:8px;">
+                            <span style="font-size:11px; color:var(--text-muted);">模擬數值：</span>
+                            <button id="pnl-toggle-pct" class="tab-btn active" style="padding:4px 10px; font-size:11px; border-radius:4px; cursor:pointer;">百分比 (%)</button>
+                            <button id="pnl-toggle-usd" class="tab-btn" style="padding:4px 10px; font-size:11px; border-radius:4px; cursor:pointer;">合約美元 ($)</button>
+                        </div>
+                    </div>
+                    
+                    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:20px; flex-wrap:wrap;">
+                        <!-- 左欄: 期權推薦 -->
+                        <div>
+                            <div style="font-size:12px; color:var(--text-muted); margin-bottom:10px; font-weight:600;">🎯 精選 Long Call 合約推薦</div>
+                            <div style="display:flex; flex-direction:column; gap:10px;" id="xray-option-recs"></div>
+                        </div>
+                        <!-- 右欄: PnL 矩陣 -->
+                        <div>
+                            <div style="font-size:12px; color:var(--text-muted); margin-bottom:10px; font-weight:600;" id="xray-pnl-title">💹 最佳綜合合約損益情境模擬</div>
+                            <div style="overflow-x:auto; background:rgba(0,0,0,0.2); border-radius:8px; border:1px solid rgba(255,255,255,0.05); padding:6px;">
+                                <table id="xray-pnl-table" style="width:100%; border-collapse:collapse; font-size:11px; text-align:center;">
+                                </table>
+                            </div>
+                            <div style="font-size:10px; color:var(--text-muted); margin-top:8px;">
+                                💡 每張標準合約 = 100 股。最大風險 = 買入期權的權利金總額。
+                            </div>
+                        </div>
+                    </div>
                 </section>
 
                 <!-- 季度趨勢 -->

@@ -21,36 +21,30 @@ OUTPUT_PATH = os.path.join(SCRIPT_DIR, 'Web_Dashboard', 'sector_history.json')
 
 # ── 板塊定義 (與前端 SECTOR_MAP 完全一致) ──
 SECTOR_MAP = {
-    "雲端巨頭 (Hyperscalers)": ["MSFT", "GOOGL", "AMZN", "META", "AAPL"],
-    "晶片設計 (IC Design)": ["NVDA", "AMD", "QCOM", "ARM"],
-    "晶圓代工與IDM (Foundry)": ["TSM", "INTC"],
-    "特用晶片 (Memory/Net/Power)": ["AVGO", "MRVL", "MU", "TXN", "MPWR"],
-    "半導體設備 (Semi Equipment)": ["AMAT", "LRCX", "KLAC"],
-    "AI伺服器與硬體 (AI Servers)": ["SMCI", "DELL", "HPE"],
-    "網通與儲存設備 (Network & Storage)": ["ANET", "NTAP", "PSTG"],
-    "資料中心基建與散熱 (Infra & Cooling)": ["VRT", "ETN", "PWR"],
-    "公用事業與電力 (Utilities & Power)": ["CEG", "NEE", "GE", "DUK"],
-    "資料庫與AI分析 (Data & AI Platforms)": ["PLTR", "SNOW", "MDB", "DDOG"],
-    "企業軟體 (Enterprise SaaS)": ["CRM", "NOW", "ORCL", "ADBE", "INTU", "IBM"],
-    "網路安全 (Cybersecurity)": ["CRWD", "PANW", "FTNT", "ZS", "NET", "OKTA"],
-    "自動化與應用 (Automation & Apps)": ["TSLA", "PATH", "APP", "SYM", "UBER"],
+    "先進半導體與封裝 (AI Semiconductors & Packaging)": ["NVDA", "AMD", "TSM", "AVGO", "ARM"],
+    "矽光子與高速光通信 (Silicon Photonics & Optics)": ["COHR", "LITE", "CLS", "FN", "CAMT"],
+    "AI伺服器與高速存儲 (AI Servers & Storage)": ["SMCI", "DELL", "ANET", "PSTG", "WDC"],
+    "液冷基建與精密空調 (Cooling & HVAC Infrastructure)": ["VRT", "MOD", "FIX", "EME", "JCI"],
+    "AI電力、核能與SMR (AI Power & Grid & SMR)": ["CEG", "VST", "GEV", "ETN", "SMR"],
+    "AI軟體、智慧代理與超大市值 (AI SaaS & Hyperscalers)": ["PLTR", "APP", "MSFT", "GOOGL", "META"],
+    "減肥藥與生技巨頭 (GLP-1 Weight Loss & Biotech)": ["LLY", "NVO", "VKTX", "TMDX", "CRSP"],
+    "低軌衛星與太空軍工 (Space & Satellites & Defense)": ["RKLB", "LUNR", "ASTS", "GE", "LMT"],
+    "自動駕駛與智慧機器人 (Autonomous & Robotics)": ["TSLA", "UBER", "SYM", "ISRG", "ROK"],
+    "網路安全與未來金融科技 (Cybersecurity & Fintech & Crypto)": ["CRWD", "PANW", "NET", "COIN", "HOOD"],
 }
 
 # 每個板塊的配色 (前端繪圖用)
 SECTOR_COLORS = {
-    "雲端巨頭 (Hyperscalers)": "#3b82f6",
-    "晶片設計 (IC Design)": "#ef4444",
-    "晶圓代工與IDM (Foundry)": "#f59e0b",
-    "特用晶片 (Memory/Net/Power)": "#8b5cf6",
-    "半導體設備 (Semi Equipment)": "#ec4899",
-    "AI伺服器與硬體 (AI Servers)": "#f97316",
-    "網通與儲存設備 (Network & Storage)": "#14b8a6",
-    "資料中心基建與散熱 (Infra & Cooling)": "#06b6d4",
-    "公用事業與電力 (Utilities & Power)": "#84cc16",
-    "資料庫與AI分析 (Data & AI Platforms)": "#a855f7",
-    "企業軟體 (Enterprise SaaS)": "#6366f1",
-    "網路安全 (Cybersecurity)": "#10b981",
-    "自動化與應用 (Automation & Apps)": "#64748b",
+    "先進半導體與封裝 (AI Semiconductors & Packaging)": "#ef4444",
+    "矽光子與高速光通信 (Silicon Photonics & Optics)": "#f97316",
+    "AI伺服器與高速存儲 (AI Servers & Storage)": "#f59e0b",
+    "液冷基建與精密空調 (Cooling & HVAC Infrastructure)": "#06b6d4",
+    "AI電力、核能與SMR (AI Power & Grid & SMR)": "#10b981",
+    "AI軟體、智慧代理與超大市值 (AI SaaS & Hyperscalers)": "#3b82f6",
+    "減肥藥與生技巨頭 (GLP-1 Weight Loss & Biotech)": "#ec4899",
+    "低軌衛星與太空軍工 (Space & Satellites & Defense)": "#8b5cf6",
+    "自動駕駛與智慧機器人 (Autonomous & Robotics)": "#64748b",
+    "網路安全與未來金融科技 (Cybersecurity & Fintech & Crypto)": "#a855f7",
 }
 
 
