@@ -258,11 +258,11 @@ class APIHandler(http.server.SimpleHTTPRequestHandler):
                 if SCRIPT_DIR not in sys.path:
                     sys.path.append(SCRIPT_DIR)
                 from generate_fundamentals import fetch_fundamentals
-                from generate_institutional import fetch_institutional
+                from generate_institutional import fetch_institutional_data
 
                 print(f"[{datetime.now().strftime('%H:%M:%S')}] ⏳ 正在下載 {ticker} 基本面與籌碼面數據...")
                 fund_data = fetch_fundamentals(ticker)
-                inst_data = fetch_institutional(ticker)
+                inst_data = fetch_institutional_data(ticker)
 
                 # 將下載的資料寫入全域 JSON 檔案以便前端存取 (這可以保持原有的讀取邏輯)
                 # 基本面
@@ -273,6 +273,12 @@ class APIHandler(http.server.SimpleHTTPRequestHandler):
                         fund_db = json.load(f)
                 if fund_data:
                     fund_db['stocks'][ticker] = fund_data
+                    # 重新計算估值，確保新抓取的個股擁有完整的估值資訊
+                    try:
+                        from valuation_engine import enrich_watchlist_valuations
+                        fund_db['stocks'] = enrich_watchlist_valuations(fund_db['stocks'])
+                    except Exception as ve_err:
+                        print(f"  ⚠️ On-demand valuation failed: {ve_err}")
                 with open(fund_path, 'w', encoding='utf-8') as f:
                     json.dump(fund_db, f, ensure_ascii=False)
 
@@ -398,6 +404,85 @@ class APIHandler(http.server.SimpleHTTPRequestHandler):
                 self.end_headers()
                 self.wfile.write(json.dumps({'status': 'error', 'message': str(e)}).encode('utf-8'))
 
+        elif self.path == '/api/positions':
+            # POST /api/positions — 新增/確認出場
+            content_length = int(self.headers['Content-Length'])
+            post_data = self.rfile.read(content_length)
+            try:
+                data = json.loads(post_data.decode('utf-8'))
+                action = data.get('action', '')
+                ticker = data.get('ticker', '').upper().strip()
+                
+                import exit_manager
+                
+                if action == 'add':
+                    strategy = data.get('strategy', 'swing')
+                    entry_price = float(data.get('entry_price', 0))
+                    shares = int(data.get('shares', 0))
+                    stop_loss = float(data.get('stop_loss', 0))
+                    notes = data.get('notes', '')
+                    option_expiry = data.get('option_expiry', '')
+                    option_strike = float(data.get('option_strike', 0.0))
+                    
+                    pos = exit_manager.add_position(
+                        ticker=ticker, strategy=strategy, entry_price=entry_price,
+                        shares=shares, stop_loss=stop_loss, notes=notes,
+                        option_expiry=option_expiry, option_strike=option_strike
+                    )
+                    
+                    if pos:
+                        self.send_response(200)
+                        self.send_header('Content-type', 'application/json')
+                        self.end_headers()
+                        self.wfile.write(json.dumps({'status': 'ok', 'position': pos.to_dict()}).encode('utf-8'))
+                    else:
+                        self.send_response(400)
+                        self.send_header('Content-type', 'application/json')
+                        self.end_headers()
+                        self.wfile.write(json.dumps({'status': 'error', 'message': f'{ticker} 已有持倉'}).encode('utf-8'))
+                        
+                elif action == 'close' or action == 'confirm_exit':
+                    exit_price = data.get('exit_price', None)
+                    if exit_price is not None:
+                        exit_price = float(exit_price)
+                        
+                    record = exit_manager.confirm_exit(ticker, exit_price)
+                    self.send_response(200)
+                    self.send_header('Content-type', 'application/json')
+                    self.end_headers()
+                    self.wfile.write(json.dumps({'status': 'ok', 'record': record}).encode('utf-8'))
+                    
+                else:
+                    raise ValueError(f'Unknown action: {action}')
+            except Exception as e:
+                self.send_response(500)
+                self.send_header('Content-type', 'application/json')
+                self.end_headers()
+                self.wfile.write(json.dumps({'status': 'error', 'message': str(e)}).encode('utf-8'))
+
+        elif self.path == '/api/scan_exits':
+            # POST /api/scan_exits — 觸發出場掃描
+            try:
+                import exit_manager
+                from scanner_base import send_line_notify
+                
+                print("📡 前端觸發出場掃描...")
+                alerts = exit_manager.scan_exits()
+                if alerts:
+                    msg = "\n".join(alerts)
+                    send_line_notify(msg)
+                    
+                self.send_response(200)
+                self.send_header('Content-type', 'application/json')
+                self.end_headers()
+                self.wfile.write(json.dumps({'status': 'ok', 'alerts': alerts}).encode('utf-8'))
+            except Exception as e:
+                print(f"⚠️ 出場掃描 API 錯誤: {e}")
+                self.send_response(500)
+                self.send_header('Content-type', 'application/json')
+                self.end_headers()
+                self.wfile.write(json.dumps({'status': 'error', 'message': str(e)}).encode('utf-8'))
+
         else:
             self.send_error(404, "Not Found")
     def do_GET(self):
@@ -415,6 +500,29 @@ class APIHandler(http.server.SimpleHTTPRequestHandler):
                 self.send_header('Content-type', 'application/json')
                 self.end_headers()
                 self.wfile.write(b'{"status": "error"}')
+
+        elif self.path == '/api/positions':
+            # GET /api/positions — 讀取持倉 (包含 positions.json 和 trade_history.json)
+            try:
+                import exit_manager
+                positions = exit_manager.load_positions()
+                history = exit_manager.load_trade_history()
+                
+                self.send_response(200)
+                self.send_header('Content-type', 'application/json')
+                self.end_headers()
+                
+                res = {
+                    'status': 'ok',
+                    'positions': [p.to_dict() for p in positions],
+                    'history': history
+                }
+                self.wfile.write(json.dumps(res, ensure_ascii=False).encode('utf-8'))
+            except Exception as e:
+                self.send_response(500)
+                self.send_header('Content-type', 'application/json')
+                self.end_headers()
+                self.wfile.write(json.dumps({'status': 'error', 'message': str(e)}).encode('utf-8'))
 
         elif self.path == '/api/trade_plan':
             # GET /api/trade_plan — 讀取交易計劃 JSON

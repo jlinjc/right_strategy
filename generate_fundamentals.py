@@ -267,6 +267,11 @@ def fetch_fundamentals(ticker):
             'fcf': fcf,
             'fcf_fmt': fmt_num(fcf),
             'fcf_yield': fcf_y,
+            'totalDebt': safe_get(info, 'totalDebt'),
+            'totalCash': safe_get(info, 'totalCash'),
+            'sharesOutstanding': safe_get(info, 'sharesOutstanding'),
+            'operatingCashflow': safe_get(info, 'operatingCashflow'),
+            'capitalExpenditure': safe_get(info, 'capitalExpenditure'),
 
             # 市場概況
             'mcap': mcap,
@@ -561,6 +566,15 @@ def generate_all_fundamentals():
             print(f"✅  Rev={rev}  P/E={pe}  [{pct}%]")
         else:
             print(f"❌  [{pct}%]")
+
+    # 調用 valuation_engine 來計算專業估值並注入各股資料中
+    try:
+        print(f"\n[{datetime.now().strftime('%H:%M:%S')}] ⚖️ 正在執行專業多因子估值矩陣計算...")
+        from valuation_engine import enrich_watchlist_valuations
+        results = enrich_watchlist_valuations(results)
+        print("  ✅ 估值矩陣計算完成！")
+    except Exception as ve_err:
+        print(f"  ⚠️ 估值矩陣計算失敗: {ve_err}")
 
     output = {
         'last_updated': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),

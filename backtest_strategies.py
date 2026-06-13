@@ -81,13 +81,13 @@ class BaseStrategy:
 class TD9BuyStrategy(BaseStrategy):
     """
     移植自 us_scanner_td9.py
-    進場: TD ≤ -8 (下跌竭盡) 且股價 > 200MA
+    進場: TD ≤ -9 (DeMark 完整竭盡訊號，第9根) 且股價 > 200MA
     停損: 進場日最低價 或 entry - 1.5×ATR(14)，取較大者
     出場: 股價回到 10MA 之上 or 持有超過 10 天 or 觸發停損
     """
     name = 'td9_buy'
 
-    def __init__(self, td_threshold: int = -8, max_hold_days: int = 10):
+    def __init__(self, td_threshold: int = -9, max_hold_days: int = 10):
         self.td_threshold = td_threshold
         self.max_hold_days = max_hold_days
 
@@ -176,9 +176,13 @@ class MAPullbackStrategy(BaseStrategy):
     """
     name = 'ma_pullback'
 
-    def __init__(self, ma_windows=(10, 20, 60), max_hold_days: int = 20):
+    def __init__(self, ma_windows=(10, 20, 60), max_hold_days: int = 20,
+                 require_market_uptrend: bool = False):
         self.ma_windows = ma_windows
         self.max_hold_days = max_hold_days
+        # 市場環境門檻：QQQ 收盤 > 自身 21日EMA 才允許產生訊號
+        # (O'Neil Follow-through + Weinstein Stage 2 概念，過濾修正期)
+        self.require_market_uptrend = require_market_uptrend
 
     def scan(self, idx: int, ticker: str, df: pd.DataFrame,
              benchmark_df: pd.DataFrame) -> Optional[Signal]:
@@ -188,6 +192,16 @@ class MAPullbackStrategy(BaseStrategy):
         close = df['Close'].iloc[idx]
         high = df['High'].iloc[idx]
         low = df['Low'].iloc[idx]
+
+        # 市場環境門檻：大盤(QQQ)必須在 21日EMA 之上 (不偷看未來)
+        if self.require_market_uptrend and benchmark_df is not None:
+            cur_date = df.index[idx]
+            bm_mask = benchmark_df.index <= cur_date
+            bm_close = benchmark_df['Close'][bm_mask]
+            if len(bm_close) >= 21:
+                bm_ema21 = bm_close.ewm(span=21, adjust=False).mean().iloc[-1]
+                if bm_close.iloc[-1] < bm_ema21:
+                    return None
 
         # 趨勢濾網
         ma200 = df['Close'].iloc[max(0, idx-199):idx+1].mean()
@@ -221,6 +235,23 @@ class MAPullbackStrategy(BaseStrategy):
             ma10 = df['Close'].iloc[idx-9:idx+1].mean()
             ma20 = df['Close'].iloc[idx-19:idx+1].mean()
             if ma10 < ma20 * 0.99:  # 均線死叉，不是好的回測環境
+                return None
+
+        # RS 濾網: 過去 63 天個股漲幅必須超越 benchmark (SPY/QQQ)
+        if idx >= 63 and len(benchmark_df) >= 63:
+            current_date = df.index[idx]
+            start_date = df.index[idx - 63]
+            stock_ret = close / df['Close'].iloc[idx - 63] - 1
+            bm_mask = (benchmark_df.index >= start_date) & (benchmark_df.index <= current_date)
+            if bm_mask.sum() >= 20:
+                bm_ret = benchmark_df['Close'][bm_mask].iloc[-1] / benchmark_df['Close'][bm_mask].iloc[0] - 1
+                if stock_ret <= bm_ret:  # 跑輸大盤，不是領頭羊，跳過
+                    return None
+
+        # 52 週高點濾網: 距離 52 週高點不能超過 25%
+        if idx >= 252:
+            high_52w = df['High'].iloc[max(0, idx - 252):idx + 1].max()
+            if close < high_52w * 0.75:
                 return None
 
         # ATR 停損

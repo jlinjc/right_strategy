@@ -31,145 +31,15 @@ from datetime import datetime
 from scanner_base import (
     AI_TECH_STOCKS, BENCHMARK, DASHBOARD_DIR, TOTAL_CAPITAL,
     calc_atr, calculate_position, get_market_regime, save_dashboard_data,
+    calc_td_count,
 )
-
-
-# ============================================================
-# TD9 計算
-# ============================================================
-def calc_td_list(df):
-    """計算整個歷史的 TD Sequential 數列"""
-    td_list = [0] * len(df)
-    td_count = 0
-    for i in range(4, len(df)):
-        cur = float(df['Close'].iloc[i])
-        prior = float(df['Close'].iloc[i - 4])
-        if cur > prior:
-            td_count = td_count + 1 if td_count >= 0 else 1
-        elif cur < prior:
-            td_count = td_count - 1 if td_count <= 0 else -1
-        else:
-            td_count = 0
-        td_list[i] = td_count
-    return td_list
-
-
-def calc_rsi(prices, period=14):
-    """計算 RSI"""
-    delta = prices.diff()
-    gain = (delta.where(delta > 0, 0)).rolling(window=period).mean()
-    loss = (-delta.where(delta < 0, 0)).rolling(window=period).mean()
-    rs = gain / loss
-    return 100 - (100 / (1 + rs))
 
 
 # ============================================================
 # 策略掃描
 # ============================================================
-def scan_td9_signals(stocks_data, regime):
-    """掃描 TD9 下跌竭盡買入 + 上漲竭盡賣出"""
-    buy_signals = []
-    sell_signals = []
-    risk_pct = regime['risk_per_trade']
-
-    for ticker, df in stocks_data.items():
-        if len(df) < 200:
-            continue
-
-        td_list = calc_td_list(df)
-        td_val = td_list[-1]
-
-        # --- 賣出竭盡 (TD8/TD9) ---
-        if td_val in [8, 9]:
-            sell_signals.append({
-                'ticker': ticker,
-                'strategy': 'td9_sell',
-                'td_count': td_val,
-                'close': round(float(df['Close'].iloc[-1]), 2),
-                'message': f"連漲 {td_val} 天，上漲竭盡，考慮減碼或設移動停損",
-            })
-
-        # --- 買入竭盡 (TD-8/TD-9) ---
-        if td_val not in [-8, -9]:
-            continue
-
-        close = float(df['Close'].iloc[-1])
-        low = float(df['Low'].iloc[-1])
-
-        # 濾網 1: 股價 > 200MA
-        ma200 = float(df['Close'].rolling(200).mean().iloc[-1])
-        if pd.isna(ma200) or close < ma200:
-            continue
-
-        # 濾網 2: RSI
-        rsi_series = calc_rsi(df['Close'], 14)
-        rsi = float(rsi_series.iloc[-1]) if not pd.isna(rsi_series.iloc[-1]) else 50.0
-
-        # 底背離檢測
-        is_price_new_low = close <= float(df['Close'].rolling(15).min().iloc[-1])
-        is_rsi_not_new_low = rsi > float(rsi_series.rolling(15).min().iloc[-1]) if not pd.isna(rsi_series.rolling(15).min().iloc[-1]) else False
-        is_divergence = is_price_new_low and is_rsi_not_new_low
-
-        if rsi > 35 and not is_divergence:
-            continue
-
-        # ATR 停損
-        atr_series = calc_atr(df['High'], df['Low'], df['Close'])
-        atr = float(atr_series.iloc[-1]) if not pd.isna(atr_series.iloc[-1]) else close * 0.03
-
-        stop_by_low = low
-        stop_by_atr = close - 1.5 * atr
-        stop_loss = max(stop_by_low, stop_by_atr)
-        if stop_loss >= close * 0.99:
-            stop_loss = close * 0.97
-
-        # 目標價
-        stop_dist = close - stop_loss
-        target_1r = close + stop_dist
-        target_2r = close + 2 * stop_dist
-
-        # 倉位計算
-        shares, cost, actual_risk = calculate_position(close, stop_loss, custom_risk_pct=risk_pct)
-
-        filters_passed = [f">200MA (${ma200:.2f})"]
-        if rsi <= 35:
-            filters_passed.append(f"RSI={rsi:.1f} ≤ 35")
-        if is_divergence:
-            filters_passed.append("RSI 底背離 ⚡")
-        filters_passed.append(f"廣度={regime['breadth']:.1f}%")
-
-        # 限價 = 昨收 + 0.5% (給開盤滑點留空間)
-        limit_price = round(close * 1.005, 2)
-
-        buy_signals.append({
-            'ticker': ticker,
-            'strategy': 'td9_buy',
-            'strategy_label': f"TD{td_val} 下跌竭盡",
-            'signal_date': str(df.index[-1].date()) if hasattr(df.index[-1], 'date') else str(df.index[-1]),
-            'close_price': round(close, 2),
-            'entry_price': limit_price,
-            'entry_note': f"限價 ${limit_price} 以下買入",
-            'stop_loss': round(stop_loss, 2),
-            'stop_pct': round((stop_loss / close - 1) * 100, 1),
-            'target_1r': round(target_1r, 2),
-            'target_2r': round(target_2r, 2),
-            'shares': shares,
-            'position_cost': round(cost, 2),
-            'risk_amount': round(actual_risk, 2),
-            'risk_pct_of_capital': round(actual_risk / TOTAL_CAPITAL * 100, 1) if TOTAL_CAPITAL > 0 else 0,
-            'reason': f"TD{td_val} 下跌竭盡, 高於200MA (${ma200:.0f}), RSI={rsi:.1f}",
-            'filters_passed': filters_passed,
-            'priority': abs(td_val),
-            'atr': round(atr, 2),
-            'rsi': round(rsi, 1),
-            'schwab_order': _gen_schwab_order(ticker, shares, limit_price, stop_loss),
-        })
-
-    return buy_signals, sell_signals
-
-
-def scan_ma_signals(stocks_data, market_df, regime):
-    """掃描均線回測買入訊號"""
+def scan_swing_signals(stocks_data, market_df, regime):
+    """掃描波段回調買入訊號 (均線回測為主，TD9為加分，已移除 RSI)"""
     buy_signals = []
     risk_pct = regime['risk_per_trade']
 
@@ -225,6 +95,10 @@ def scan_ma_signals(stocks_data, market_df, regime):
         else:
             rs_score = 0
 
+        # TD9 判定 (加分條件)
+        td_val = calc_td_count(df)
+        is_td9_buy = td_val in [-8, -9]
+
         # ATR 停損
         atr_series = calc_atr(df['High'], df['Low'], df['Close'])
         atr = float(atr_series.iloc[-1]) if not pd.isna(atr_series.iloc[-1]) else close * 0.03
@@ -250,10 +124,20 @@ def scan_ma_signals(stocks_data, market_df, regime):
             f"RS > QQQ +{rs_score*100:.1f}%",
         ]
 
+        strategy_label = f"波段回調 ({touched_ma})"
+        priority = 1.5 if touched_ma == '60MA' else 1.0
+        reason = f"多頭回測 {touched_ma} (${touched_ma_val:.2f}), >200MA, 量縮, RS強"
+
+        if is_td9_buy:
+            filters_passed.append(f"TD{td_val} 下跌竭盡加分 ⚡")
+            strategy_label += " (TD-9 加分)"
+            priority += 0.5
+            reason += f", TD{td_val} 下跌竭盡"
+
         buy_signals.append({
             'ticker': ticker,
-            'strategy': 'ma_pullback',
-            'strategy_label': f"均線回測 {touched_ma}",
+            'strategy': 'swing',
+            'strategy_label': strategy_label,
             'signal_date': str(df.index[-1].date()) if hasattr(df.index[-1], 'date') else str(df.index[-1]),
             'close_price': round(close, 2),
             'entry_price': limit_price,
@@ -266,14 +150,32 @@ def scan_ma_signals(stocks_data, market_df, regime):
             'position_cost': round(cost, 2),
             'risk_amount': round(actual_risk, 2),
             'risk_pct_of_capital': round(actual_risk / TOTAL_CAPITAL * 100, 1) if TOTAL_CAPITAL > 0 else 0,
-            'reason': f"多頭回測 {touched_ma} (${touched_ma_val:.2f}), >200MA, 量縮, RS強",
+            'reason': reason,
             'filters_passed': filters_passed,
-            'priority': 1.5 if touched_ma == '60MA' else 1.0,
+            'priority': priority,
             'atr': round(atr, 2),
             'schwab_order': _gen_schwab_order(ticker, shares, limit_price, stop_loss),
         })
 
     return buy_signals
+
+
+def scan_td9_sell_signals(stocks_data):
+    """僅掃描 TD9 上漲竭盡賣出訊號"""
+    sell_signals = []
+    for ticker, df in stocks_data.items():
+        if len(df) < 200:
+            continue
+        td_val = calc_td_count(df)
+        if td_val in [8, 9]:
+            sell_signals.append({
+                'ticker': ticker,
+                'strategy': 'td9_sell',
+                'td_count': td_val,
+                'close': round(float(df['Close'].iloc[-1]), 2),
+                'message': f"連漲 {td_val} 天，上漲竭盡，考慮減碼或設移動停損",
+            })
+    return sell_signals
 
 
 def scan_momentum_signals(stocks_data, regime):
@@ -433,18 +335,17 @@ def generate_trade_plan():
     if regime['regime'] != 'no_risk':
         print("🔍 Step 3: 掃描策略訊號...")
 
-        # TD9
-        print("   → TD9 下跌竭盡...")
-        td9_buys, td9_sells = scan_td9_signals(stocks_data, regime)
-        all_buy_signals.extend(td9_buys)
-        all_sell_signals.extend(td9_sells)
-        print(f"     買入: {len(td9_buys)} 檔 | 賣出竭盡: {len(td9_sells)} 檔")
+        # 波段回調 (MA回測為主 + TD9加分)
+        print("   → 波段回調 (均線回測 + TD9)...")
+        swing_buys = scan_swing_signals(stocks_data, market_df, regime)
+        all_buy_signals.extend(swing_buys)
+        print(f"     買入: {len(swing_buys)} 檔")
 
-        # 均線回測
-        print("   → 均線回測...")
-        ma_buys = scan_ma_signals(stocks_data, market_df, regime)
-        all_buy_signals.extend(ma_buys)
-        print(f"     買入: {len(ma_buys)} 檔")
+        # TD9 賣出竭盡
+        print("   → TD9 賣出竭盡...")
+        td9_sells = scan_td9_sell_signals(stocks_data)
+        all_sell_signals.extend(td9_sells)
+        print(f"     賣出竭盡: {len(td9_sells)} 檔")
 
         # 動能突破
         print("   → 動能突破...")
@@ -454,7 +355,7 @@ def generate_trade_plan():
     else:
         print("🛑 Step 3: 大盤環境為防守，跳過策略掃描。")
         # 仍然掃描賣出竭盡
-        _, td9_sells = scan_td9_signals(stocks_data, regime)
+        td9_sells = scan_td9_sell_signals(stocks_data)
         all_sell_signals.extend(td9_sells)
 
     # 排序: 優先級高的在前
@@ -507,6 +408,21 @@ def generate_trade_plan():
             print(f"     {s['ticker']:6s} | TD+{s['td_count']} | ${s['close']} | {s['message']}")
 
     print(f"\n  💾 已寫入: {filepath}")
+    print(f"{'='*55}\n")
+
+    # 7. 執行持倉出場掃描
+    print("📋 Step 4: 執行持倉出場掃描...")
+    try:
+        import exit_manager
+        exit_alerts = exit_manager.scan_exits()
+        if exit_alerts:
+            print(f"   ⚠️ 偵測到 {len(exit_alerts)} 筆出場警報！")
+            from scanner_base import send_line_notify
+            send_line_notify("\n".join(exit_alerts))
+        else:
+            print("   ✅ 持倉正常，無出場訊號。")
+    except Exception as e:
+        print(f"   ⚠️ 出場掃描執行失敗: {e}")
     print(f"{'='*55}\n")
 
     return plan

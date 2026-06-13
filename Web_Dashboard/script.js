@@ -28,6 +28,7 @@ let intradayRS = []; // sorted array of {ticker, ret, label}
 // ==========================================
 const viewTitles = {
     'trade-plan': '今日交易計劃',
+    'positions': '持倉管理與出場監控',
     'dashboard': '市場監控中心',
     'heatmap': 'TD9 陣列熱力圖',
     'sectors': '產業板塊強弱',
@@ -72,6 +73,7 @@ document.querySelectorAll('.nav-link').forEach(link => {
 
         // Render view-specific content
         if (target === 'trade-plan') loadTradePlan();
+        if (target === 'positions') loadPositionsDashboard();
         if (target === 'heatmap') renderHeatmap();
         if (target === 'alerts-history') renderAlertsHistory();
         if (target === 'power-gauge') loadAndRenderPowerGauge();
@@ -468,6 +470,11 @@ function changeChartStock(ticker) {
     renderFundamentals();
     renderInstitutional();
     renderStrengthRanking();
+    
+    // 同步渲染主看板的量化決策 X 光
+    if (typeof renderDashboardXray === 'function') {
+        renderDashboardXray(ticker);
+    }
 }
 
 // ==========================================
@@ -1091,6 +1098,11 @@ loadFundamentalsData();
 // Load institutional data
 loadInstitutionalData();
 
+// 盤前預先載入量化戰力評分數據
+if (typeof loadPowerGaugeData === 'function') {
+    loadPowerGaugeData();
+}
+
 // Load intraday strength ranking
 loadIntradayRS();
 
@@ -1240,6 +1252,23 @@ async function loadFundamentalsData() {
     }
 }
 
+function getValuationPointerPercent(price, fair, cheap, expensive) {
+    if (!price || !fair || !cheap || !expensive) return 50;
+    const minVal = fair * 0.6;
+    const maxVal = fair * 1.4;
+    
+    if (price <= minVal) return 2;
+    if (price >= maxVal) return 98;
+    
+    if (price <= cheap) {
+        return 2 + ((price - minVal) / (cheap - minVal)) * 33;
+    } else if (price <= expensive) {
+        return 35 + ((price - cheap) / (expensive - cheap)) * 30;
+    } else {
+        return 65 + ((price - expensive) / (maxVal - expensive)) * 33;
+    }
+}
+
 function renderFundamentals() {
     const d = fundamentalsData[selectedStock];
     const tickerEl = document.getElementById('fund-ticker');
@@ -1254,7 +1283,60 @@ function renderFundamentals() {
             const e = document.getElementById(id);
             if (e) e.innerHTML = '<div class="fund-metric-card" style="grid-column:1/-1;text-align:center;padding:20px;border:1px dashed rgba(255,255,255,0.1);"><div class="fund-metric-label">尚未下載 (請按上方 ⬇️下載數據 按鈕)</div></div>';
         });
+        const valBox = document.querySelector('.valuation-box');
+        if (valBox) valBox.style.display = 'none';
         return;
+    }
+
+    // 渲染機構估值儀表
+    const valBox = document.querySelector('.valuation-box');
+    if (valBox) {
+        if (d.valuation) {
+            valBox.style.display = 'block';
+            document.getElementById('val-current-price').textContent = '$' + (d.price || '--');
+            document.getElementById('val-fair-value').textContent = '$' + (d.valuation.fair_value || '--');
+            document.getElementById('val-cheap-price').textContent = '$' + (d.valuation.cheap_price || '--');
+            
+            const badge = document.getElementById('val-status-badge');
+            if (badge) {
+                badge.textContent = d.valuation.status_zh || '--';
+                if (d.valuation.status === 'Underpriced') {
+                    badge.style.background = 'rgba(16, 185, 129, 0.2)';
+                    badge.style.color = '#10b981';
+                    badge.style.border = '1px solid rgba(16, 185, 129, 0.4)';
+                } else if (d.valuation.status === 'Overpriced') {
+                    badge.style.background = 'rgba(239, 68, 68, 0.2)';
+                    badge.style.color = '#ef4444';
+                    badge.style.border = '1px solid rgba(239, 68, 68, 0.4)';
+                } else {
+                    badge.style.background = 'rgba(245, 158, 11, 0.2)';
+                    badge.style.color = '#f59e0b';
+                    badge.style.border = '1px solid rgba(245, 158, 11, 0.4)';
+                }
+            }
+            
+            const pct = getValuationPointerPercent(d.price, d.valuation.fair_value, d.valuation.cheap_price, d.valuation.expensive_price);
+            const pointer = document.getElementById('val-gauge-pointer');
+            if (pointer) pointer.style.left = pct + '%';
+            
+            document.getElementById('val-scale-min').textContent = '$' + (d.valuation.fair_value * 0.6).toFixed(2);
+            document.getElementById('val-scale-mid').textContent = '合理價: $' + (d.valuation.fair_value || '--');
+            document.getElementById('val-scale-max').textContent = '$' + (d.valuation.fair_value * 1.4).toFixed(2);
+            
+            document.getElementById('val-sub-dcf').textContent = '$' + (d.valuation.price_dcf || '--');
+            document.getElementById('val-wacc').textContent = (d.valuation.wacc || '--') + '%';
+            document.getElementById('val-growth').textContent = (d.valuation.implied_growth || '--') + '%';
+            
+            document.getElementById('val-sub-mult').textContent = '$' + (d.valuation.price_multiplier || '--');
+            document.getElementById('val-target-pe').textContent = (d.valuation.target_pe || '--') + 'x';
+            document.getElementById('val-ke').textContent = (d.valuation.ke || '--') + '%';
+            
+            document.getElementById('val-sub-peer').textContent = '$' + (d.valuation.price_peer || '--');
+            document.getElementById('val-peer-pe').textContent = (d.valuation.peer_median_pe || '--') + 'x';
+            document.getElementById('val-peer-ps').textContent = (d.valuation.peer_median_ps || '--') + 'x';
+        } else {
+            valBox.style.display = 'none';
+        }
     }
 
     const n2 = document.getElementById('fund-name');
@@ -2507,9 +2589,7 @@ function switchToView(viewName) {
     document.getElementById('view-title').textContent = viewTitles[viewName] || '';
 }
 
-function openStockXray(ticker) {
-    switchToView('stock-xray');
-
+function renderDashboardXray(ticker) {
     // 從 pgData 找到該股票
     if (!pgData || !pgData.stocks) return;
     var stock = pgData.stocks.find(function (s) { return s.ticker === ticker; });
@@ -2786,11 +2866,39 @@ function openStockXray(ticker) {
         if (optSection) optSection.style.display = 'none';
     }
 
-    // Load K-line chart
-    loadXrayChart(ticker);
-
     // Load quarterly trends
     loadXrayQuarterly(ticker);
+}
+
+// 實戰穿透：點擊排行榜個股自動跳轉並滾動至主看板交易計劃
+function openStockXray(ticker) {
+    switchToView('dashboard');
+    document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+    document.querySelector('.nav-link[data-view="dashboard"]')?.classList.add('active');
+    
+    changeChartStock(ticker);
+    
+    setTimeout(function () {
+        var tpBlock = document.getElementById('xray-trade-plan');
+        if (tpBlock) {
+            tpBlock.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+    }, 200);
+}
+
+// 預載入 Power Gauge 評分
+async function loadPowerGaugeData() {
+    try {
+        var res = await fetch('power_gauge_data.json?t=' + Date.now());
+        if (res.ok) {
+            pgData = await res.json();
+            if (selectedStock) {
+                renderDashboardXray(selectedStock);
+            }
+        }
+    } catch (e) {
+        console.warn('Power Gauge pre-load failed:', e);
+    }
 }
 
 function drawXrayRadar(dims) {
@@ -3194,7 +3302,7 @@ function renderTradePlan(plan) {
         buyContainer.innerHTML = `<div class="tp-no-signals" style="grid-column:1/-1;"><div class="tp-no-emoji">⚪</div>${noMsg}</div>`;
     } else {
         buyContainer.innerHTML = plan.buy_signals.map((s, i) => {
-            const stratClass = s.strategy === 'td9_buy' ? 'td9' : s.strategy === 'ma_pullback' ? 'ma' : 'momentum';
+            const stratClass = s.strategy === 'td9_buy' ? 'td9' : (s.strategy === 'ma_pullback' || s.strategy === 'swing') ? 'ma' : 'momentum';
             const filtersHtml = (s.filters_passed || []).map(f => `<span class="tp-meta-tag">${f}</span>`).join('');
             const order = s.schwab_order || {};
             const orderId = 'tp-order-' + i;
@@ -3356,4 +3464,261 @@ document.getElementById('btn-rescan-plan')?.addEventListener('click', async func
         this.disabled = false;
         this.textContent = '🔄 重新掃描';
     }
+});
+
+// ==========================================
+// 11. POSITIONS & EXITS DASHBOARD LOGIC
+// ==========================================
+async function loadPositionsDashboard() {
+    try {
+        const res = await fetch('/api/positions');
+        const data = await res.json();
+        if (data.status === 'ok') {
+            renderActivePositions(data.positions);
+            renderTradeHistory(data.history);
+        }
+    } catch (e) {
+        console.error("載入持倉資料失敗:", e);
+    }
+}
+
+function renderActivePositions(positions) {
+    const listEl = document.getElementById('pos-active-list');
+    if (!listEl) return;
+    document.getElementById('pos-active-count').textContent = positions.length + ' 筆';
+    
+    if (positions.length === 0) {
+        listEl.innerHTML = `
+            <div class="tp-empty-state glass-panel" style="padding:40px; text-align:center; grid-column:1/-1;">
+                <div style="font-size:40px; margin-bottom:12px; opacity:0.5;">💼</div>
+                <div style="color:var(--text-muted); font-size:13px;">目前無持倉部位。可點擊右上角「手動新增持倉」建立。</div>
+            </div>
+        `;
+        return;
+    }
+    
+    const strategyLabels = {
+        'hod': '日內突破 HOD',
+        'swing': '波段回調',
+        'momentum': '動能突破',
+        'buy_call': 'Buy Call 選擇權'
+    };
+    
+    listEl.innerHTML = positions.map(pos => {
+        const alertHtml = pos.exit_alert 
+            ? `<div style="background:rgba(239,68,68,0.12); border:1px solid rgba(239,68,68,0.3); border-radius:8px; padding:10px; margin-bottom:12px; color:#ef4444; font-size:12px; font-weight:600; line-height:1.5;">
+                 ⚠️ 出場警報：${pos.exit_alert} (${pos.exit_alert_time})
+               </div>`
+            : '';
+            
+        const stratClass = pos.strategy === 'buy_call' ? 'td9' : (pos.strategy === 'swing') ? 'ma' : 'momentum';
+        const notesHtml = pos.notes ? `<div style="font-size:12px; color:var(--text-muted); margin-top:8px; border-top:1px solid rgba(255,255,255,0.04); padding-top:6px;"><strong>備註：</strong>${pos.notes}</div>` : '';
+        const optionHtml = pos.option_expiry ? `
+            <div style="display:flex; justify-content:space-between; margin-bottom:6px;">
+                <span style="font-size:12px; color:var(--text-muted);">選擇權到期 (Expiry)</span>
+                <span style="font-size:12px; font-family:var(--font-mono); color:#f59e0b;">${pos.option_expiry} (K=$${pos.option_strike})</span>
+            </div>` : '';
+            
+        return `
+            <div class="tp-signal-card glass-panel" style="padding:18px; border-radius:12px; border-left:4px solid ${pos.exit_alert ? '#ef4444' : 'var(--accent-purple)'}; display:flex; flex-direction:column; justify-content:space-between;">
+                <div>
+                    <div class="tp-signal-header" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                        <span class="tp-signal-ticker" style="font-size:18px; font-weight:700; font-family:var(--font-mono); color:#fff;">${pos.ticker}</span>
+                        <span class="tp-signal-strategy ${stratClass}" style="padding:2px 8px; font-size:11px; border-radius:4px; font-weight:600;">${strategyLabels[pos.strategy] || pos.strategy}</span>
+                    </div>
+                    
+                    ${alertHtml}
+                    
+                    <div style="display:flex; flex-direction:column; gap:6px;">
+                        <div style="display:flex; justify-content:space-between;">
+                            <span style="font-size:12px; color:var(--text-muted);">進場價格 (Entry Price)</span>
+                            <span style="font-size:13px; font-weight:600; font-family:var(--font-mono); color:#fff;">$${pos.entry_price.toFixed(2)} × ${pos.shares} 股</span>
+                        </div>
+                        <div style="display:flex; justify-content:space-between;">
+                            <span style="font-size:12px; color:var(--text-muted);">歷史最高價 (High)</span>
+                            <span style="font-size:13px; font-weight:600; font-family:var(--font-mono); color:#10b981;">$${pos.highest_price.toFixed(2)}</span>
+                        </div>
+                        <div style="display:flex; justify-content:space-between;">
+                            <span style="font-size:12px; color:var(--text-muted);">移動停損價 (Stop Loss)</span>
+                            <span style="font-size:13px; font-weight:600; font-family:var(--font-mono); color:#ef4444;">$${pos.current_stop.toFixed(2)} <span style="font-size:10px; color:var(--text-muted); font-weight:normal;">(初始 $${pos.initial_stop.toFixed(2)})</span></span>
+                        </div>
+                        <div style="display:flex; justify-content:space-between;">
+                            <span style="font-size:12px; color:var(--text-muted);">持有天數 (Hold Days)</span>
+                            <span style="font-size:13px; font-weight:600; font-family:var(--font-mono); color:#fff;">${pos.days_held} 天</span>
+                        </div>
+                        ${optionHtml}
+                    </div>
+                    
+                    ${notesHtml}
+                </div>
+                
+                <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:14px; border-top:1px solid rgba(255,255,255,0.06); padding-top:10px;">
+                    <button class="btn-tf" onclick="confirmExitPrompt('${pos.ticker}', ${pos.current_stop})" style="padding:4px 10px; font-size:12px; background:rgba(239,68,68,0.15); border-color:rgba(239,68,68,0.3); color:#ef4444; font-weight:600;">
+                        🚪 確認出場 (平倉)
+                    </button>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+function renderTradeHistory(history) {
+    const tbody = document.getElementById('pos-history-tbody');
+    if (!tbody) return;
+    document.getElementById('pos-history-count').textContent = history.length + ' 筆';
+    
+    if (history.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="8" style="text-align:center; padding:30px; color:var(--text-muted);">無歷史交易紀錄</td>
+            </tr>
+        `;
+        return;
+    }
+    
+    const strategyLabels = {
+        'hod': '日內突破 HOD',
+        'swing': '波段回調',
+        'momentum': '動能突破',
+        'buy_call': 'Buy Call 選擇權'
+    };
+    
+    tbody.innerHTML = history.map(t => {
+        const pnlColor = t.pnl >= 0 ? '#10b981' : '#ef4444';
+        const pnlSign = t.pnl >= 0 ? '+' : '';
+        return `
+            <tr>
+                <td style="font-weight:700; font-family:var(--font-mono); color:#fff;">${t.ticker}</td>
+                <td>${strategyLabels[t.strategy] || t.strategy}</td>
+                <td>
+                    <div style="font-family:var(--font-mono);">$${t.entry_price.toFixed(2)} × ${t.shares}</div>
+                    <div style="font-size:10px; color:var(--text-muted);">${t.entry_date}</div>
+                </td>
+                <td>
+                    <div style="font-family:var(--font-mono); font-weight:600;">$${t.exit_price.toFixed(2)}</div>
+                    <div style="font-size:10px; color:var(--text-muted);">${t.exit_date}</div>
+                </td>
+                <td style="font-family:var(--font-mono);">${t.hold_days} 天</td>
+                <td style="font-family:var(--font-mono); font-weight:700; color:${pnlColor};">${pnlSign}$${t.pnl.toFixed(2)}</td>
+                <td style="font-family:var(--font-mono); font-weight:700; color:${pnlColor};">${pnlSign}${t.pnl_pct.toFixed(1)}%</td>
+                <td style="font-size:11px; max-width:200px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${t.exit_reason}">${t.exit_reason}</td>
+            </tr>
+        `;
+    }).join('');
+}
+
+function confirmExitPrompt(ticker, currentStop) {
+    const priceStr = prompt(`請輸入 ${ticker} 的實際出場價格 (預設使用移動停損價 $${currentStop}):`, currentStop);
+    if (priceStr === null) return;
+    
+    const exitPrice = parseFloat(priceStr);
+    if (isNaN(exitPrice) || exitPrice <= 0) {
+        alert("價格格式不正確，平倉失敗");
+        return;
+    }
+    
+    fetch('/api/positions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            action: 'close',
+            ticker: ticker,
+            exit_price: exitPrice
+        })
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.status === 'ok') {
+            loadPositionsDashboard();
+        } else {
+            alert("平倉失敗: " + data.message);
+        }
+    })
+    .catch(err => {
+        console.error(err);
+        alert("網路錯誤，平倉失敗");
+    });
+}
+
+// Show/Hide Add Position Modal Form
+document.getElementById('btn-show-add-pos-modal')?.addEventListener('click', () => {
+    document.getElementById('add-pos-section').style.display = 'block';
+});
+document.getElementById('btn-close-add-pos')?.addEventListener('click', () => {
+    document.getElementById('add-pos-section').style.display = 'none';
+});
+document.getElementById('btn-cancel-add-pos')?.addEventListener('click', () => {
+    document.getElementById('add-pos-section').style.display = 'none';
+});
+
+// Add Position Submit Handler
+document.getElementById('add-pos-form')?.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const ticker = document.getElementById('add-pos-ticker').value.trim();
+    const strategy = document.getElementById('add-pos-strategy').value;
+    const entry_price = parseFloat(document.getElementById('add-pos-price').value);
+    const shares = parseInt(document.getElementById('add-pos-shares').value);
+    const stop_loss = parseFloat(document.getElementById('add-pos-stop').value);
+    const notes = document.getElementById('add-pos-notes').value.trim();
+    const option_expiry = document.getElementById('add-pos-expiry').value.trim();
+    const option_strike = parseFloat(document.getElementById('add-pos-strike').value) || 0.0;
+    
+    fetch('/api/positions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            action: 'add',
+            ticker: ticker,
+            strategy: strategy,
+            entry_price: entry_price,
+            shares: shares,
+            stop_loss: stop_loss,
+            notes: notes,
+            option_expiry: option_expiry,
+            option_strike: option_strike
+        })
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.status === 'ok') {
+            document.getElementById('add-pos-section').style.display = 'none';
+            document.getElementById('add-pos-form').reset();
+            loadPositionsDashboard();
+        } else {
+            alert("新增持倉失敗: " + data.message);
+        }
+    })
+    .catch(err => {
+        console.error(err);
+        alert("新增持倉網路錯誤");
+    });
+});
+
+// Scan Exits Handler
+document.getElementById('btn-scan-exits')?.addEventListener('click', function() {
+    this.disabled = true;
+    this.textContent = '⏳ 出場掃描中...';
+    
+    fetch('/api/scan_exits', { method: 'POST' })
+    .then(res => res.json())
+    .then(data => {
+        this.disabled = false;
+        this.textContent = '⚡ 執行出場掃描';
+        if (data.status === 'ok') {
+            if (data.alerts && data.alerts.length > 0) {
+                alert(`掃描完成！觸發 ${data.alerts.length} 筆出場警報，已發送 LINE。`);
+            } else {
+                alert("掃描完成！所有持倉部位均在安全範圍內。");
+            }
+            loadPositionsDashboard();
+        } else {
+            alert("出場掃描失敗: " + data.message);
+        }
+    })
+    .catch(err => {
+        this.disabled = false;
+        this.textContent = '⚡ 執行出場掃描';
+        console.error(err);
+        alert("出場掃描網路錯誤");
+    });
 });

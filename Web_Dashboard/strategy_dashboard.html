@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Anti-Gravity 作戰中心 · 右側動能拉回</title>
+<style>
+  :root{
+    --bg:#0a0e17; --panel:#121826; --panel2:#1a2233; --line:#26304a;
+    --txt:#e6ecf5; --muted:#8a96ad; --accent:#4da3ff;
+    --green:#2ecc71; --green-d:#155f3a; --red:#ff5a5a; --red-d:#5e1f1f;
+    --yellow:#ffcb45; --yellow-d:#5e4d14; --mid:#3a4358;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--txt);font-family:-apple-system,"Segoe UI",
+    "Microsoft JhengHei",sans-serif;line-height:1.5;padding:0 0 60px}
+  a{color:var(--accent);text-decoration:none}
+  .wrap{max-width:1180px;margin:0 auto;padding:0 18px}
+
+  /* Header */
+  header{background:linear-gradient(180deg,#0e1422,#0a0e17);border-bottom:1px solid var(--line);
+    padding:18px 0;position:sticky;top:0;z-index:20;backdrop-filter:blur(6px)}
+  .hrow{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
+  .brand{display:flex;align-items:center;gap:12px}
+  .orb{width:34px;height:34px;border-radius:50%;background:radial-gradient(circle at 30% 30%,#7fd0ff,#1a6fff 60%,#0a2a66);
+    box-shadow:0 0 18px #2a7fff88}
+  .brand h1{font-size:19px;letter-spacing:.5px}
+  .brand .sub{font-size:12px;color:var(--muted)}
+  .updated{font-size:12px;color:var(--muted);text-align:right}
+  .btn{background:var(--panel2);border:1px solid var(--line);color:var(--txt);
+    padding:7px 14px;border-radius:8px;cursor:pointer;font-size:13px}
+  .btn:hover{border-color:var(--accent)}
+
+  /* Regime banner */
+  .regime{margin:18px 0;border-radius:14px;padding:16px 20px;display:flex;align-items:center;
+    gap:18px;border:1px solid var(--line)}
+  .regime.green{background:linear-gradient(90deg,#0f2a1c,#121826);border-color:var(--green-d)}
+  .regime.yellow{background:linear-gradient(90deg,#2a2510,#121826);border-color:var(--yellow-d)}
+  .regime.red{background:linear-gradient(90deg,#2a1212,#121826);border-color:var(--red-d)}
+  .light{width:46px;height:46px;border-radius:50%;flex:none}
+  .green .light{background:var(--green);box-shadow:0 0 22px var(--green)}
+  .yellow .light{background:var(--yellow);box-shadow:0 0 22px var(--yellow)}
+  .red .light{background:var(--red);box-shadow:0 0 22px var(--red)}
+  .regime .lbl{font-size:18px;font-weight:600}
+  .regime .act{font-size:14px;color:var(--muted);margin-top:2px}
+  .regime .qqq{margin-left:auto;text-align:right;font-size:12px;color:var(--muted);line-height:1.7}
+  .regime .qqq b{color:var(--txt);font-size:14px}
+
+  /* Section */
+  section{margin:26px 0}
+  .stitle{display:flex;align-items:center;gap:10px;margin-bottom:14px}
+  .stitle h2{font-size:16px;letter-spacing:.5px}
+  .stitle .tag{font-size:11px;color:var(--muted);background:var(--panel2);
+    border:1px solid var(--line);padding:2px 9px;border-radius:20px}
+  .stitle .line{flex:1;height:1px;background:var(--line)}
+
+  /* Playbook */
+  .play{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px 20px}
+  .card h3{font-size:14px;margin-bottom:12px;display:flex;align-items:center;gap:8px}
+  .card h3 .pill{font-size:11px;padding:2px 8px;border-radius:6px}
+  .pill.in{background:var(--green-d);color:#aef5cd}
+  .pill.out{background:#1d3a5e;color:#bfe0ff}
+  .chk{display:flex;gap:10px;margin:9px 0;font-size:13.5px;align-items:flex-start}
+  .chk .i{flex:none;width:20px;height:20px;border-radius:5px;display:grid;place-items:center;
+    font-size:12px;font-weight:700}
+  .chk.g .i{background:var(--green-d);color:#aef5cd}
+  .chk.b .i{background:#1d3a5e;color:#bfe0ff}
+  .expect{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
+  .kpi{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 16px;flex:1;min-width:120px}
+  .kpi .v{font-size:22px;font-weight:700}
+  .kpi .k{font-size:12px;color:var(--muted);margin-top:2px}
+  .note{font-size:12.5px;color:var(--muted);margin-top:10px;padding-left:2px}
+
+  /* Signal cards */
+  .sigs{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px}
+  .sig{background:linear-gradient(180deg,#13243a,#121826);border:1px solid #244065;
+    border-radius:14px;padding:16px 18px;position:relative;overflow:hidden}
+  .sig::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--green)}
+  .sig .tk{font-size:20px;font-weight:700;letter-spacing:.5px}
+  .sig .rs{font-size:11px;color:var(--muted);margin:2px 0 12px}
+  .lvls{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+  .lvl{background:#0e1626;border:1px solid var(--line);border-radius:9px;padding:8px 10px}
+  .lvl .k{font-size:10.5px;color:var(--muted)}
+  .lvl .v{font-size:16px;font-weight:700;margin-top:1px}
+  .lvl.entry .v{color:#bfe0ff}
+  .lvl.stop .v{color:var(--red)}
+  .lvl.tgt .v{color:var(--green)}
+  .lvl.size .v{font-size:14px}
+  .sigfoot{font-size:11.5px;color:var(--muted);margin-top:11px;border-top:1px dashed var(--line);padding-top:9px}
+  .sigfoot b{color:var(--txt)}
+  .empty{background:var(--panel);border:1px dashed var(--line);border-radius:12px;
+    padding:26px;text-align:center;color:var(--muted)}
+
+  /* Watch + tables */
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th,td{padding:9px 12px;text-align:center;border-bottom:1px solid var(--line)}
+  th{color:var(--muted);font-weight:600;font-size:12px;background:var(--panel2)}
+  td:first-child,th:first-child{text-align:left}
+  .tblwrap{background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+  tr.win td{background:#0f2a1c33}
+  tr.lose td{background:#2a121233}
+  tr.win td:first-child{box-shadow:inset 3px 0 0 var(--green)}
+  tr.lose td:first-child{box-shadow:inset 3px 0 0 var(--red)}
+  .pos{color:var(--green)}.neg{color:var(--red)}
+
+  /* Evidence accordion */
+  .ev{background:var(--panel);border:1px solid var(--line);border-radius:12px;margin-bottom:12px;overflow:hidden}
+  .ev>summary{padding:14px 18px;cursor:pointer;font-size:14px;font-weight:600;
+    display:flex;align-items:center;gap:10px;list-style:none}
+  .ev>summary::-webkit-details-marker{display:none}
+  .ev>summary .ar{transition:.2s;color:var(--muted)}
+  .ev[open]>summary .ar{transform:rotate(90deg)}
+  .ev .body{padding:0 18px 16px}
+  .ev .body .note{margin:0 0 12px}
+  details.ev[open]>summary{border-bottom:1px solid var(--line)}
+
+  .foot{text-align:center;color:var(--muted);font-size:12px;margin-top:30px}
+  @media(max-width:720px){.play{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap hrow">
+    <div class="brand">
+      <div class="orb"></div>
+      <div>
+        <h1>Anti-Gravity 作戰中心</h1>
+        <div class="sub">右側動能 · 均線拉回 · 分批出場 — 一套用數據定案的紀律系統</div>
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:14px">
+      <div class="updated" id="updated">載入中…</div>
+      <button class="btn" onclick="loadAll()">↻ 重新整理</button>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+  <!-- 大盤 REGIME -->
+  <div class="regime" id="regime">
+    <div class="light"></div>
+    <div><div class="lbl">載入中…</div><div class="act"></div></div>
+  </div>
+
+  <!-- 紀律總覽 -->
+  <section>
+    <div class="stitle"><h2>📜 策略紀律總覽</h2><span class="tag">照表操課，不臨場改主意</span><div class="line"></div></div>
+    <div class="play">
+      <div class="card">
+        <h3><span class="pill in">進場</span> 四個條件全中才進</h3>
+        <div id="entryRules"></div>
+      </div>
+      <div class="card">
+        <h3><span class="pill out">出場</span> 分批落袋 + 抱住贏家</h3>
+        <div id="exitRules"></div>
+      </div>
+    </div>
+    <div class="expect" id="expect"></div>
+    <div class="note" id="expectNote"></div>
+  </section>
+
+  <!-- 真實風險 / 穩健性 -->
+  <section>
+    <div class="stitle"><h2>🛡️ 真實風險 — 別被回測騙</h2><span class="tag">投大資金前必看</span><div class="line"></div></div>
+    <div id="robust"></div>
+  </section>
+
+  <!-- 今日信號 -->
+  <section>
+    <div class="stitle"><h2>🎯 今日進場信號卡</h2><span class="tag" id="sigCount">—</span><div class="line"></div></div>
+    <div class="sigs" id="signals"></div>
+  </section>
+
+  <!-- 醞釀中 -->
+  <section>
+    <div class="stitle"><h2>👀 醞釀中觀察清單</h2><span class="tag">站上200MA+動能正+正在靠近拉回均線</span><div class="line"></div></div>
+    <div class="tblwrap"><table id="watch"></table></div>
+  </section>
+
+  <!-- 回測實證 -->
+  <section>
+    <div class="stitle"><h2>🔬 回測實證 — 為什麼敢照這套做</h2><span class="tag" id="evDate">—</span><div class="line"></div></div>
+    <div id="evidence"></div>
+  </section>
+
+  <div class="foot" id="foot"></div>
+</div>
+
+<script>
+const $ = s => document.querySelector(s);
+const fmtF = v => (v==null ? '—' : v);
+async function getJSON(f){ const r = await fetch(f + '?t=' + Date.now()); if(!r.ok) throw 0; return r.json(); }
+
+function renderRegime(rg){
+  const el = $('#regime');
+  el.className = 'regime ' + rg.light;
+  el.innerHTML = `
+    <div class="light"></div>
+    <div>
+      <div class="lbl">${rg.label}</div>
+      <div class="act">▶ 紀律動作：${rg.action}</div>
+    </div>
+    <div class="qqq">
+      QQQ <b>${rg.qqq_close}</b><br>
+      21EMA ${rg.ema21} · 50MA ${rg.ma50}<br>
+      200MA ${rg.ma200}
+    </div>`;
+}
+
+function renderPlaybook(ev, cfg){
+  const fc = ev.final_config;
+  $('#entryRules').innerHTML = fc.entry.map(t =>
+    `<div class="chk g"><span class="i">✓</span><span>${t}</span></div>`).join('');
+  $('#exitRules').innerHTML = fc.exit.map(t =>
+    `<div class="chk b"><span class="i">▸</span><span>${t}</span></div>`).join('');
+  const e = fc.expectation;
+  $('#expect').innerHTML = `
+    <div class="kpi"><div class="v">${e.sharpe}</div><div class="k">OOS Sharpe (3年)</div></div>
+    <div class="kpi"><div class="v">${e.pf}</div><div class="k">獲利因子 PF</div></div>
+    <div class="kpi"><div class="v">${e.wr}</div><div class="k">勝率 WR</div></div>
+    <div class="kpi"><div class="v neg">${e.mdd}</div><div class="k">最大回撤 MDD</div></div>`;
+  $('#expectNote').textContent = '※ ' + e.note;
+}
+
+function renderSignals(d){
+  $('#sigCount').textContent = `${d.n_signals} 個可執行 · 資料日 ${d.data_date}`;
+  const box = $('#signals');
+  if(!d.signals.length){ box.innerHTML = '<div class="empty">今日沒有符合四條件的進場信號 — 紀律就是不亂進場，空手等設定成形。</div>'; return; }
+  box.innerHTML = d.signals.map(c => `
+    <div class="sig">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div class="tk">${c.ticker}</div>
+        ${c.rs_pct!=null?`<div style="background:#1d3a5e;color:#bfe0ff;font-size:12px;font-weight:700;padding:3px 9px;border-radius:7px">RS ${c.rs_pct}</div>`:''}
+      </div>
+      <div class="rs">${c.reason} · 動能 ${c.momentum>0?'+':''}${c.momentum}</div>
+      <div class="lvls">
+        <div class="lvl entry"><div class="k">進場價</div><div class="v">$${c.entry}</div></div>
+        <div class="lvl stop"><div class="k">硬停損 (風險${c.risk_pct}%)</div><div class="v">$${c.stop}</div></div>
+        <div class="lvl tgt"><div class="k">分批目標 +${c.scale1_gain_pct}%</div><div class="v">$${c.scale1_target}</div></div>
+        <div class="lvl size"><div class="k">建議部位 (帳戶${(d.config.account_size/1000)}k·風險${d.config.risk_per_trade_pct}%)</div><div class="v">${c.suggested_shares}股 ≈ $${c.suggested_dollars.toLocaleString()}</div></div>
+      </div>
+      <div class="sigfoot">觸及 <b>$${c.scale1_target}</b> 賣 <b>${c.scale_frac}%</b> 落袋，剩餘用 <b>吊燈${c.trail_mult}×ATR</b> 移動停利抱住趨勢。ATR=$${c.atr}</div>
+      ${c.fundamentals?`<div class="sigfoot" style="border-top:none;padding-top:4px">基本面(裁量參考)：淨利率 ${fmtF(c.fundamentals.net_margin)}% · 營收增 ${fmtF(c.fundamentals.rev_growth)}% · ROE ${fmtF(c.fundamentals.roe)}% · 前瞻PE ${c.fundamentals.fwd_pe??'—'}</div>`:''}
+    </div>`).join('');
+}
+
+function renderWatch(d){
+  const t = $('#watch');
+  if(!d.watchlist.length){ t.innerHTML = '<tr><td style="color:var(--muted);padding:18px">目前沒有醞釀中的標的</td></tr>'; return; }
+  t.innerHTML = `<thead><tr><th>標的</th><th>RS</th><th>現價</th><th>最近拉回均線</th><th>距離</th><th>趨勢</th><th>動能</th></tr></thead>
+    <tbody>${d.watchlist.map(w => `<tr>
+      <td><b>${w.ticker}</b></td><td>${w.rs_pct!=null?w.rs_pct:'—'}</td><td>$${w.close}</td><td>${w.nearest_ma}</td>
+      <td class="${Math.abs(w.nearest_ma_dist_pct)<3?'pos':''}">${w.nearest_ma_dist_pct>0?'+':''}${w.nearest_ma_dist_pct}%</td>
+      <td>${w.trend_ok?'✅':'—'}</td><td>${w.momentum_pos?'✅ 正':'—'}</td></tr>`).join('')}</tbody>`;
+}
+
+const STAT = ['win','lose','mid'];
+function evTable(step){
+  const rows = step.rows.map(r => {
+    let cls = '', cells = r.slice();
+    if(STAT.includes(cells[cells.length-1])){ cls = cells.pop(); }
+    return `<tr class="${cls}">${cells.map((c,i)=>`<td>${c}</td>`).join('')}</tr>`;
+  }).join('');
+  const head = step.cols ? `<thead><tr>${step.cols.map(c=>`<th>${c}</th>`).join('')}</tr></thead>` : '';
+  return `<div class="tblwrap"><table>${head}<tbody>${rows}</tbody></table></div>`;
+}
+
+function renderEvidence(ev){
+  $('#evDate').textContent = `研究 ${ev.research_date} · ${ev.universe}`;
+  const steps = ['step1_strategy','step2_validation','step3_exit','step4_filter',
+                 'step5_honesty','step6_concentration','step7_survivorship','step8_rs','step9_rs_fund'];
+  let html = '';
+  steps.forEach((k,i) => {
+    const s = ev[k];
+    if(!s) return;
+    const openByDefault = (k==='step8_rs' || k==='step7_survivorship');
+    html += `<details class="ev" ${openByDefault?'open':''}>
+      <summary><span class="ar">▶</span> ${s.title}</summary>
+      <div class="body"><div class="note">${s.note}</div>${evTable(s)}</div>
+    </details>`;
+  });
+  // 教訓
+  const L = ev.final_config.lessons;
+  html += `<details class="ev" open><summary><span class="ar">▶</span> 💡 整個過程最重要的紀律收穫</summary>
+    <div class="body">${L.map(t=>`<div class="chk g"><span class="i">✓</span><span>${t}</span></div>`).join('')}</div></details>`;
+  $('#evidence').innerHTML = html;
+}
+
+function renderRobust(rb){
+  if(!rb){ $('#robust').innerHTML = '<div class="note">尚無穩健性資料，請執行 python validate_robustness.py</div>'; return; }
+  const sigBadge = rb.significant
+    ? `<span style="color:var(--green)">✅ 統計顯著 (t=${rb.t_stat}, p<0.01)</span>`
+    : `<span style="color:var(--red)">⚠️ 不顯著 (t=${rb.t_stat})</span>`;
+  const survive = rb.edge_survives_multiple_testing
+    ? `<span style="color:var(--green)">通過多重測試</span>`
+    : `<span style="color:var(--yellow)">未通過多重測試</span>`;
+  $('#robust').innerHTML = `
+    <div class="card">
+      <div class="expect" style="margin-top:0">
+        <div class="kpi"><div class="v" style="font-size:18px">${sigBadge}</div><div class="k">${rb.n_trades} 筆交易期望值顯著性 · ${survive}（試過~${rb.approx_trials}種組態，雜訊門檻${rb.expected_max_noise_sigma}σ）</div></div>
+      </div>
+      <div class="expect">
+        <div class="kpi"><div class="v neg">${rb.plan_mdd}%</div><div class="k">規劃用回撤<br>(MC 99分位/歷史較差者)</div></div>
+        <div class="kpi"><div class="v neg">${rb.mc_mdd_p95}%</div><div class="k">壞運回撤<br>(MC 95分位)</div></div>
+        <div class="kpi"><div class="v">${rb.mc_mdd_median}%</div><div class="k">中位回撤<br>(MC 50分位)</div></div>
+        <div class="kpi"><div class="v neg">${rb.hist_mdd}%</div><div class="k">歷史實際回撤</div></div>
+      </div>
+      <div class="note">⚠️ 歷史實際 ${rb.hist_mdd}% 比 Monte Carlo 中位 ${rb.mc_mdd_median}% 還差 —— 因為持倉全是科技股、殺盤時高度相關一起跌，獨立重抽會低估回撤。<b>請以 ${rb.plan_mdd}% ~ -25% 為部位上限的承受底線。</b></div>
+      <div class="note">📈 3年終值報酬分布(固定$風險模型)：中位 +${rb.ret_median}% · 壞運(5分位) +${rb.ret_p5}% · 好運(95分位) +${rb.ret_p95}%。此為生存者偏差股池上的樂觀估計，真實值更低，務必先 paper trading。</div>
+    </div>`;
+}
+
+async function loadAll(){
+  try{
+    const [sig, ev, rb] = await Promise.all([
+      getJSON('strategy_signals.json'),
+      getJSON('backtest_evidence.json'),
+      getJSON('robustness.json').catch(()=>null),
+    ]);
+    $('#updated').innerHTML = `信號更新 ${sig.last_updated}<br>實證更新 ${ev.last_updated}`;
+    renderRegime(sig.regime);
+    renderPlaybook(ev, sig.config);
+    renderRobust(rb);
+    renderSignals(sig);
+    renderWatch(sig);
+    renderEvidence(ev);
+    $('#foot').textContent = `${sig.config.universe||''}　|　進場：${sig.config.entry}　|　出場：${sig.config.exit}`;
+  }catch(e){
+    $('#regime').innerHTML = '<div class="lbl" style="color:var(--red)">⚠️ 資料載入失敗</div>'+
+      '<div class="act">請先執行：python generate_signals.py 與 python generate_evidence.py，再用 web_server.py 開啟。</div>';
+  }
+}
+loadAll();
+</script>
+</body>
+</html>

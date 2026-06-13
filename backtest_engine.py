@@ -248,6 +248,57 @@ class Portfolio:
         del self.positions[ticker]
         return trade
 
+    def scale_out(self, ticker: str, fraction: float, exit_price: float,
+                  exit_date: date, reason: str) -> Optional[Trade]:
+        """
+        部分平倉（分批出場）。賣出 fraction 比例的股數，賣掉的那部分記成獨立
+        Trade（正確計入 PF/績效），剩餘股數續抱。標記 pos.scaled_out=True。
+        """
+        if ticker not in self.positions:
+            return None
+        pos = self.positions[ticker]
+
+        sell_shares = int(pos.shares * fraction)
+        if sell_shares < 1:
+            return None
+        if sell_shares >= pos.shares:
+            # 比例過大則直接全平
+            return self.close_position(ticker, exit_price, exit_date, reason)
+
+        if pos.direction == 'long':
+            fill_price = exit_price * (1 - self.slippage_pct)
+        else:
+            fill_price = exit_price * (1 + self.slippage_pct)
+        fill_price = round(fill_price, 2)
+
+        proceeds = fill_price * sell_shares - self.commission_per_trade
+        self.cash += proceeds
+
+        total_commission = self.commission_per_trade * 2
+        if pos.direction == 'long':
+            gross_pnl = (fill_price - pos.entry_price) * sell_shares
+        else:
+            gross_pnl = (pos.entry_price - fill_price) * sell_shares
+        net_pnl = gross_pnl - total_commission
+        pnl_pct = (fill_price / pos.entry_price - 1) * 100 if pos.direction == 'long' \
+            else (1 - fill_price / pos.entry_price) * 100
+
+        trade = Trade(
+            ticker=ticker, direction=pos.direction, strategy=pos.strategy,
+            entry_date=pos.entry_date, entry_price=pos.entry_price,
+            exit_date=exit_date, exit_price=fill_price, shares=sell_shares,
+            pnl=round(net_pnl, 2), pnl_pct=round(pnl_pct, 2),
+            hold_days=pos.days_held, entry_reason=pos.reason,
+            exit_reason=reason, commission_total=total_commission,
+        )
+        self.closed_trades.append(trade)
+
+        # 縮減剩餘持倉
+        pos.cost_basis *= (pos.shares - sell_shares) / pos.shares
+        pos.shares -= sell_shares
+        pos.scaled_out = True
+        return trade
+
     def update_daily(self, current_date: date, prices: Dict[str, dict]):
         """
         每日收盤後更新所有持倉。
@@ -285,13 +336,17 @@ class RiskManager:
                  max_risk_per_trade: float = 0.01,
                  max_positions: int = 6,
                  max_daily_loss_pct: float = 0.03,
-                 max_sector_positions: int = 3):
+                 max_sector_positions: int = 3,
+                 max_portfolio_heat: float = None):
         self.max_risk_per_trade = max_risk_per_trade
         self.max_positions = max_positions
         self.max_daily_loss_pct = max_daily_loss_pct
         self.max_sector_positions = max_sector_positions
+        # 組合總風險上限：所有持倉「進場到停損」風險總和 / 淨值 不得超過此值
+        # （限制同時押注的相關曝險，壓低真實尾部回撤）None = 不啟用
+        self.max_portfolio_heat = max_portfolio_heat
 
-                self._sector_map = {
+        self._sector_map = {
             'semiconductor': ['NVDA', 'AMD', 'TSM', 'AVGO', 'ARM'],
             'optics_connect': ['COHR', 'LITE', 'CLS', 'FN', 'CAMT'],
             'servers_storage': ['SMCI', 'DELL', 'ANET', 'PSTG', 'WDC'],
@@ -358,6 +413,15 @@ class RiskManager:
         )
         if sector_count >= self.max_sector_positions:
             return False, f'板塊 {ticker_sector} 已達最大 {self.max_sector_positions} 檔'
+
+        # 4.5 組合總風險上限 (portfolio heat)
+        if self.max_portfolio_heat is not None and portfolio.equity > 0:
+            open_heat = sum(
+                max(p.entry_price - p.stop_loss, 0) * p.shares
+                for p in portfolio.positions.values() if p.direction == 'long'
+            ) / portfolio.equity
+            if open_heat + self.max_risk_per_trade > self.max_portfolio_heat:
+                return False, f'組合總風險已達上限 {self.max_portfolio_heat*100:.0f}%'
 
         # 5. 當日虧損檢查
         if len(portfolio.equity_curve) >= 2:

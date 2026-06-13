@@ -22,6 +22,9 @@
                 <a href="#" class="nav-link" data-view="trade-plan">
                     <span class="nav-icon">📋</span> 今日交易計劃
                 </a>
+                <a href="#" class="nav-link" data-view="positions">
+                    <span class="nav-icon">💼</span> 持倉管理
+                </a>
                 <a href="#" class="nav-link active" data-view="dashboard">
                     <span class="nav-icon">📡</span> 即時儀表板
                 </a>
@@ -140,6 +143,117 @@
                 </section>
             </div>
 
+            <!-- ========== VIEW 11: 持倉管理 ========== -->
+            <div class="view-panel" id="view-positions">
+                <div class="view-header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+                    <h2>持倉管理 <span class="subtitle">三層出場框架實戰監控 (無 RSI)</span></h2>
+                    <div style="display:flex; align-items:center; gap:10px;">
+                        <button class="btn-tf" id="btn-scan-exits" style="padding:8px 16px; background:linear-gradient(135deg, rgba(239,68,68,0.3), rgba(245,158,11,0.3)); border-color:rgba(239,68,68,0.5); font-size:13px; font-weight:600;">
+                            ⚡ 執行出場掃描
+                        </button>
+                        <button class="btn-tf" id="btn-show-add-pos-modal" style="padding:8px 16px; background:rgba(59,130,246,0.15); border-color:rgba(59,130,246,0.3); font-size:13px; font-weight:600;">
+                            ➕ 手動新增持倉
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 新增持倉表單 (預設隱藏) -->
+                <section class="glass-panel" id="add-pos-section" style="display:none; margin-top:16px; padding:20px; border-radius:14px; border-left:4px solid var(--accent-blue);">
+                    <h3 style="margin:0 0 16px 0; font-size:15px; color:var(--text-main); display:flex; justify-content:space-between;">
+                        <span>新增持倉部位</span>
+                        <span id="btn-close-add-pos" style="cursor:pointer; opacity:0.6; font-size:18px;">✕</span>
+                    </h3>
+                    <form id="add-pos-form" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:12px;">
+                        <div>
+                            <label style="display:block; font-size:11px; color:var(--text-muted); margin-bottom:4px; font-weight:600;">股票代碼 (Ticker)</label>
+                            <input type="text" id="add-pos-ticker" required style="width:100%; padding:8px; background:var(--bg-card); border:1px solid var(--border-glow); border-radius:6px; color:#fff; font-family:var(--font-mono); text-transform:uppercase;">
+                        </div>
+                        <div>
+                            <label style="display:block; font-size:11px; color:var(--text-muted); margin-bottom:4px; font-weight:600;">交易策略 (Strategy)</label>
+                            <select id="add-pos-strategy" style="width:100%; padding:8px; background:var(--bg-card); border:1px solid var(--border-glow); border-radius:6px; color:#fff;">
+                                <option value="swing">Swing 波段回調</option>
+                                <option value="momentum">Momentum 動能突破</option>
+                                <option value="hod">HOD 日內突破</option>
+                                <option value="buy_call">Buy Call 選擇權</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label style="display:block; font-size:11px; color:var(--text-muted); margin-bottom:4px; font-weight:600;">進場價格 (Entry Price)</label>
+                            <input type="number" step="0.01" id="add-pos-price" required style="width:100%; padding:8px; background:var(--bg-card); border:1px solid var(--border-glow); border-radius:6px; color:#fff; font-family:var(--font-mono);">
+                        </div>
+                        <div>
+                            <label style="display:block; font-size:11px; color:var(--text-muted); margin-bottom:4px; font-weight:600;">股數 (Shares / 合約數)</label>
+                            <input type="number" id="add-pos-shares" required style="width:100%; padding:8px; background:var(--bg-card); border:1px solid var(--border-glow); border-radius:6px; color:#fff; font-family:var(--font-mono);">
+                        </div>
+                        <div>
+                            <label style="display:block; font-size:11px; color:var(--text-muted); margin-bottom:4px; font-weight:600;">初始停損 (Initial Stop)</label>
+                            <input type="number" step="0.01" id="add-pos-stop" required style="width:100%; padding:8px; background:var(--bg-card); border:1px solid var(--border-glow); border-radius:6px; color:#fff; font-family:var(--font-mono);">
+                        </div>
+                        <div>
+                            <label style="display:block; font-size:11px; color:var(--text-muted); margin-bottom:4px; font-weight:600;">選擇權到期日 (Expiry YYYY-MM-DD)</label>
+                            <input type="text" id="add-pos-expiry" placeholder="2026-06-20" style="width:100%; padding:8px; background:var(--bg-card); border:1px solid var(--border-glow); border-radius:6px; color:#fff; font-family:var(--font-mono);">
+                        </div>
+                        <div>
+                            <label style="display:block; font-size:11px; color:var(--text-muted); margin-bottom:4px; font-weight:600;">選擇權履約價 (Strike)</label>
+                            <input type="number" step="0.5" id="add-pos-strike" placeholder="135" style="width:100%; padding:8px; background:var(--bg-card); border:1px solid var(--border-glow); border-radius:6px; color:#fff; font-family:var(--font-mono);">
+                        </div>
+                        <div style="grid-column:1/-1;">
+                            <label style="display:block; font-size:11px; color:var(--text-muted); margin-bottom:4px; font-weight:600;">備註 (Notes)</label>
+                            <input type="text" id="add-pos-notes" placeholder="例如: 連續下跌竭盡加分進場" style="width:100%; padding:8px; background:var(--bg-card); border:1px solid var(--border-glow); border-radius:6px; color:#fff;">
+                        </div>
+                        <div style="grid-column:1/-1; display:flex; justify-content:flex-end; gap:10px; margin-top:8px;">
+                            <button type="button" class="btn-tf" id="btn-cancel-add-pos" style="padding:6px 14px;">取消</button>
+                            <button type="submit" class="btn-tf" style="padding:6px 16px; background:var(--accent-blue); border-color:var(--accent-blue); color:#fff; font-weight:600;">儲存部位</button>
+                        </div>
+                    </form>
+                </section>
+
+                <!-- 持倉部位列表 -->
+                <section style="margin-top:20px;">
+                    <div style="display:flex; align-items:center; gap:10px; margin-bottom:12px;">
+                        <h3 style="margin:0; font-size:16px; color:var(--text-primary);">💼 當前持倉部位</h3>
+                        <span id="pos-active-count" class="badge-count" style="font-size:12px;">0 筆</span>
+                    </div>
+                    <div id="pos-active-list" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(360px, 1fr)); gap:16px;">
+                        <div class="tp-empty-state glass-panel" style="padding:40px; text-align:center; grid-column:1/-1;">
+                            <div style="font-size:40px; margin-bottom:12px; opacity:0.5;">💼</div>
+                            <div style="color:var(--text-muted); font-size:13px;">載入持倉資料中...</div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 已平倉歷史紀錄 -->
+                <section style="margin-top:28px;">
+                    <div style="display:flex; align-items:center; gap:10px; margin-bottom:12px;">
+                        <h3 style="margin:0; font-size:16px; color:var(--text-primary);">📊 已平倉歷史紀錄</h3>
+                        <span id="pos-history-count" class="badge-count" style="font-size:12px;">0 筆</span>
+                    </div>
+                    <div class="glass-panel" style="padding:16px; border-radius:14px;">
+                        <div class="bt-table-wrap" style="max-height: 400px;">
+                            <table class="bt-table" id="pos-history-table">
+                                <thead>
+                                    <tr>
+                                        <th>標的</th>
+                                        <th>交易策略</th>
+                                        <th>進場時間/價格</th>
+                                        <th>出場時間/價格</th>
+                                        <th>持有天數</th>
+                                        <th>實現盈虧</th>
+                                        <th>實現報酬率</th>
+                                        <th>出場原因</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="pos-history-tbody">
+                                    <tr>
+                                        <td colspan="8" style="text-align:center; padding:30px; color:var(--text-muted);">無歷史交易紀錄</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
+            </div>
+
             <!-- ========== VIEW 1: 即時儀表板 ========== -->
             <div class="view-panel active" id="view-dashboard">
                 <div class="grid-layout">
@@ -245,6 +359,101 @@
                             </div>
                         </div>
 
+                        <!-- 華爾街機構估值儀表 (Wall Street Valuation Box) -->
+                        <div class="valuation-box glass-panel" style="margin-top: 16px; margin-bottom: 24px; padding: 20px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.08); background: rgba(30, 41, 59, 0.45); box-shadow: inset 0 1px 1px rgba(255,255,255,0.05);">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                                <h4 style="margin: 0; font-size: 15px; color: var(--text-primary); display: flex; align-items: center; gap: 8px;">
+                                    <span>🏛️ 華爾街機構多因子估值矩陣</span>
+                                </h4>
+                                <div id="val-status-badge" style="padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 600;">--</div>
+                            </div>
+                            
+                            <!-- 核心數值摘要 -->
+                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 20px;">
+                                <div style="background: rgba(0,0,0,0.15); padding: 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.03);">
+                                    <div style="font-size: 11px; color: var(--text-muted); margin-bottom: 4px;">當前股價</div>
+                                    <div id="val-current-price" style="font-size: 20px; font-weight: 700; color: #fff; font-family: var(--font-mono);">--</div>
+                                </div>
+                                <div style="background: rgba(0,0,0,0.15); padding: 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.03); border-left: 3px solid var(--accent-blue);">
+                                    <div style="font-size: 11px; color: var(--text-muted); margin-bottom: 4px;">綜合合理定價</div>
+                                    <div id="val-fair-value" style="font-size: 20px; font-weight: 700; color: var(--accent-blue); font-family: var(--font-mono);">--</div>
+                                </div>
+                                <div style="background: rgba(0,0,0,0.15); padding: 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.03); border-left: 3px solid #10b981;">
+                                    <div style="font-size: 11px; color: var(--text-muted); margin-bottom: 4px;">安全邊際買點 (85折)</div>
+                                    <div id="val-cheap-price" style="font-size: 20px; font-weight: 700; color: #10b981; font-family: var(--font-mono);">--</div>
+                                </div>
+                            </div>
+                            
+                            <!-- 估值區間儀表規 -->
+                            <div style="margin-bottom: 20px; padding: 0 10px;">
+                                <div style="display: flex; justify-content: space-between; font-size: 11px; color: var(--text-muted); margin-bottom: 6px;">
+                                    <span>🟢 便宜低估區</span>
+                                    <span>🟡 合理價值區</span>
+                                    <span>🔴 昂貴高估區</span>
+                                </div>
+                                <div class="val-gauge-track" style="position: relative; height: 10px; border-radius: 5px; background: linear-gradient(to right, #10b981 0%, #10b981 35%, #f59e0b 35%, #f59e0b 65%, #ef4444 65%, #ef4444 100%); margin-bottom: 8px;">
+                                    <!-- 指針 -->
+                                    <div id="val-gauge-pointer" style="position: absolute; top: -4px; left: 50%; width: 18px; height: 18px; border-radius: 50%; background: #fff; border: 3px solid var(--accent-blue); box-shadow: 0 0 8px rgba(59,130,246,0.8); transform: translateX(-50%); transition: left 0.5s ease-out;"></div>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; font-size: 10px; color: var(--text-muted); font-family: var(--font-mono);">
+                                    <span id="val-scale-min">--</span>
+                                    <span id="val-scale-mid">合理價: --</span>
+                                    <span id="val-scale-max">--</span>
+                                </div>
+                            </div>
+                            
+                            <!-- 三估值因子與折現參數 -->
+                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px;">
+                                <!-- Model 1: WACC-DCF -->
+                                <div style="background: rgba(255,255,255,0.02); padding: 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.04);">
+                                    <div style="font-weight: 600; font-size: 12px; color: #fff; margin-bottom: 8px; display:flex; justify-content:space-between; align-items:center;">
+                                        <span>💵 兩階段 WACC-DCF</span>
+                                        <span id="val-sub-dcf" style="font-family:var(--font-mono); color:var(--accent-blue); font-weight:700;">--</span>
+                                    </div>
+                                    <div style="display: flex; justify-content: space-between; font-size: 11px; color: var(--text-muted); margin-bottom: 4px;">
+                                        <span>加權成本 (WACC)</span>
+                                        <span id="val-wacc" style="font-family:var(--font-mono); color:#fff;">--</span>
+                                    </div>
+                                    <div style="display: flex; justify-content: space-between; font-size: 11px; color: var(--text-muted);">
+                                        <span>隱含增長率 (G)</span>
+                                        <span id="val-growth" style="font-family:var(--font-mono); color:#fff;">--</span>
+                                    </div>
+                                </div>
+                                
+                                <!-- Model 2: PEG Multiplier -->
+                                <div style="background: rgba(255,255,255,0.02); padding: 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.04);">
+                                    <div style="font-weight: 600; font-size: 12px; color: #fff; margin-bottom: 8px; display:flex; justify-content:space-between; align-items:center;">
+                                        <span>📈 成長折現乘數</span>
+                                        <span id="val-sub-mult" style="font-family:var(--font-mono); color:var(--accent-blue); font-weight:700;">--</span>
+                                    </div>
+                                    <div style="display: flex; justify-content: space-between; font-size: 11px; color: var(--text-muted); margin-bottom: 4px;">
+                                        <span>目標 PE / PEG</span>
+                                        <span id="val-target-pe" style="font-family:var(--font-mono); color:#fff;">--</span>
+                                    </div>
+                                    <div style="display: flex; justify-content: space-between; font-size: 11px; color: var(--text-muted);">
+                                        <span>股權成本 (Ke)</span>
+                                        <span id="val-ke" style="font-family:var(--font-mono); color:#fff;">--</span>
+                                    </div>
+                                </div>
+                                
+                                <!-- Model 3: CCA Relative -->
+                                <div style="background: rgba(255,255,255,0.02); padding: 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.04);">
+                                    <div style="font-weight: 600; font-size: 12px; color: #fff; margin-bottom: 8px; display:flex; justify-content:space-between; align-items:center;">
+                                        <span>🏛️ CCA 同業相對估值</span>
+                                        <span id="val-sub-peer" style="font-family:var(--font-mono); color:var(--accent-blue); font-weight:700;">--</span>
+                                    </div>
+                                    <div style="display: flex; justify-content: space-between; font-size: 11px; color: var(--text-muted); margin-bottom: 4px;">
+                                        <span>同業 PE 中位數</span>
+                                        <span id="val-peer-pe" style="font-family:var(--font-mono); color:#fff;">--</span>
+                                    </div>
+                                    <div style="display: flex; justify-content: space-between; font-size: 11px; color: var(--text-muted);">
+                                        <span>同業 PS 中位數</span>
+                                        <span id="val-peer-ps" style="font-family:var(--font-mono); color:#fff;">--</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
                         <!-- 核心估值指標卡片 -->
                         <div class="fund-category-label">📐 估值面 Valuation</div>
                         <div class="fund-metrics-grid" id="fund-valuation-grid"></div>
@@ -331,6 +540,89 @@
                             <div class="inst-table-wrap" id="inst-insider-table"></div>
                         </div>
                     </section>
+
+                    <!-- ==================== 整合量化決策駕駛艙 (Cockpit X-Ray) ==================== -->
+                    <div style="grid-column: 1 / -1; display: flex; align-items: center; justify-content: space-between; margin-top: 24px; padding-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.08);">
+                        <h2 id="xray-title" style="font-size: 18px; color: var(--text-main); margin: 0; font-weight: 700;">個股深度 X 光</h2>
+                    </div>
+
+                    <!-- 宏觀過濾器警告 (如果大盤轉空) -->
+                    <div id="xray-macro-warning" style="grid-column: 1 / -1; display:none; background:rgba(239,68,68,0.1); border:1px solid rgba(239,68,68,0.4); border-radius:8px; padding:12px 16px; color:#ef4444; font-size:13px; font-weight:600; align-items:center; gap:8px;">
+                        ⚠️ 大盤處於空頭趨勢 (QQQ 低於 20MA)，建議將所有多單部位規模縮減至 1/3 或空手觀望。
+                    </div>
+
+                    <!-- 1. 實戰交易規劃區 (Trade Plan) -->
+                    <section class="glass-panel" id="xray-trade-plan" style="grid-column: 1 / -1; padding:20px; border-radius:14px; border-left: 4px solid #3b82f6;">
+                    </section>
+
+                    <!-- 2. 綜合戰力與五維雷達 (Power Gauge) -->
+                    <section class="xray-radar-section" style="grid-column: 1 / -1; display: flex; flex-direction: column; gap: 16px;">
+                        <!-- Hero / Badge summary inside the cockpit -->
+                        <div class="xray-hero" id="xray-hero"></div>
+                        <div class="xray-grid-2col">
+                            <div class="glass-panel" style="padding:20px; display:flex; flex-direction:column; align-items:center;">
+                                <h3 style="font-size:14px; color:var(--text-main); margin-bottom:12px; align-self:flex-start; font-weight: 600;">🎯 五維雷達圖</h3>
+                                <canvas id="xray-radar" width="280" height="280"></canvas>
+                            </div>
+                            <div class="glass-panel" style="padding:20px;">
+                                <h3 style="font-size:14px; color:var(--text-main); margin-bottom:12px; font-weight: 600;">📊 維度評分明細</h3>
+                                <div id="xray-dimensions"></div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- 3. 🚦 訊號彙整 -->
+                    <section class="glass-panel" style="grid-column: 1 / -1; padding:20px;">
+                        <h3 style="font-size:14px; color:var(--text-main); margin-bottom:12px; font-weight: 600;">🚦 訊號彙整</h3>
+                        <div id="xray-signals" style="display:flex; flex-wrap:wrap; gap:10px;"></div>
+                    </section>
+
+                    <!-- 3.5. 基本面與籌碼面指標 -->
+                    <section class="glass-panel" style="grid-column: 1 / -1; padding:20px;">
+                        <h3 style="font-size:14px; color:var(--text-main); margin-bottom:12px; font-weight: 600;">💼 核心指標 & 🐋 大戶籌碼</h3>
+                        <div id="xray-fundamentals" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap:12px;"></div>
+                    </section>
+
+                    <!-- 4. 🐋 買方期權推薦與損益模擬器 -->
+                    <section class="glass-panel" id="xray-options-section" style="grid-column: 1 / -1; padding:20px; display:none;">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; flex-wrap:wrap; gap:8px;">
+                            <h3 style="font-size:14px; color:var(--text-main); margin:0; font-weight: 600;">🐋 Long Call 期權推薦 & 損益模擬器</h3>
+                            <div style="display:flex; align-items:center; gap:8px;">
+                                <span style="font-size:11px; color:var(--text-muted);">模擬數值：</span>
+                                <button id="pnl-toggle-pct" class="tab-btn active" style="padding:4px 10px; font-size:11px; border-radius:4px; cursor:pointer;">百分比 (%)</button>
+                                <button id="pnl-toggle-usd" class="tab-btn" style="padding:4px 10px; font-size:11px; border-radius:4px; cursor:pointer;">合約美元 ($)</button>
+                            </div>
+                        </div>
+                        
+                        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:20px; flex-wrap:wrap;">
+                            <!-- 左欄: 期權推薦 -->
+                            <div>
+                                <div style="font-size:12px; color:var(--text-muted); margin-bottom:10px; font-weight:600;">🎯 精選 Long Call 合約推薦</div>
+                                <div style="display:flex; flex-direction:column; gap:10px;" id="xray-option-recs"></div>
+                            </div>
+                            <!-- 右欄: PnL 矩陣 -->
+                            <div>
+                                <div style="font-size:12px; color:var(--text-muted); margin-bottom:10px; font-weight:600;" id="xray-pnl-title">💹 最佳綜合合約損益情境模擬</div>
+                                <div style="overflow-x:auto; background:rgba(0,0,0,0.2); border-radius:8px; border:1px solid rgba(255,255,255,0.05); padding:6px;">
+                                    <table id="xray-pnl-table" style="width:100%; border-collapse:collapse; font-size:11px; text-align:center;">
+                                    </table>
+                                </div>
+                                <div style="font-size:10px; color:var(--text-muted); margin-top:8px;">
+                                    💡 每張標準合約 = 100 股。最大風險 = 買入期權的權利金總額。
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- 5. 季度財報趨勢 (Canvas) -->
+                    <section class="glass-panel" style="grid-column: 1 / -1; padding:20px;">
+                        <h3 style="font-size:14px; color:var(--text-main); margin-bottom:12px; font-weight: 600;">📊 季度財報趨勢 <span style="font-size:11px; color:var(--text-muted);">(最近 8 季)</span></h3>
+                        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:16px;">
+                            <div><canvas id="xray-revenue-chart" height="200"></canvas></div>
+                            <div><canvas id="xray-margin-chart" height="200"></canvas></div>
+                        </div>
+                    </section>
+                    <!-- ======================================================================== -->
 
                     <section class="grid-section glass-panel">
                         <div class="section-header">
@@ -616,96 +908,7 @@
             </div>
 
             <!-- ========== VIEW 10: 個股深度 X 光 ========== -->
-            <div class="view-panel" id="view-stock-xray">
-                <div class="view-header">
-                    <div style="display:flex; align-items:center; gap:12px;">
-                        <button class="btn-tf" id="xray-back-btn" style="padding:6px 12px; font-size:12px;">← 返回排行榜</button>
-                        <h2 id="xray-title">個股深度 X 光</h2>
-                    </div>
-                </div>
-
-                <!-- 宏觀過濾器警告 (如果大盤轉空) -->
-                <div id="xray-macro-warning" style="display:none; margin-top:16px; background:rgba(239,68,68,0.1); border:1px solid rgba(239,68,68,0.4); border-radius:8px; padding:12px 16px; color:#ef4444; font-size:13px; font-weight:600; display:flex; align-items:center; gap:8px;">
-                    ⚠️ 大盤處於空頭趨勢 (QQQ 低於 20MA)，建議將所有多單部位規模縮減至 1/3 或空手觀望。
-                </div>
-
-                <!-- 頭部：價格 + 評分 -->
-                <div class="xray-hero" id="xray-hero" style="margin-top:16px;"></div>
-
-                <!-- 實戰交易規劃卡 (Trade Plan) -->
-                <div id="xray-trade-plan" class="glass-panel" style="margin-top:16px; padding:20px; border-radius:14px; border-left: 4px solid #3b82f6;">
-                </div>
-
-                <!-- 雷達圖 + 維度明細 -->
-                <div style="display:grid; grid-template-columns: 340px 1fr; gap:16px; margin-top:16px;">
-                    <section class="glass-panel" style="padding:20px; display:flex; flex-direction:column; align-items:center;">
-                        <h3 style="font-size:14px; color:var(--text-main); margin-bottom:12px; align-self:flex-start;">🎯 五維雷達圖</h3>
-                        <canvas id="xray-radar" width="280" height="280"></canvas>
-                    </section>
-                    <section class="glass-panel" style="padding:20px;">
-                        <h3 style="font-size:14px; color:var(--text-main); margin-bottom:12px;">📊 維度評分明細</h3>
-                        <div id="xray-dimensions"></div>
-                    </section>
-                </div>
-
-                <!-- K 線圖 -->
-                <section class="glass-panel" style="margin-top:16px; padding:20px;">
-                    <h3 style="font-size:14px; color:var(--text-main); margin-bottom:12px;">📈 日線走勢圖</h3>
-                    <div id="xray-chart" style="width:100%; height:350px;"></div>
-                </section>
-
-                <!-- 基本面與籌碼面指標 -->
-                <section class="glass-panel" style="margin-top:16px; padding:20px;">
-                    <h3 style="font-size:14px; color:var(--text-main); margin-bottom:12px;">💼 核心指標 & 🐋 大戶籌碼</h3>
-                    <div id="xray-fundamentals" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap:12px;"></div>
-                </section>
-
-                <!-- 🐋 買方期權推薦與損益模擬器 -->
-                <section class="glass-panel" id="xray-options-section" style="margin-top:16px; padding:20px; display:none;">
-                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; flex-wrap:wrap; gap:8px;">
-                        <h3 style="font-size:14px; color:var(--text-main); margin:0;">🐋 Long Call 期權推薦 & 損益模擬器</h3>
-                        <div style="display:flex; align-items:center; gap:8px;">
-                            <span style="font-size:11px; color:var(--text-muted);">模擬數值：</span>
-                            <button id="pnl-toggle-pct" class="tab-btn active" style="padding:4px 10px; font-size:11px; border-radius:4px; cursor:pointer;">百分比 (%)</button>
-                            <button id="pnl-toggle-usd" class="tab-btn" style="padding:4px 10px; font-size:11px; border-radius:4px; cursor:pointer;">合約美元 ($)</button>
-                        </div>
-                    </div>
-                    
-                    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:20px; flex-wrap:wrap;">
-                        <!-- 左欄: 期權推薦 -->
-                        <div>
-                            <div style="font-size:12px; color:var(--text-muted); margin-bottom:10px; font-weight:600;">🎯 精選 Long Call 合約推薦</div>
-                            <div style="display:flex; flex-direction:column; gap:10px;" id="xray-option-recs"></div>
-                        </div>
-                        <!-- 右欄: PnL 矩陣 -->
-                        <div>
-                            <div style="font-size:12px; color:var(--text-muted); margin-bottom:10px; font-weight:600;" id="xray-pnl-title">💹 最佳綜合合約損益情境模擬</div>
-                            <div style="overflow-x:auto; background:rgba(0,0,0,0.2); border-radius:8px; border:1px solid rgba(255,255,255,0.05); padding:6px;">
-                                <table id="xray-pnl-table" style="width:100%; border-collapse:collapse; font-size:11px; text-align:center;">
-                                </table>
-                            </div>
-                            <div style="font-size:10px; color:var(--text-muted); margin-top:8px;">
-                                💡 每張標準合約 = 100 股。最大風險 = 買入期權的權利金總額。
-                            </div>
-                        </div>
-                    </div>
-                </section>
-
-                <!-- 季度趨勢 -->
-                <section class="glass-panel" style="margin-top:16px; padding:20px;">
-                    <h3 style="font-size:14px; color:var(--text-main); margin-bottom:12px;">📊 季度財報趨勢 <span style="font-size:11px; color:var(--text-muted);">(最近 8 季)</span></h3>
-                    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:16px;">
-                        <div><canvas id="xray-revenue-chart" height="200"></canvas></div>
-                        <div><canvas id="xray-margin-chart" height="200"></canvas></div>
-                    </div>
-                </section>
-
-                <!-- 訊號彙整 -->
-                <section class="glass-panel" style="margin-top:16px; padding:20px;">
-                    <h3 style="font-size:14px; color:var(--text-main); margin-bottom:12px;">🚦 訊號彙整</h3>
-                    <div id="xray-signals" style="display:flex; flex-wrap:wrap; gap:10px;"></div>
-                </section>
-            </div>
+            <!-- 舊的獨立分頁已整合至 Dashboard 看板 -->
 
         </main>
     </div>

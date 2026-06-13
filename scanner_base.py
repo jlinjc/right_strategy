@@ -198,11 +198,47 @@ def calc_volume_ratio(candle_volume, today_avg_volume):
         return candle_volume / today_avg_volume
     return 0.0
 
+
+def calc_td_count(df, idx=None):
+    """
+    計算 TD Sequential 計數值。
+    正數 = 連漲 (賣出竭盡), 負數 = 連跌 (買入竭盡)
+    idx: 計算到第幾根 (None = 最後一根)
+    """
+    if idx is None:
+        idx = len(df) - 1
+    td_count = 0
+    for i in range(4, idx + 1):
+        cur = float(df['Close'].iloc[i])
+        prior = float(df['Close'].iloc[i - 4])
+        if cur > prior:
+            td_count = td_count + 1 if td_count >= 0 else 1
+        elif cur < prior:
+            td_count = td_count - 1 if td_count <= 0 else -1
+        else:
+            td_count = 0
+    return td_count
+
+
+def calc_vwap(df_today):
+    """
+    計算當日 VWAP (Volume Weighted Average Price)。
+    df_today: 僅包含當日的 K 線 (需含 High, Low, Close, Volume 欄位)
+    回傳: pd.Series (與 df_today 同 index)
+    """
+    tp = (df_today['High'] + df_today['Low'] + df_today['Close']) / 3
+    tpv = tp * df_today['Volume']
+    cum_tpv = tpv.cumsum()
+    cum_vol = df_today['Volume'].cumsum()
+    vwap = cum_tpv / cum_vol
+    return vwap
+
 # ============================================================
 # 風控與倉位管理模組 (Risk & Position Sizing)
 # ============================================================
-TOTAL_CAPITAL = 10000        # 用戶總資金 (預設 $10,000)
-RISK_PER_TRADE = 0.02        # 單筆交易願意承受的最大虧損比例 (2%)
+TOTAL_CAPITAL = float(os.getenv('TRADING_CAPITAL', 100_000))  # 從 .env 讀取，預設 $100,000
+RISK_PER_TRADE = 0.01        # 單筆交易願意承受的最大虧損比例 (1%)
+MAX_POSITIONS = 6            # 最大同時持倉數
 
 def calc_atr(high, low, close, window=14):
     """計算 Average True Range (ATR)"""
@@ -258,27 +294,30 @@ def calculate_position(entry_price, stop_loss_price, custom_risk_pct=None):
     """
     根據風險比例計算建議買入股數。
     回傳: (建議買入股數, 總買入金額, 實際風險金額)
+
+    資金來源: TRADING_CAPITAL in .env (預設 $100,000)
+    風險比例: 1% per trade (MAX_POSITIONS=6 時，組合總風險 ≤ 6%)
+    單筆上限: 資金的 15% (防止過度集中)
     """
     if entry_price <= 0 or stop_loss_price <= 0 or stop_loss_price >= entry_price:
         return 0, 0.0, 0.0
-        
+
     risk_pct = custom_risk_pct if custom_risk_pct is not None else RISK_PER_TRADE
     risk_amount = TOTAL_CAPITAL * risk_pct
     stop_distance = entry_price - stop_loss_price
-    
-    # 根據停損距離計算股數
+
     shares = int(risk_amount / stop_distance)
-    
-    # 鐵律：單筆交易總金額不得超過本金의 20%
-    max_capital_per_trade = TOTAL_CAPITAL * 0.20
+
+    # 單筆上限 15%（降低集中度風險，比原來的 20% 更保守）
+    max_capital_per_trade = TOTAL_CAPITAL * 0.15
     max_shares = int(max_capital_per_trade / entry_price)
-    
+
     shares = min(shares, max_shares)
     shares = max(shares, 0)
-    
+
     total_cost = shares * entry_price
     actual_risk = shares * stop_distance
-    
+
     return shares, total_cost, actual_risk
 
 
