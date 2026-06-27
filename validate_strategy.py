@@ -65,6 +65,12 @@ DEFAULT_RISK = dict(
     slippage=0.0005,
 )
 
+# Phase 0（誠實的尺）：停損成交模型
+#   True  = 跳空開盤低於停損時，以「開盤價」成交(更差) → 如實反映崩盤左尾
+#   False = 舊樂觀假設：永遠在停損價本身成交(系統性低估崩盤虧損/MDD)
+# 預設 True（誠實）。設 False 可重現舊回測、量化「跳空樂觀」灌了多少水。
+HONEST_STOP_FILL = True
+
 PASS_THR = dict(
     min_sharpe_oos=0.7,           # OOS Sharpe 最低門檻
     min_is_oos_retention=0.50,    # OOS Sharpe 需保留 IS Sharpe 的 50%
@@ -198,7 +204,12 @@ def _run_window(
                     reason = res
                     ep = prices.get(tk, {}).get('Close', pos.stop_loss)
                     if '停損' in reason and prices.get(tk, {}).get('Low', ep) <= pos.stop_loss:
-                        ep = pos.stop_loss
+                        if HONEST_STOP_FILL:
+                            # 跳空開盤已在停損下方 → 以開盤成交(更差)；否則停損價內成交
+                            op = prices.get(tk, {}).get('Open', pos.stop_loss)
+                            ep = min(op, pos.stop_loss)
+                        else:
+                            ep = pos.stop_loss   # 舊樂觀假設：不跳空
                     portfolio.close_position(tk, ep, cd, reason)
 
         portfolio.update_daily(cd, prices)

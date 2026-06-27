@@ -92,6 +92,35 @@
   .empty{background:var(--panel);border:1px dashed var(--line);border-radius:12px;
     padding:26px;text-align:center;color:var(--muted)}
 
+  /* Conviction tier + signal quality */
+  .sig.tA::before{background:var(--green)}
+  .sig.tB::before{background:var(--accent)}
+  .sig.tC::before{background:var(--mid)}
+  .tier{font-size:13px;font-weight:800;padding:3px 10px;border-radius:7px;letter-spacing:.5px}
+  .tier.tA{background:var(--green-d);color:#aef5cd}
+  .tier.tB{background:#1d3a5e;color:#bfe0ff}
+  .tier.tC{background:#2a3145;color:#9fb0cc}
+  .tags{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0 6px}
+  .tag2{font-size:10.5px;padding:2px 8px;border-radius:6px;background:#0e1626;
+    border:1px solid var(--line);color:var(--muted);white-space:nowrap}
+  .tag2.pead{background:#13301f;border-color:var(--green-d);color:#9fe7bd}
+  .tag2.late{background:#2a2510;border-color:var(--yellow-d);color:#ffe39a}
+  .tag2.sec{color:#bfe0ff}
+  .tag2.ern{color:#d9c0ff}
+  .pqrow{display:flex;align-items:center;gap:9px;margin:4px 0 2px;font-size:11px;color:var(--muted)}
+  .pqbar{flex:1;height:6px;border-radius:4px;background:#0e1626;border:1px solid var(--line);overflow:hidden}
+  .pqbar>i{display:block;height:100%;border-radius:4px}
+  .warn{display:flex;flex-wrap:wrap;gap:6px;margin-top:9px}
+  .warnchip{font-size:10.5px;padding:3px 9px;border-radius:6px;background:var(--red-d);
+    color:#ffc9c9;border:1px solid #7a2a2a;font-weight:600}
+  .heatbanner{display:flex;align-items:center;gap:14px;background:var(--panel);
+    border:1px solid var(--line);border-radius:12px;padding:12px 16px;margin-bottom:14px;
+    font-size:13px;flex-wrap:wrap}
+  .heatbanner .bar{flex:1;min-width:150px;height:9px;border-radius:5px;background:#0e1626;
+    border:1px solid var(--line);overflow:hidden}
+  .heatbanner .bar>i{display:block;height:100%}
+  .heatbanner b{color:var(--txt)}
+
   /* Watch + tables */
   table{width:100%;border-collapse:collapse;font-size:13px}
   th,td{padding:9px 12px;text-align:center;border-bottom:1px solid var(--line)}
@@ -143,6 +172,21 @@
     <div><div class="lbl">載入中…</div><div class="act"></div></div>
   </div>
 
+  <!-- ★今日掛單建議(台美股:該買什麼/別追什麼/掛單價) -->
+  <div id="buyList"></div>
+
+  <!-- 核心-衛星 王者配置 -->
+  <div id="coreBanner"></div>
+
+  <!-- 台股版面板(同一套引擎搬到台股) -->
+  <div id="taiwanPanel"></div>
+
+  <!-- 台美股產業龍頭個股(衛星) -->
+  <div id="leadersPanel"></div>
+
+  <!-- 策略選單(各有優勢,投資人自選風險檔位) -->
+  <div id="menuPanel"></div>
+
   <!-- 紀律總覽 -->
   <section>
     <div class="stitle"><h2>📜 策略紀律總覽</h2><span class="tag">照表操課，不臨場改主意</span><div class="line"></div></div>
@@ -169,6 +213,7 @@
   <!-- 今日信號 -->
   <section>
     <div class="stitle"><h2>🎯 今日進場信號卡</h2><span class="tag" id="sigCount">—</span><div class="line"></div></div>
+    <div id="heatBanner"></div>
     <div class="sigs" id="signals"></div>
   </section>
 
@@ -223,26 +268,325 @@ function renderPlaybook(ev, cfg){
   $('#expectNote').textContent = '※ ' + e.note;
 }
 
+// ── 兩策略今日操作面板(A 全押SMH / B 輪動最強) ──
+let LAST_CS = null;
+function moneyFmt(n){ return '$'+Math.round(n).toLocaleString(); }
+function stratInstr(d, cap, lev){
+  lev = lev || 1;
+  const r = {price:d?d.close:0, expo:0, dollars:0, shares:0, entry:d?d.entry_cap:null,
+             exit:d?d.exit_price:null, verb:'—', holder:'', buyer:''};
+  if(!d) return r;
+  const expo = (d.suggested_expo!=null ? d.suggested_expo : 0) * lev;
+  r.expo = expo; r.dollars = cap*expo; r.shares = d.close>0 ? r.dollars/d.close : 0;
+  if(d.credit_cut){ r.verb='🔴 出場→現金'; r.holder='信用示警:全部出場轉現金';
+                    r.buyer='不進場(等HYG站回200MA)'; r.expo=0; r.dollars=0; r.shares=0; return r; }
+  switch(d.state){
+    case 'risk_on':
+      r.verb='🟢 持有 / 可進';
+      r.holder=`調整到曝險 ${Math.round(expo*100)}% = ${moneyFmt(r.dollars)} (${Math.round(r.shares)}股)`;
+      r.buyer = (d.entry_state==='can_enter')
+        ? `可進場：限價 ≤ $${d.entry_cap}，買 ${Math.round(r.shares)}股 ≈ ${moneyFmt(r.dollars)}（停損距 -${d.stop_risk_pct}%）`
+        : `🟡 追高,等拉回到 ≤ $${d.entry_cap} 再進（距50MA ${d.dist50_pct>0?'+':''}${d.dist50_pct}%）`;
+      break;
+    case 'panic_watch':
+      r.verb='🟠 恐慌容忍'; r.holder='維持現有曝險,給3日確認別砍V底'; r.buyer='暫不加碼'; break;
+    case 'warning':
+      r.verb='🟡 逼近停損'; r.holder='收盤跌破停損線即全出'; r.buyer='不進場';
+      r.expo=0;r.dollars=0;r.shares=0; break;
+    default:
+      r.verb='🔴 出場→現金'; r.holder='已跌破200MA→全部現金,等站回'; r.buyer='不進場(等站回200MA)';
+      r.expo=0;r.dollars=0;r.shares=0;
+  }
+  return r;
+}
+function cardHTML(title, sub, tk, d, cap, lev){
+  const it = stratInstr(d, cap, lev);
+  return `
+  <div style="background:#0b1727;border:1px solid #1d3a5e;border-radius:10px;padding:12px;height:100%">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;gap:6px">
+      <div style="font-weight:800;font-size:14px">${title}</div>
+      <div style="font-size:12px;color:#6fd0ff;white-space:nowrap">${tk||'—'} $${d?d.close:'—'}${d&&d.rs_score!=null?' · RS'+d.rs_score:''}</div>
+    </div>
+    <div style="color:var(--muted);font-size:11px;margin-bottom:8px">${sub}</div>
+    <div style="font-size:16px;font-weight:800;margin:4px 0">${it.verb}</div>
+    <table style="width:100%;font-size:12.5px;border-collapse:collapse">
+      <tr><td style="color:var(--muted);padding:3px 0;vertical-align:top">🏠 持有者</td><td style="text-align:right">${it.holder}</td></tr>
+      <tr><td style="color:var(--muted);padding:3px 0;vertical-align:top">💵 空手者</td><td style="text-align:right">${it.buyer}</td></tr>
+      <tr><td style="color:var(--muted);padding:3px 0">🎯 進場上限價</td><td style="text-align:right;color:#7ee0a0;font-weight:700">$${it.entry!=null?it.entry:'—'}</td></tr>
+      <tr><td style="color:var(--muted);padding:3px 0">🛑 出場/停損價</td><td style="text-align:right;color:#e06a6a;font-weight:700">$${it.exit!=null?it.exit:'—'}</td></tr>
+      <tr><td style="color:var(--muted);padding:3px 0">📊 建議曝險→金額</td><td style="text-align:right;font-weight:800;color:#7ee0a0">${Math.round(it.expo*100)}% = ${moneyFmt(it.dollars)} (${Math.round(it.shares)}股)</td></tr>
+    </table>
+  </div>`;
+}
+function updateCards(cs){
+  if(!cs || !cs.cores) return;
+  const capA = Number(localStorage.getItem('capA')||10000);
+  const capB = Number(localStorage.getItem('capB')||10000);
+  const lev = Number(localStorage.getItem('lev')||1);
+  const A = cs.cores['SMH'];
+  // ★ B 用「最低持有30日鎖」後的實際持有(rotation_hold),非每日生變的最強
+  const rh = cs.rotation_hold || {};
+  const Bp = rh.ticker || cs.strongest;
+  const B = Bp ? cs.cores[Bp] : null;
+  let lockTxt;
+  if(rh.ticker){
+    if(rh.locked) lockTxt = `🔒 已抱${rh.days_held}日·還${rh.lock_days_left}日滿鎖才可換`
+      + (rh.today_strongest&&rh.today_strongest!==rh.ticker?`（今日最強 ${rh.today_strongest}，滿鎖再換）`:'');
+    else lockTxt = `🔓 已滿${rh.min_hold_days||30}日可換（今日最強 ${rh.today_strongest||'—'}）`;
+    if(rh.forced_out_prev) lockTxt += ' ⚠️前任跌破已被換出';
+  } else lockTxt = '空手（無核心站上200MA 或 信用砍0）';
+  const ca=$('#cardA'), cb=$('#cardB');
+  if(ca) ca.innerHTML = cardHTML('🅰️ A · 抱SMH（核心）','擇時抱半導體龍頭·換手少·稅最省','SMH',A,capA,lev);
+  if(cb) cb.innerHTML = cardHTML('🅱️ B · 輪動最強（衛星）','最低持有30日·跌破立刻出 — '+lockTxt, Bp||'(全在200MA下)', B, capB,lev);
+}
+function setCap(k,v){ localStorage.setItem(k, v||0); localStorage.setItem('allocMode','custom'); updateCards(LAST_CS); refreshShellChrome(); }
+function setLev(v){ localStorage.setItem('lev', v||1); updateCards(LAST_CS); }
+// ★ 配置模式預設(research_core_satellite.py / confirm_refinements.py):一鍵設好 A/B 比例 + 槓桿
+function setMode(m){
+  const total = Number(localStorage.getItem('capA')||10000) + Number(localStorage.getItem('capB')||10000);
+  let a,b,lev;
+  if(m==='core'){ a=total; b=0; lev=1; }            // 🛡️ 純A:省事
+  else if(m==='balanced'){ a=total/2; b=total/2; lev=1; }   // ⚖️ A+B各半:最穩
+  else { a=total*0.6; b=total*0.4; lev=1.35; }      // 🚀 A60/B40×1.35:最大財富
+  localStorage.setItem('capA',Math.round(a)); localStorage.setItem('capB',Math.round(b));
+  localStorage.setItem('lev',lev); localStorage.setItem('allocMode',m);
+  updateCards(LAST_CS); refreshShellChrome();
+}
+function refreshShellChrome(){ const el=$('#twoStratShell'); if(el) el.innerHTML=twoStratShell(); }
+function twoStratShell(){
+  const capA = Number(localStorage.getItem('capA')||10000);
+  const capB = Number(localStorage.getItem('capB')||10000);
+  const lev = Number(localStorage.getItem('lev')||1);
+  const mode = localStorage.getItem('allocMode')||'custom';
+  const inS = 'width:88px;background:#0b1727;color:#fff;border:1px solid #1d3a5e;border-radius:6px;padding:3px 6px';
+  const opt=(v,t)=>`<option value="${v}" ${lev==v?'selected':''}>${t}</option>`;
+  const mb=(m,emoji,t,sub)=>{
+    const on = mode===m;
+    return `<button onclick="setMode('${m}')" title="${sub}" style="cursor:pointer;flex:1;min-width:150px;text-align:left;
+      background:${on?'#16324f':'#0b1727'};border:1px solid ${on?'#4f9fe0':'#1d3a5e'};border-radius:8px;padding:8px 10px;color:#fff">
+      <div style="font-weight:800;font-size:12.5px">${emoji} ${t}${on?' ✓':''}</div>
+      <div style="font-size:10.5px;color:var(--muted);margin-top:2px">${sub}</div></button>`;
+  };
+  return `
+  <div style="background:#0e1b2e;border:1px solid #2a4a72;border-radius:12px;padding:14px 16px;margin:10px 0">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+      <div style="font-weight:800;font-size:15px">🎯 兩策略今日操作 <span style="color:var(--muted);font-weight:400;font-size:11px">(收盤訊號;先選下方配置模式)</span></div>
+      <div style="font-size:12px;color:var(--muted)">本金A <input type="number" value="${capA}" oninput="setCap('capA',this.value)" style="${inS}"> · 本金B <input type="number" value="${capB}" oninput="setCap('capB',this.value)" style="${inS}">
+        · 槓桿 <select onchange="setLev(this.value)" style="${inS}">${opt(0.67,'保守 0.67x')}${opt(1,'標準 1.0x')}${opt(1.25,'積極 1.25x')}${opt(1.35,'財富 1.35x')}</select></div>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
+      ${mb('core','🛡️','純A · 省事','全押SMH擇時 · CAGR+38.6%/回撤-35% · 換手少稅省')}
+      ${mb('balanced','⚖️','A+B各半 · 最穩','各50% · Sharpe1.45最高/回撤-26%最淺 · 不加槓桿')}
+      ${mb('wealth','🚀','A60/B40×1.35 · 財富','同-34%回撤多賺+12%/年 · CAGR+50.8% · 推翻純A定論')}
+    </div>
+    <div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:10px;align-items:stretch">
+      <div id="cardA" style="flex:1;min-width:290px"></div>
+      <div id="cardB" style="flex:1;min-width:290px"></div>
+    </div>
+    <div style="color:var(--muted);font-size:11px;margin-top:8px">📌 <b>核心衛星實證推翻「純A唯一解」</b>:A+B混合Sharpe1.45>純A1.37,加槓桿到同回撤(-34%)→CAGR反超(+50.8 vs +38.6%)。
+      B 已內建<b>最低持有30日鎖</b>(換進至少抱一個月才准換、跌破立刻出=免費降換手+降稅)。
+      槓桿硬上限1.5(Kelly 2-4x是「樣本無真熊市」幻覺);限價別追貴於進場上限;跌破出場價轉現金;信用示警兩策略都砍曝險。</div>
+  </div>`;
+}
+
+// ★ 殺盤紀律橫幅:一眼看出「今天該不該動手」,防恐慌砍底(真edge=不手賤)
+function disciplineBanner(cs){
+  if(!cs || !cs.cores) return '';
+  const A = cs.cores['SMH']; if(!A) return '';
+  let bg,emoji,msg;
+  if(A.credit_cut){ bg='#3a1620'; emoji='🔴'; msg=`信用示警 → 今天<b>出場轉現金</b>(HYG/LQD 跌破)。這是少數該動手的日子。`; }
+  else if(A.state==='risk_on'){ bg='#12251a'; emoji='✅'; msg=`SMH 沒破線(停損 <b>$${A.exit_price}</b>)→ <b>續抱,今天不要動手</b>。盤中殺盤是雜訊,只看收盤、只在<b>收盤跌破 $${A.exit_price}</b>才出。`; }
+  else if(A.state==='warning'){ bg='#2a2410'; emoji='🟡'; msg=`SMH 逼近停損 <b>$${A.exit_price}</b> → 不要提前砍,<b>收盤跌破才出</b>,否則續抱。`; }
+  else if(A.state==='panic_watch'){ bg='#2a1e10'; emoji='🟠'; msg=`恐慌跌破但 VIX 高+信用尚健康 → <b>給3日確認,別砍在 V 底</b>(維持現倉)。`; }
+  else { bg='#3a1620'; emoji='🔴'; msg=`SMH 已跌破停損 <b>$${A.exit_price}</b> → <b>出場轉現金</b>,等站回再進。`; }
+  return `
+  <div style="background:${bg};border:1px solid #2a4a72;border-radius:12px;padding:12px 16px;margin:10px 0;display:flex;gap:12px;align-items:center">
+    <div style="font-size:30px">${emoji}</div>
+    <div><div style="font-weight:800;font-size:14px;margin-bottom:2px">📋 今日紀律</div>
+      <div style="font-size:13px;line-height:1.5">${msg}</div>
+      <div style="color:var(--muted);font-size:11px;margin-top:3px">真 edge = 熊市躲現金 + 不手賤砍底(擇時相對買持只多 +0.08 Sharpe)。紀律比參數值錢。</div>
+    </div>
+  </div>`;
+}
+
+function renderCore(cs, sig){
+  const el = $('#coreBanner');
+  if(!el) return;
+  if(!cs || !cs.cores){ el.innerHTML=''; return; }
+  LAST_CS = cs;
+  const emo = {risk_on:'🟢', risk_off:'🔴', warning:'🟡', panic_watch:'🟠', credit_warning:'🟠', core_warning:'🟡'};
+  const txt = {risk_on:'抱住(滿核心倉)', risk_off:'轉現金(空手等站回200MA)', warning:'逼近200MA,跌破即出',
+               panic_watch:'恐慌容忍(VIX高,給3日確認別砍V底)', credit_warning:'信用示警,提前減/出',
+               core_warning:'核心跌破,出場'};
+  const p = cs.cores[cs.primary] || Object.values(cs.cores)[0];
+  const verdict = cs.combined || p;   // 有合併判斷(核心+信用+恐慌)優先
+  const nSig = (sig && sig.n_signals!=null) ? sig.n_signals : '—';
+  const vixOn = (cs.vix!=null && cs.panic_vix!=null && cs.vix > cs.panic_vix);
+  const vixChip = (cs.vix!=null)
+    ? `<span style="background:${vixOn?'#3a1620':'#16233a'};border-radius:7px;padding:3px 9px;margin-right:6px;font-size:12px">
+         ${vixOn?'🔴':'🟢'} VIX ${cs.vix} ${vixOn?'恐慌(啟動容忍出場)':'平靜'}</span>` : '';
+  const chips = vixChip + Object.entries(cs.cores).map(([tk,d])=>{
+    const below = (d.days_below>0) ? ` 跌破${d.days_below}日` : '';
+    return `<span style="background:#16233a;border-radius:7px;padding:3px 9px;margin-right:6px;font-size:12px">
+       ${emo[d.state]||'⚪'} ${tk} $${d.close} vs 200MA $${d.ma200} (${d.dist_pct>0?'+':''}${d.dist_pct}%)${below}</span>`;}).join('');
+  const entryEmo = {can_enter:'🟢', extended:'🟡', no_entry:'🔴'};
+  const actRows = Object.entries(cs.cores).map(([tk,d])=>{
+    const thrTxt = (d.entry_thr!=null)?`進≤+${Math.round((d.entry_thr-1)*100)}% 出×${d.exit_buf}`:'';
+    const stopTxt = (d.stop_risk_pct!=null)?`<br><span style="color:var(--muted);font-size:10px">現進場 -${d.stop_risk_pct}%</span>`:'';
+    return `
+    <tr style="border-top:1px solid #16273f">
+      <td style="padding:5px 4px;font-weight:700;white-space:nowrap">${emo[d.state]||'⚪'} ${tk}<br><span style="color:#6fd0ff;font-size:10px;font-weight:400">${thrTxt}</span></td>
+      <td style="padding:5px 4px;text-align:right;white-space:nowrap">$${d.close}<br><span style="color:var(--muted);font-size:10px">50MA ${d.dist50_pct>0?'+':''}${d.dist50_pct}%</span>${d.suggested_expo!=null?`<br><span style="color:#7ee0a0;font-size:10px;font-weight:700">曝險 ${Math.round(d.suggested_expo*100)}%</span>`:(d.state==='panic_watch'?'<br><span style="color:#e0b070;font-size:10px">曝險 維持</span>':'')}</td>
+      <td style="padding:5px 4px">${d.hold_action||d.action||''}</td>
+      <td style="padding:5px 4px">${entryEmo[d.entry_state]||''} ${d.entry_action||''}</td>
+      <td style="padding:5px 4px;text-align:right;color:#e06a6a;white-space:nowrap">$${d.exit_price!=null?d.exit_price:'—'}${stopTxt}</td>
+    </tr>`;}).join('');
+  const actionTable = `
+    <div style="margin-top:12px;background:#0b1727;border:1px solid #1d3a5e;border-radius:9px;padding:10px 12px">
+      <div style="font-weight:800;font-size:13px;margin-bottom:6px">📋 今日該怎麼做 <span style="color:var(--muted);font-weight:400;font-size:11px">(收盤訊號;盤前盤中是雜訊,不看 · 每指數用自校參數)</span></div>
+      <div class="tblwrap"><table style="width:100%;border-collapse:collapse;font-size:12.5px">
+        <thead><tr style="color:var(--muted);font-size:11px;text-align:left">
+          <th style="padding:3px 4px">指數<br>(自校門檻)</th><th style="padding:3px 4px;text-align:right">現價</th>
+          <th style="padding:3px 4px">🏠 持有者(續抱/出場/停損)</th><th style="padding:3px 4px">💵 空手者(進場/等)</th>
+          <th style="padding:3px 4px;text-align:right">🛑 停損價<br>(現進場風險)</th>
+        </tr></thead><tbody>${actRows}</tbody>
+      </table></div>
+      <div style="color:var(--muted);font-size:11px;margin-top:7px">
+        ⏸️ <b>停利</b>：${cs.take_profit_note||'本策略不停利,騎到收盤跌破停損線才出'}
+        ${cs.vix!=null?(' · VIX '+cs.vix+(vixOn?' 🔴恐慌(跌破給3日確認;空手=進場綠燈)':' 🟢平靜')):''}
+        <br>🎯 <b>自校參數</b>：${cs.params_note||'每指數用自己的進場門檻+出場緩衝'}(SMH+10%/×.98 · QQQ+7%/×1.0 · SPY+5%/×1.0 · SOXX+7%/×.99 · XLK+10%/×.98 · 跨4時間窗穩健性驗證)
+      </div>
+    </div>`;
+  el.innerHTML = `
+    ${disciplineBanner(cs)}
+    <div id="twoStratShell">${twoStratShell()}</div>
+    <div style="background:linear-gradient(90deg,#0e1b2e,#10243d);border:1px solid #1d3a5e;border-radius:12px;padding:14px 16px;margin:10px 0">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+        <div style="font-weight:800;font-size:15px">👑 核心-衛星配置</div>
+        <div style="color:var(--muted);font-size:12px">建議 核心70% / 衛星30%(月再平衡) · 核心更新 ${cs.last_updated||''}</div>
+      </div>
+      <div style="margin-top:10px;display:flex;gap:18px;flex-wrap:wrap">
+        <div style="flex:1;min-width:260px">
+          <div style="font-size:12px;color:var(--muted)">🛡️ 核心(70%) — 擇時指數 @200MA + 信用카那리아 + 恐慌容忍</div>
+          <div style="font-size:18px;font-weight:800;margin:3px 0">${emo[verdict.state]||'⚪'} ${cs.primary}：${verdict.action||txt[verdict.state]||''}</div>
+          <div style="margin-top:6px">${chips}</div>
+        </div>
+        <div style="flex:1;min-width:220px">
+          <div style="font-size:12px;color:var(--muted)">🚀 衛星(30%) — 騎乘個股</div>
+          <div style="font-size:18px;font-weight:800;margin:3px 0">今日進場訊號 ${nSig} 檔</div>
+          <div style="color:var(--muted);font-size:12px">下方信號卡：拉回進場 → 騎50MA出場(讓贏家跑)</div>
+        </div>
+      </div>
+      ${actionTable}
+    </div>`;
+  updateCards(cs);
+}
+
+function renderMenu(mn){
+  const el = $('#menuPanel');
+  if(!el) return;
+  if(!mn || !mn.strategies){ el.innerHTML=''; return; }
+  const shColor = s => s>=1.3?'#39d98a':(s>=1.1?'#6fd0ff':(s>=0.9?'#e0b85a':'#e06a6a'));
+  const ddColor = d => d>=-22?'#39d98a':(d>=-32?'#e0b85a':'#e06a6a');
+  const sorted = [...mn.strategies].sort((a,b)=> b.total - a.total);
+  const rows = sorted.map(s=>`
+    <tr>
+      <td><span style="font-size:11px;color:var(--muted)">${s.category}</span><br><b>${s.name}</b>
+          <div style="font-size:11px;color:var(--muted)">${s.desc||''}</div></td>
+      <td style="text-align:right;font-weight:800;color:#39d98a">+${s.total}%</td>
+      <td style="text-align:right">${s.cagr!=null?'+'+s.cagr+'%':'—'}</td>
+      <td style="text-align:right;font-weight:800;color:${shColor(s.sharpe)}">${s.sharpe}</td>
+      <td style="text-align:right;color:${ddColor(s.mdd)}">${s.mdd}%</td>
+      <td style="text-align:right;color:var(--muted)">${s.y22!=null?s.y22+'%':'—'}</td>
+    </tr>`).join('');
+  el.innerHTML = `
+    <section>
+      <div class="stitle"><h2>🧭 策略選單 — 你選風險檔位</h2><span class="tag">同一引擎,不同槓桿=同一條效率線</span><div class="line"></div></div>
+      <div style="background:#10243d;border:1px solid #1d3a5e;border-radius:10px;padding:10px 14px;margin-bottom:10px;font-size:13px;color:#cfe0f5">
+        💡 <b>關鍵</b>:VolTgt-SMH 各版本 Sharpe 幾乎都 ~1.34(品質相同),差別只在「報酬/回撤的規模」。
+        所以不是選「哪個最好」,而是選「<b>你睡得著的回撤</b>」——保守(-20%) → 平衡(-27%) → 博命(-35%)。
+        <span style="color:var(--muted)">期間 ${mn.period||''}</span>
+      </div>
+      <div class="tblwrap"><table style="width:100%;border-collapse:collapse">
+        <thead><tr style="color:var(--muted);font-size:12px;text-align:right">
+          <th style="text-align:left">策略</th><th>總報酬</th><th>CAGR</th><th>Sharpe</th><th>最大回撤</th><th>2022</th>
+        </tr></thead><tbody>${rows}</tbody>
+      </table></div>
+    </section>`;
+}
+
+function renderHeatBanner(d){
+  const el = $('#heatBanner');
+  const h = d.portfolio_heat; const max = (d.config.max_portfolio_heat_pct)||3;
+  const gmax = (d.config.max_gross_exposure_pct)||150;
+  if(!h){ el.innerHTML=''; return; }
+  const pct = h.open_heat_pct||0;
+  const gpct = h.open_gross_pct||0;
+  const w = Math.min(pct/max*100, 100);
+  const gw = Math.min(gpct/gmax*100, 100);
+  const col = pct >= max ? 'var(--red)' : (pct >= max*0.67 ? 'var(--yellow)' : 'var(--green)');
+  const gcol = gpct >= gmax ? 'var(--red)' : (gpct >= gmax*0.67 ? 'var(--yellow)' : 'var(--green)');
+  const held = (h.held_tickers&&h.held_tickers.length)
+    ? h.held_tickers.join(', ') : '無持倉';
+  const secs = h.sector_counts ? Object.entries(h.sector_counts)
+    .map(([s,n])=>`${s}×${n}`).join(' · ') : '';
+  el.innerHTML = `
+    <div>🔥 組合熱度 <b>${pct.toFixed(2)}%</b> / 上限 ${max}%　（停損距離左尾）</div>
+    <div class="bar"><i style="width:${w}%;background:${col}"></i></div>
+    <div style="margin-top:6px">📦 gross 名目曝險 <b>${gpct.toFixed(1)}%</b> / 上限 ${gmax}%　（群聚跳空左尾）</div>
+    <div class="bar"><i style="width:${gw}%;background:${gcol}"></i></div>
+    <div style="color:var(--muted);font-size:12px">持倉：${held}${secs?'　|　'+secs:''}</div>`;
+}
+
+function pqColor(q){ return q>=60?'var(--green)':(q>=40?'var(--yellow)':'var(--red)'); }
+
 function renderSignals(d){
-  $('#sigCount').textContent = `${d.n_signals} 個可執行 · 資料日 ${d.data_date}`;
+  $('#sigCount').textContent = `${d.n_signals} 個可執行 · ${d.n_filtered||0} 個被閘門擋下 · 資料日 ${d.data_date}`;
+  renderHeatBanner(d);
   const box = $('#signals');
-  if(!d.signals.length){ box.innerHTML = '<div class="empty">今日沒有符合四條件的進場信號 — 紀律就是不亂進場，空手等設定成形。</div>'; return; }
-  box.innerHTML = d.signals.map(c => `
-    <div class="sig">
-      <div style="display:flex;justify-content:space-between;align-items:center">
-        <div class="tk">${c.ticker}</div>
+  if(!d.signals.length){ box.innerHTML = '<div class="empty">今日沒有符合進場條件的信號 — 紀律就是不亂進場，空手等設定成形。</div>'; return; }
+  const acct = d.config.account_size;
+  box.innerHTML = d.signals.map(c => {
+    const tier = c.conviction_tier || 'B';
+    // 品質標籤
+    const tags = [];
+    if(c.pead_active) tags.push(`<span class="tag2 pead">PEAD 財報後漂移${c.last_surprise_pct!=null?' +'+Math.round(c.last_surprise_pct)+'%':''}</span>`);
+    if(c.sector!=null) tags.push(`<span class="tag2 sec">${c.sector} RS${c.sector_rs!=null?Math.round(c.sector_rs):'—'}</span>`);
+    if(c.late_stage) tags.push(`<span class="tag2 late">⚠ 趨勢末段(自相對${c.ext_self_pct!=null?Math.round(c.ext_self_pct):''}%)</span>`);
+    if(c.days_to_earnings!=null) tags.push(`<span class="tag2 ern">財報 D-${c.days_to_earnings}</span>`);
+    if(c.regime_mult!=null && c.regime_mult<1) tags.push(`<span class="tag2 late">regime 縮倉 ×${c.regime_mult}</span>`);
+    if(c.stop_floored) tags.push(`<span class="tag2 late">停損加寬→$${c.stop}(原$${c.stop_raw})</span>`);
+    // 風險警示（容量分配已實際縮倉，這裡說明為何被夾）
+    const warns = [];
+    if(c.no_room) warns.push(`<span class="warnchip">⛔ 無容量配置${c.capacity_note?'：'+c.capacity_note:''}</span>`);
+    else if(c.capacity_capped) warns.push(`<span class="warnchip">⚠️ 已縮倉${c.capacity_note?'：'+c.capacity_note:''}</span>`);
+    const pq = c.pullback_quality!=null?c.pullback_quality:'—';
+    return `
+    <div class="sig t${tier}">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+        <div style="display:flex;align-items:center;gap:9px">
+          <span class="tier t${tier}">${tier} ${c.conviction_score!=null?c.conviction_score:''}</span>
+          <span class="tk">${c.ticker}</span>
+        </div>
         ${c.rs_pct!=null?`<div style="background:#1d3a5e;color:#bfe0ff;font-size:12px;font-weight:700;padding:3px 9px;border-radius:7px">RS ${c.rs_pct}</div>`:''}
       </div>
       <div class="rs">${c.reason} · 動能 ${c.momentum>0?'+':''}${c.momentum}</div>
-      <div class="lvls">
-        <div class="lvl entry"><div class="k">進場價</div><div class="v">$${c.entry}</div></div>
-        <div class="lvl stop"><div class="k">硬停損 (風險${c.risk_pct}%)</div><div class="v">$${c.stop}</div></div>
-        <div class="lvl tgt"><div class="k">分批目標 +${c.scale1_gain_pct}%</div><div class="v">$${c.scale1_target}</div></div>
-        <div class="lvl size"><div class="k">建議部位 (帳戶${(d.config.account_size/1000)}k·風險${d.config.risk_per_trade_pct}%)</div><div class="v">${c.suggested_shares}股 ≈ $${c.suggested_dollars.toLocaleString()}</div></div>
+      <div class="tags">${tags.join('')}</div>
+      <div class="pqrow"><span>拉回品質</span>
+        <span class="pqbar"><i style="width:${pq==='—'?0:pq}%;background:${pqColor(pq==='—'?0:pq)}"></i></span>
+        <span><b style="color:var(--txt)">${pq}</b>${c.pq_vol_contraction_pct!=null?' · 量縮'+Math.round(c.pq_vol_contraction_pct)+'%':''}${c.pq_waterfall?' · ⚠瀑布':''}</span>
       </div>
-      <div class="sigfoot">觸及 <b>$${c.scale1_target}</b> 賣 <b>${c.scale_frac}%</b> 落袋，剩餘用 <b>吊燈${c.trail_mult}×ATR</b> 移動停利抱住趨勢。ATR=$${c.atr}</div>
+      <div class="lvls">
+        <div class="lvl entry"><div class="k">進場價 (追價上限 $${c.entry_limit!=null?c.entry_limit:c.entry})</div><div class="v">$${c.entry}</div></div>
+        <div class="lvl stop"><div class="k">硬停損 (每股風險${c.risk_pct}%${c.stop_floored?'·已加寬':''})</div><div class="v">$${c.stop}</div></div>
+        <div class="lvl tgt"><div class="k">騎乘出場線 (收盤跌破${c.trail_ma}MA才走)</div><div class="v">$${c.trail_line}</div></div>
+        <div class="lvl size"><div class="k">信心分級部位 (${tier}級·目標風險${c.target_risk_pct!=null?c.target_risk_pct:c.eff_risk_pct}%·名目≤${c.notional_cap_pct}%)</div><div class="v">${c.suggested_shares}股 ≈ $${(c.suggested_dollars||0).toLocaleString()}</div></div>
+      </div>
+      ${warns.length?`<div class="warn">${warns.join('')}</div>`:''}
+      <div class="sigfoot">次日 open 成交，最多追到 <b>$${c.entry_limit!=null?c.entry_limit:c.entry}</b>(超過放棄)。出場=<b>讓贏家跑</b>：不早砍，抱到<b>收盤跌破${c.trail_ma}MA($${c.trail_line})</b>才出(保守線 ${c.trail_ma_tight}MA $${c.trail_line_tight})；期間僅<b>災難硬停損 $${c.stop}</b>保護。此線隨股價上行而上移。ATR=$${c.atr} · 實佔帳戶風險 ${c.trade_risk_pct}%</div>
       ${c.fundamentals?`<div class="sigfoot" style="border-top:none;padding-top:4px">基本面(裁量參考)：淨利率 ${fmtF(c.fundamentals.net_margin)}% · 營收增 ${fmtF(c.fundamentals.rev_growth)}% · ROE ${fmtF(c.fundamentals.roe)}% · 前瞻PE ${c.fundamentals.fwd_pe??'—'}</div>`:''}
-    </div>`).join('');
+    </div>`;
+  }).join('');
 }
 
 function renderWatch(d){
@@ -311,15 +655,204 @@ function renderRobust(rb){
     </div>`;
 }
 
+// ── 台股面板(同一套引擎搬到台股;台股 yfinance 絕對價位可能失真→一律以「%」為主)──
+function twCard(title, sub, tk, d){
+  if(!d) return `<div style="background:#0b1727;border:1px solid #1d3a5e;border-radius:10px;padding:12px">
+    <div style="font-weight:800">${title}</div><div style="color:var(--muted);font-size:12px;margin-top:6px">${sub}<br>（無核心站上200MA / 信用砍0 → 空手）</div></div>`;
+  const cut = d.credit_cut;
+  let verb, hold, buy;
+  if(cut){ verb='🔴 出場→現金'; hold='全球風險全示警:全部轉現金'; buy='不進場(等HYG/LQD/SMH站回)'; }
+  else if(d.state==='risk_on'){
+    verb='🟢 持有 / 可進';
+    hold=`調整曝險到 ${Math.round((d.suggested_expo||0)*100)}%（不停利,騎到跌破線）`;
+    buy = d.entry_state==='can_enter'
+      ? `可進場：別追貴於現價 +${d.entry_cap_pct}%（停損距 ${d.exit_pct}%）`
+      : `🟡 追高,等拉回（距50MA ${d.dist50_pct>0?'+':''}${d.dist50_pct}% > 門檻 +${Math.round((d.entry_thr-1)*100)}%）`;
+  } else if(d.state==='warning'){ verb='🟡 逼近停損'; hold='收盤跌破停損線即全出'; buy='不進場'; }
+  else if(d.state==='panic_watch'){ verb='🟠 恐慌容忍'; hold='維持現倉,給3日確認別砍V底'; buy='暫不加碼'; }
+  else { verb='🔴 出場→現金'; hold='已跌破200MA→全部現金'; buy='不進場(等站回)'; }
+  return `
+  <div style="background:#0b1727;border:1px solid #1d3a5e;border-radius:10px;padding:12px;height:100%">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;gap:6px">
+      <div style="font-weight:800;font-size:14px">${title}</div>
+      <div style="font-size:12px;color:#6fd0ff;white-space:nowrap">${tk} ${d.name||''}${d.rs_score!=null?' · RS'+d.rs_score:''}</div>
+    </div>
+    <div style="color:var(--muted);font-size:11px;margin-bottom:8px">${sub}</div>
+    <div style="font-size:16px;font-weight:800;margin:4px 0">${verb}</div>
+    <table style="width:100%;font-size:12.5px;border-collapse:collapse">
+      <tr><td style="color:var(--muted);padding:3px 0;vertical-align:top">🏠 持有者</td><td style="text-align:right">${hold}</td></tr>
+      <tr><td style="color:var(--muted);padding:3px 0;vertical-align:top">💵 空手者</td><td style="text-align:right">${buy}</td></tr>
+      <tr><td style="color:var(--muted);padding:3px 0">📍 距200MA / 50MA</td><td style="text-align:right">${d.dist_pct>0?'+':''}${d.dist_pct}% / ${d.dist50_pct>0?'+':''}${d.dist50_pct}%</td></tr>
+      <tr><td style="color:var(--muted);padding:3px 0">🎯 進場上限</td><td style="text-align:right;color:#7ee0a0;font-weight:700">現價 +${d.entry_cap_pct}%</td></tr>
+      <tr><td style="color:var(--muted);padding:3px 0">🛑 出場/停損</td><td style="text-align:right;color:#e06a6a;font-weight:700">現價 ${d.exit_pct}%（破200MA×${d.exit_buf}）</td></tr>
+      <tr><td style="color:var(--muted);padding:3px 0">📊 建議曝險</td><td style="text-align:right;font-weight:800;color:#7ee0a0">${d.suggested_expo!=null?Math.round(d.suggested_expo*100)+'%':'維持'}</td></tr>
+    </table>
+  </div>`;
+}
+function renderTaiwan(tw){
+  const el = $('#taiwanPanel'); if(!el) return;
+  if(!tw || !tw.cores){ el.innerHTML=''; return; }
+  const cores = tw.cores;
+  const A = cores[tw.anchor_a] || cores['0052.TW'];
+  const rh = tw.rotation_hold||{};
+  const Bp = rh.ticker || tw.strongest;
+  const B = Bp ? cores[Bp] : null;
+  let lockTxt;
+  if(rh.ticker){
+    lockTxt = rh.locked ? `🔒 已抱${rh.days_held}日·還${rh.lock_days_left}日滿鎖`
+      + (rh.today_strongest&&rh.today_strongest!==rh.ticker?`（今最強 ${rh.today_strongest}）`:'')
+      : `🔓 滿鎖可換（今最強 ${rh.today_strongest||'—'}）`;
+  } else lockTxt='空手';
+  const can = tw.canary||{};
+  const cE = can.health>=1?'🟢':(can.health>0?'🟠':'🔴');
+  const cStr = can.assets ? Object.values(can.assets).map(a=>`${a.name}${a.ok?'🟢':'🔴'}${a.dist_pct>0?'+':''}${a.dist_pct}%`).join(' · ') : '';
+  // 觀察候選(不可回測)
+  const watch = (tw.watch_have||[]).map(tk=>{const d=cores[tk];return d?
+    `<span style="display:inline-block;background:#10243d;border:1px solid #234; border-radius:6px;padding:2px 7px;margin:2px;font-size:11px">${tk} ${d.name} ${d.dist_pct>0?'+':''}${d.dist_pct}%↑200MA</span>`:''}).join('');
+  el.innerHTML = `
+  <div style="background:#0e1b2e;border:1px solid #2a4a72;border-radius:12px;padding:14px 16px;margin:10px 0">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+      <div style="font-weight:800;font-size:15px">🇹🇼 台股版今日操作 <span style="color:var(--muted);font-weight:400;font-size:11px">(同一套引擎·收盤訊號·更新 ${tw.last_updated||''})</span></div>
+      <div style="font-size:12px;color:${can.health>=1?'#7ee0a0':(can.health>0?'#e0b46a':'#e06a6a')}">${cE} 信用+費半哨 ${can.n_healthy}/${can.n_total} → 曝險×${Math.round((can.health??1)*100)}%</div>
+    </div>
+    <div style="color:var(--muted);font-size:11px;margin-top:3px">${cStr}</div>
+    <div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:10px;align-items:stretch">
+      <div style="flex:1;min-width:290px">${twCard('🅰️ A · 抱0052富邦科技（主力）','回測Sharpe最高1.96 / 2022 +3.7% / MDD-12%', tw.anchor_a, A)}</div>
+      <div style="flex:1;min-width:290px">${twCard('🅱️ B · 輪動最強（衛星）','最低持有30日 · '+lockTxt, Bp||'—', B)}</div>
+    </div>
+    ${watch?`<div style="margin-top:10px;font-size:11px;color:var(--muted)">🔬 觀察候選（歷史不足·不可回測·暫不納入輪動，僅追蹤是否站上200MA）：<br>${watch}</div>`:''}
+    <div style="color:var(--muted);font-size:11px;margin-top:8px">📌 台股實證:趨勢ETF擇時加分、<b>高股息(0056)擇時傷已排除</b>;最佳哨=<b>全球信用+費半(HYG+LQD+SOXX)</b>非本地匯率。
+      擇時=崩盤保險(<b>2008 擇時0% vs 買持-48%</b>),牛市讓利。
+      <br>💡 <b>台股無資本利得稅</b>(僅證交稅0.1%)→<b>輪動B 淨報酬反勝A</b>(+35.1 vs +32.1%),不像美股偏A!台股建議偏 B 或 A+B各半。
+      想衝財富:加 <b>00631L 正2</b>(免融資2x)當衛星,A40/B40+正2 20% → Sharpe2.21/MDD-11%(正2須擇時,崩盤會爆)。
+      <br>⚠️ <b>台股 yfinance 絕對價位可能失真,一律看「%」</b>(站上MA200、距50MA、停損距都是相對值=正確);下單以券商實際報價×這些%換算。台股1張=1000股,ETF可買零股。</div>
+  </div>`;
+}
+
+// ── ★今日掛單建議:把策略翻成「該買什麼/別追/掛單價/原因」(台美股共用) ──
+function buyRows(cores, isTW, heldTk, strongestTk){
+  const rows=[];
+  for(const tk in cores){
+    const d=cores[tk]; if(!d || d.watch_only) continue;
+    const cut=d.credit_cut;
+    const tag = tk===heldTk ? '🅱️持有' : (tk===strongestTk ? '👑最強' : '');
+    let bucket, action, limit, reason, color;
+    if(cut || d.state==='risk_off' || d.entry_state==='no_entry' || d.dist_pct<0){
+      bucket=3; color='#e06a6a'; action='🔴 不要碰';
+      limit='—'; reason = cut ? '信用/費半哨示警→現金' : '在200MA之下,趨勢轉空,等站回再說';
+    } else if(d.entry_state==='extended'){
+      bucket=2; color='#e0b46a'; action='🟡 別追高';
+      limit = isTW ? `等拉回:現價需回到 +${d.entry_cap_pct}% 以內` : `等拉回 ≤ $${d.entry_cap}`;
+      reason = `距50MA +${d.dist50_pct}% 已超過門檻 +${Math.round((d.entry_thr-1)*100)}%＝追高區,別追`;
+    } else if(d.entry_state==='can_enter'){
+      const cheap = d.stop_risk_pct<=12;
+      bucket = cheap?0:1; color='#7ee0a0'; action = cheap?'🟢 可買(便宜)':'🟢 可買(偏貴小量)';
+      limit = isTW ? `限價 ≤ 現價 +${d.entry_cap_pct}%` : `限價 ≤ $${d.entry_cap}`;
+      reason = cheap
+        ? `貼近均線,停損僅 ${d.stop_risk_pct}%＝便宜,可進。曝險建議 ${Math.round((d.suggested_expo||0)*100)}%`
+        : `在趨勢中但離200MA遠(停損 ${d.stop_risk_pct}%)→曝險自動調小到 ${Math.round((d.suggested_expo||0)*100)}%,只小量`;
+    } else { continue; }
+    const stop = isTW ? `現價 ${d.exit_pct}%` : `$${d.exit_price}`;
+    rows.push({bucket,tk,name:d.name||'',tag,action,color,limit,stop,
+               dist:`${d.dist_pct>0?'+':''}${d.dist_pct}%/${d.dist50_pct>0?'+':''}${d.dist50_pct}%`,reason});
+  }
+  rows.sort((a,b)=>a.bucket-b.bucket);
+  return rows;
+}
+function buyTable(title, rows){
+  if(!rows.length) return '';
+  const tr = rows.map(r=>`
+    <tr style="border-top:1px solid #14233a">
+      <td style="padding:5px 6px;font-weight:700;white-space:nowrap;color:${r.color}">${r.action}</td>
+      <td style="padding:5px 6px;white-space:nowrap"><b>${r.tk}</b> ${r.name} ${r.tag?'<span style=\"color:#6fd0ff\">'+r.tag+'</span>':''}</td>
+      <td style="padding:5px 6px;white-space:nowrap;color:#7ee0a0">${r.limit}</td>
+      <td style="padding:5px 6px;white-space:nowrap;color:#e06a6a">${r.stop}</td>
+      <td style="padding:5px 6px;color:var(--muted);font-size:11px">${r.reason}</td>
+    </tr>`).join('');
+  return `<div style="font-weight:800;font-size:13px;margin:10px 0 4px">${title}</div>
+    <div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px">
+      <tr style="color:var(--muted);font-size:11px;text-align:left">
+        <th style="padding:3px 6px">動作</th><th style="padding:3px 6px">標的</th>
+        <th style="padding:3px 6px">掛單價(限價)</th><th style="padding:3px 6px">停損</th><th style="padding:3px 6px">原因</th></tr>
+      ${tr}</table></div>`;
+}
+function renderBuyList(cs, tw){
+  const el=$('#buyList'); if(!el) return;
+  let usRows=[], twRows=[];
+  if(cs && cs.cores){
+    usRows = buyRows(cs.cores, false, (cs.rotation_hold||{}).ticker, cs.strongest);
+  }
+  if(tw && tw.cores){
+    twRows = buyRows(tw.cores, true, (tw.rotation_hold||{}).ticker, tw.strongest);
+  }
+  if(!usRows.length && !twRows.length){ el.innerHTML=''; return; }
+  el.innerHTML = `
+  <div style="background:#0e1b2e;border:1px solid #2a4a72;border-radius:12px;padding:14px 16px;margin:10px 0">
+    <div style="font-weight:800;font-size:15px">📋 今日掛單建議 <span style="color:var(--muted);font-weight:400;font-size:11px">(依現在位階:該買什麼/別追什麼/掛在哪;收盤訊號)</span></div>
+    ${buyTable('🇺🇸 美股', usRows)}
+    ${twRows.length?buyTable('🇹🇼 台股（價位用「%」×你券商現價換算,yfinance絕對價可能失真）', twRows):''}
+    <div style="color:var(--muted);font-size:11px;margin-top:8px">🟢可買=站上200MA且沒追高(停損≤12%=便宜) · 🟡別追=已超過進場門檻,掛單等拉回 · 🔴不碰=跌破200MA或哨示警。
+      掛限價別買貴於「掛單價」;跌破「停損」收盤轉現金。曝險照各卡 RiskTarget(越貴抱越少)。</div>
+  </div>`;
+}
+
+// ── 台美股產業龍頭個股(衛星):依產業分組,顏色=狀態 ──
+function leaderChip(d, isTW){
+  const col = d.entry_state==='can_enter' ? '#7ee0a0' : (d.entry_state==='extended' ? '#e0b46a' : '#e06a6a');
+  const bd  = d.state==='risk_on' ? '#234d34' : (d.state==='warning' ? '#4d4520' : '#4d2424');
+  const act = d.entry_state==='can_enter' ? '🟢可進' : (d.entry_state==='extended' ? '🟡別追' : '🔴避');
+  const px  = (isTW?'':'$') + d.close + (isTW?'':'');
+  const lim = d.entry_state==='extended'
+        ? (isTW?`回${d.entry_cap_pct}%內`:`≤$${d.entry_cap}`)
+        : (d.entry_state==='can_enter' ? (isTW?`限+${d.entry_cap_pct}%`:`≤$${d.entry_cap}`) : '—');
+  return `<div title="${d.name} ${px} | 距200MA ${d.dist_pct}% | 停損 ${isTW?d.exit_pct+'%':'$'+d.exit_price} | RS ${d.rs_score}"
+    style="display:inline-block;background:#0b1727;border:1px solid ${bd};border-radius:7px;padding:4px 8px;margin:3px;font-size:11.5px;white-space:nowrap">
+    <b style="color:${col}">${act}</b> ${d.ticker.replace('.TW','')} ${d.name}
+    <span style="color:var(--muted)"> ${d.dist_pct>0?'+':''}${d.dist_pct}%↑MA200 · ${lim}</span></div>`;
+}
+function leaderCol(flag, title, secs, isTW){
+  if(!secs) return '';
+  let html=`<div style="flex:1;min-width:320px"><div style="font-weight:800;font-size:13px;margin-bottom:4px">${flag} ${title}</div>`;
+  for(const sec in secs){
+    html+=`<div style="margin:6px 0"><div style="color:#6fd0ff;font-size:11px;font-weight:700">${sec}</div>`;
+    html+= secs[sec].map(d=>leaderChip(d,isTW)).join('');
+    html+=`</div>`;
+  }
+  return html+`</div>`;
+}
+function renderLeaders(ld){
+  const el=$('#leadersPanel'); if(!el) return;
+  if(!ld || !ld.leaders){ el.innerHTML=''; return; }
+  el.innerHTML = `
+  <div style="background:#0e1b2e;border:1px solid #2a4a72;border-radius:12px;padding:14px 16px;margin:10px 0">
+    <div style="font-weight:800;font-size:15px">🏆 台美股產業龍頭個股 <span style="color:var(--muted);font-weight:400;font-size:11px">(衛星·同趨勢引擎·依產業分組·更新 ${ld.last_updated||''})</span></div>
+    <div style="color:var(--muted);font-size:11px;margin:3px 0 8px">🟢可進=站上200MA沒追高 · 🟡別追=超門檻等拉回 · 🔴避=跌破200MA。每檔標 距200MA% 與掛單價(滑鼠移上看停損/RS)。</div>
+    <div style="display:flex;gap:18px;flex-wrap:wrap">
+      ${leaderCol('🇺🇸','美股龍頭', ld.leaders.US, false)}
+      ${leaderCol('🇹🇼','台股龍頭（價位用%×券商現價）', ld.leaders.TW, true)}
+    </div>
+    <div style="color:var(--muted);font-size:11px;margin-top:8px">⚠️ ${ld.note||''}<br>${ld.params_note||''}</div>
+  </div>`;
+}
+
 async function loadAll(){
   try{
-    const [sig, ev, rb] = await Promise.all([
+    const [sig, ev, rb, cs, mn, tw, ld] = await Promise.all([
       getJSON('strategy_signals.json'),
       getJSON('backtest_evidence.json'),
       getJSON('robustness.json').catch(()=>null),
+      getJSON('core_status.json').catch(()=>null),
+      getJSON('strategy_menu.json').catch(()=>null),
+      getJSON('taiwan_status.json').catch(()=>null),
+      getJSON('leaders_status.json').catch(()=>null),
     ]);
     $('#updated').innerHTML = `信號更新 ${sig.last_updated}<br>實證更新 ${ev.last_updated}`;
     renderRegime(sig.regime);
+    renderBuyList(cs, tw);
+    renderCore(cs, sig);
+    renderTaiwan(tw);
+    renderLeaders(ld);
+    renderMenu(mn);
     renderPlaybook(ev, sig.config);
     renderRobust(rb);
     renderSignals(sig);
