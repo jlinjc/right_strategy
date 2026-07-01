@@ -25,6 +25,8 @@ concurrency:
 jobs:
   build-deploy:
     runs-on: ubuntu-latest
+    env:
+      TZ: Asia/Taipei        # 讓所有 datetime.now() 產生台灣時間,和瀏覽器對得上
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
