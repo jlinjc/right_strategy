@@ -996,7 +996,8 @@ async function loadAll(){
     ]);
     $('#updated').innerHTML =
       `🟢 指數即時資料 <b>${cs?cs.last_updated:'—'}</b>(每小時自動)<br>`+
-      `<span style="color:var(--muted)">🔒 個股信號/配置/實證 ${sig.last_updated}(靜態·本機push才更新)</span>`;
+      `🟢 個股信號 <b>${sig.last_updated}</b>(每日收盤後自動)<br>`+
+      `<span style="color:var(--muted)">🔒 配置/回測實證(靜態·本機 push 才更新)</span>`;
     renderRegime(ag);
     renderAggressive(ag);
     renderAllocation(al);
