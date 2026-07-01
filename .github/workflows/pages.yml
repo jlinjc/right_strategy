@@ -4,9 +4,9 @@ name: Deploy dashboard to GitHub Pages
 # 也支援手動觸發(Actions 頁按 Run workflow)與 Web_Dashboard 有改動時自動部署。
 on:
   schedule:
-    # 用 :17 分而非整點 —— GitHub 排程在整點最容易被延遲。交易日每小時各一次:
-    - cron: '17 1-6 * * 1-5'    # 台股盤中/收盤(≈台灣 09:00-14:00)
-    - cron: '17 13-22 * * 1-5'  # 美股盤中到收盤後(≈美東 09:00-18:00)
+    # 交易日「整天」每小時各一次(:17 分,避開整點被 GitHub 延遲)。
+    # 週末不排:市場休市、無新行情,重算也是同一份數字。
+    - cron: '17 * * * 1-5'
   workflow_dispatch:
   push:
     branches: [main]

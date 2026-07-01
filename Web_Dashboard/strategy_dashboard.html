@@ -994,7 +994,9 @@ async function loadAll(){
       getJSON('aggressive_status.json').catch(()=>null),
       getJSON('allocation_status.json').catch(()=>null),
     ]);
-    $('#updated').innerHTML = `信號更新 ${sig.last_updated}<br>實證更新 ${ev.last_updated}`;
+    $('#updated').innerHTML =
+      `🟢 指數即時資料 <b>${cs?cs.last_updated:'—'}</b>(每小時自動)<br>`+
+      `<span style="color:var(--muted)">🔒 個股信號/配置/實證 ${sig.last_updated}(靜態·本機push才更新)</span>`;
     renderRegime(ag);
     renderAggressive(ag);
     renderAllocation(al);
