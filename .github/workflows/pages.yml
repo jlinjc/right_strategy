@@ -1,0 +1,64 @@
+name: Deploy dashboard to GitHub Pages
+
+# 每個交易日美股收盤後自動重算「指數核心狀態」並部署到 Pages(你的電腦可關機)。
+# 也支援手動觸發(Actions 頁按 Run workflow)與 Web_Dashboard 有改動時自動部署。
+on:
+  schedule:
+    - cron: '0 22 * * 1-5'   # 22:00 UTC ≈ 美東 17/18:00(收盤後)
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'Web_Dashboard/**'
+      - '.github/workflows/pages.yml'
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build-deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install deps
+        run: pip install --quiet yfinance pandas numpy requests lxml python-dotenv
+
+      # 只重算「輕量、自足」的指數核心狀態(各下載約 5-7 檔,雲端可靠)。
+      # 失敗不擋部署 → 該面板沿用 repo 內已 commit 的 baseline JSON(不會壞版)。
+      - name: Regenerate live index status (best-effort)
+        continue-on-error: true
+        run: |
+          python core_status.py || echo "core_status skipped"
+          python taiwan_status.py || echo "taiwan_status skipped"
+          python leaders_status.py || echo "leaders_status skipped"
+
+      # 讓網站根網址直接導到策略儀表板
+      - name: Root redirect -> strategy_dashboard.html
+        run: |
+          cat > Web_Dashboard/index.html <<'HTML'
+          <!doctype html><html><head><meta charset="utf-8">
+          <meta http-equiv="refresh" content="0; url=strategy_dashboard.html">
+          <title>策略儀表板</title></head>
+          <body><a href="strategy_dashboard.html">前往策略儀表板 →</a></body></html>
+          HTML
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: Web_Dashboard
+      - id: deployment
+        uses: actions/deploy-pages@v4

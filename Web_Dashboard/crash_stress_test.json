@@ -1,0 +1,130 @@
+{
+  "period": "2006-06-01 ~ 2026-06-12",
+  "universe": "DIVERSE_UNIVERSE (固定中性大型股池, 無AI生存者偏差)",
+  "benchmark": "SPY",
+  "full_summary": {
+    "total_trades": 1427,
+    "total_return_pct": 191.58,
+    "cagr_pct": 5.5,
+    "sharpe_ratio": 0.08,
+    "profit_factor": 1.37,
+    "win_rate_pct": 42.5,
+    "max_drawdown_pct": -25.56,
+    "max_drawdown_duration_days": 1818,
+    "benchmark_total_return_pct": 733.7
+  },
+  "crash_windows": [
+    {
+      "label": "2008 金融海嘯",
+      "window": "2007-10-01~2009-03-31",
+      "equity_before": 106730.0,
+      "equity_end": 84675.0,
+      "window_return_pct": -20.7,
+      "worst_dd_pct": -25.6,
+      "n_entries": 112,
+      "n_exits": 112,
+      "exit_breakdown": {
+        "分批": {
+          "n": 12,
+          "avg_pnl_pct": 8.3
+        },
+        "時間停損": {
+          "n": 9,
+          "avg_pnl_pct": 11.0
+        },
+        "停損": {
+          "n": 86,
+          "avg_pnl_pct": -2.6
+        },
+        "吊燈/移動停利": {
+          "n": 5,
+          "avg_pnl_pct": 4.8
+        }
+      }
+    },
+    {
+      "label": "2018 Q4 修正",
+      "window": "2018-10-01~2018-12-31",
+      "equity_before": 151991.0,
+      "equity_end": 146713.0,
+      "window_return_pct": -3.5,
+      "worst_dd_pct": -5.7,
+      "n_entries": 16,
+      "n_exits": 21,
+      "exit_breakdown": {
+        "停損": {
+          "n": 15,
+          "avg_pnl_pct": -1.9
+        },
+        "分批": {
+          "n": 3,
+          "avg_pnl_pct": 5.3
+        },
+        "時間停損": {
+          "n": 1,
+          "avg_pnl_pct": 9.0
+        },
+        "吊燈/移動停利": {
+          "n": 2,
+          "avg_pnl_pct": 1.0
+        }
+      }
+    },
+    {
+      "label": "2020 COVID崩盤",
+      "window": "2020-02-01~2020-04-30",
+      "equity_before": 155300.0,
+      "equity_end": 170800.0,
+      "window_return_pct": 10.0,
+      "worst_dd_pct": -5.5,
+      "n_entries": 25,
+      "n_exits": 26,
+      "exit_breakdown": {
+        "停損": {
+          "n": 18,
+          "avg_pnl_pct": -1.4
+        },
+        "時間停損": {
+          "n": 1,
+          "avg_pnl_pct": 8.8
+        },
+        "分批": {
+          "n": 4,
+          "avg_pnl_pct": 15.7
+        },
+        "吊燈/移動停利": {
+          "n": 3,
+          "avg_pnl_pct": 2.4
+        }
+      }
+    },
+    {
+      "label": "2022 熊市",
+      "window": "2022-01-01~2022-10-31",
+      "equity_before": 225193.0,
+      "equity_end": 236799.0,
+      "window_return_pct": 5.2,
+      "worst_dd_pct": -7.2,
+      "n_entries": 59,
+      "n_exits": 60,
+      "exit_breakdown": {
+        "停損": {
+          "n": 36,
+          "avg_pnl_pct": -1.7
+        },
+        "時間停損": {
+          "n": 5,
+          "avg_pnl_pct": 12.4
+        },
+        "吊燈/移動停利": {
+          "n": 7,
+          "avg_pnl_pct": 2.8
+        },
+        "分批": {
+          "n": 12,
+          "avg_pnl_pct": 8.4
+        }
+      }
+    }
+  ]
+}

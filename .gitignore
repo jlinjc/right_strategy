@@ -22,3 +22,10 @@ Web_Dashboard/*.json
 .DS_Store
 Thumbs.db
 *.csv
+
+# Large data caches — NEVER commit (alpha/cache is 120MB+ of pkl)
+*.pkl
+alpha/cache/
+
+# ...but DO commit the dashboard's JSON so GitHub Pages can serve it
+!Web_Dashboard/*.json

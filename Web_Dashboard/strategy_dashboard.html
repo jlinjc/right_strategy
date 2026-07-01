@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Anti-Gravity 作戰中心 · 右側動能拉回</title>
+<title>趨勢擇時作戰中心 · 200MA + 信用哨</title>
 <style>
   :root{
     --bg:#0a0e17; --panel:#121826; --panel2:#1a2233; --line:#26304a;
@@ -145,6 +145,18 @@
   details.ev[open]>summary{border-bottom:1px solid var(--line)}
 
   .foot{text-align:center;color:var(--muted);font-size:12px;margin-top:30px}
+
+  /* Collapsible groups (keep top clean, detail on demand) */
+  .grp{background:var(--panel);border:1px solid var(--line);border-radius:14px;margin:14px 0;overflow:hidden}
+  .grp>summary{padding:15px 18px;cursor:pointer;font-size:15px;font-weight:700;
+    display:flex;align-items:center;gap:10px;list-style:none}
+  .grp>summary::-webkit-details-marker{display:none}
+  .grp>summary .ar{margin-left:auto;color:var(--muted);transition:.2s;font-size:13px}
+  .grp[open]>summary .ar{transform:rotate(90deg)}
+  .grp[open]>summary{border-bottom:1px solid var(--line)}
+  .grp .gbody{padding:16px 18px}
+  .grp .gbody section:first-child{margin-top:4px}
+  .grp .gbody section{margin:18px 0}
   @media(max-width:720px){.play{grid-template-columns:1fr}}
 </style>
 </head>
@@ -154,8 +166,8 @@
     <div class="brand">
       <div class="orb"></div>
       <div>
-        <h1>Anti-Gravity 作戰中心</h1>
-        <div class="sub">右側動能 · 均線拉回 · 分批出場 — 一套用數據定案的紀律系統</div>
+        <h1>趨勢擇時作戰中心</h1>
+        <div class="sub">站上200MA + 信用哨健康 → 全押最強 · 任一破 → 全現金 — 一套用數據定案的紀律系統</div>
       </div>
     </div>
     <div style="display:flex;align-items:center;gap:14px">
@@ -172,8 +184,14 @@
     <div><div class="lbl">載入中…</div><div class="act"></div></div>
   </div>
 
+  <!-- ★進取模式(TQQQ/SOXL 槓桿) — 成長階段每日執行 -->
+  <div id="aggressivePanel"></div>
+
   <!-- ★今日掛單建議(台美股:該買什麼/別追什麼/掛單價) -->
   <div id="buyList"></div>
+
+  <!-- ★資產配置建議(核心/衛星/VRP 三塊,data talk) -->
+  <div id="allocationPanel"></div>
 
   <!-- 核心-衛星 王者配置 -->
   <div id="coreBanner"></div>
@@ -181,53 +199,57 @@
   <!-- 台股版面板(同一套引擎搬到台股) -->
   <div id="taiwanPanel"></div>
 
-  <!-- 台美股產業龍頭個股(衛星) -->
-  <div id="leadersPanel"></div>
+  <!-- ↓↓ 以下為「詳細資料」,預設收合,保持上方一目了然 ↓↓ -->
 
-  <!-- 策略選單(各有優勢,投資人自選風險檔位) -->
-  <div id="menuPanel"></div>
-
-  <!-- 紀律總覽 -->
-  <section>
-    <div class="stitle"><h2>📜 策略紀律總覽</h2><span class="tag">照表操課，不臨場改主意</span><div class="line"></div></div>
-    <div class="play">
-      <div class="card">
-        <h3><span class="pill in">進場</span> 四個條件全中才進</h3>
-        <div id="entryRules"></div>
-      </div>
-      <div class="card">
-        <h3><span class="pill out">出場</span> 分批落袋 + 抱住贏家</h3>
-        <div id="exitRules"></div>
-      </div>
+  <!-- 個股衛星(龍頭 + 今日信號 + 醞釀) -->
+  <details class="grp">
+    <summary>🏆 個股衛星 — 產業龍頭 / 今日信號 / 醞釀清單 <span class="ar">▸</span></summary>
+    <div class="gbody">
+      <div id="leadersPanel"></div>
+      <section>
+        <div class="stitle"><h2>🎯 今日進場信號卡</h2><span class="tag" id="sigCount">—</span><div class="line"></div></div>
+        <div id="heatBanner"></div>
+        <div class="sigs" id="signals"></div>
+      </section>
+      <section>
+        <div class="stitle"><h2>👀 醞釀中觀察清單</h2><span class="tag">站上200MA+動能正+靠近拉回均線</span><div class="line"></div></div>
+        <div class="tblwrap"><table id="watch"></table></div>
+      </section>
     </div>
-    <div class="expect" id="expect"></div>
-    <div class="note" id="expectNote"></div>
-  </section>
+  </details>
 
-  <!-- 真實風險 / 穩健性 -->
-  <section>
-    <div class="stitle"><h2>🛡️ 真實風險 — 別被回測騙</h2><span class="tag">投大資金前必看</span><div class="line"></div></div>
-    <div id="robust"></div>
-  </section>
-
-  <!-- 今日信號 -->
-  <section>
-    <div class="stitle"><h2>🎯 今日進場信號卡</h2><span class="tag" id="sigCount">—</span><div class="line"></div></div>
-    <div id="heatBanner"></div>
-    <div class="sigs" id="signals"></div>
-  </section>
-
-  <!-- 醞釀中 -->
-  <section>
-    <div class="stitle"><h2>👀 醞釀中觀察清單</h2><span class="tag">站上200MA+動能正+正在靠近拉回均線</span><div class="line"></div></div>
-    <div class="tblwrap"><table id="watch"></table></div>
-  </section>
-
-  <!-- 回測實證 -->
-  <section>
-    <div class="stitle"><h2>🔬 回測實證 — 為什麼敢照這套做</h2><span class="tag" id="evDate">—</span><div class="line"></div></div>
-    <div id="evidence"></div>
-  </section>
+  <!-- 個股衛星系統(獨立規則:ATR停損/騎均線/分批) — 與指數策略不同,別混用 -->
+  <details class="grp">
+    <summary>📊 個股衛星系統 — 紀律/回測/選單 <span style="color:#e0b46a;font-weight:400;font-size:11px">（獨立系統·ATR停損·騎均線·分批,≠指數策略的200MA邏輯）</span><span class="ar">▸</span></summary>
+    <div class="gbody">
+      <div style="background:#2a2510;border:1px solid var(--yellow-d);border-radius:8px;padding:9px 12px;font-size:11.5px;color:#ffe39a;margin-bottom:14px">
+        ⚠️ 此區為「個股衛星」獨立系統，用 <b>ATR停損 / 騎50MA / 分批落袋 / 40天上限</b>——因為個股≠指數ETF，規則本來就不同。
+        <b>它不適用於你的指數/TQQQ策略</b>（那套只有200MA+信用哨、全押/全出、不停利）。看個股訊號才進這區，別把這裡的「分批」套到指數上。
+      </div>
+      <div id="menuPanel"></div>
+      <section>
+        <div class="stitle"><h2>📜 個股衛星紀律（非指數策略）</h2><span class="tag">個股專用規則</span><div class="line"></div></div>
+        <div class="play">
+          <div class="card"><h3><span class="pill in">進場</span> 四個條件全中才進(個股)</h3><div id="entryRules"></div></div>
+          <div class="card"><h3><span class="pill out">出場</span> ATR分批落袋 + 騎均線(個股)</h3><div id="exitRules"></div></div>
+        </div>
+        <div class="expect" id="expect"></div>
+        <div class="note" id="expectNote"></div>
+      </section>
+      <section>
+        <div class="stitle"><h2>🛡️ 真實風險 — 別被回測騙</h2><span class="tag">投大資金前必看</span><div class="line"></div></div>
+        <div id="robust"></div>
+      </section>
+      <section>
+        <div class="stitle"><h2>🔬 個股衛星回測實證</h2><span class="tag" id="evDate">—</span><div class="line"></div></div>
+        <div style="background:#2a2510;border:1px solid var(--yellow-d);border-radius:8px;padding:9px 12px;font-size:11.5px;color:#ffe39a;margin-bottom:12px">
+          ⚠️ <b>看這裡先</b>：下面步驟中的 +3.0 Sharpe 是「2y 多頭灌水」的中間數;<b>最終真實期望 ~+1.9 Sharpe(3y,已重跑吻合)</b>。
+          且 edge 幾乎全來自「交易 AI 主題」(beta),非進出場規則(換中性股池→歸零)。歷史僅3年、季間不穩 → 此為「手癢玩玩」等級,非核心 edge,務必 paper trade ≥3個月。
+        </div>
+        <div id="evidence"></div>
+      </section>
+    </div>
+  </details>
 
   <div class="foot" id="foot"></div>
 </div>
@@ -237,19 +259,31 @@ const $ = s => document.querySelector(s);
 const fmtF = v => (v==null ? '—' : v);
 async function getJSON(f){ const r = await fetch(f + '?t=' + Date.now()); if(!r.ok) throw 0; return r.json(); }
 
-function renderRegime(rg){
-  const el = $('#regime');
-  el.className = 'regime ' + rg.light;
+// ★統一邏輯:頂部燈號 = QQQ vs 200MA + 信用哨(二元:全押/全出),不再用舊的21EMA/50MA/減半
+function renderRegime(ag){
+  const el = $('#regime'); if(!el) return;
+  if(!ag || !ag.vehicles || !ag.vehicles.length){
+    el.className='regime'; el.innerHTML='<div class="light"></div><div><div class="lbl">載入中…</div></div>'; return;
+  }
+  const qqq = ag.vehicles.find(v=>v.signal_tk==='QQQ') || ag.vehicles[0];
+  const trendOk = qqq.sig_close >= qqq.sig_ma200;
+  const canOk = ag.canary && ag.canary.ok;
+  const green = trendOk && canOk;
+  el.className = 'regime ' + (green?'green':'red');
+  const cstr = (ag.canary&&ag.canary.assets) ? Object.entries(ag.canary.assets)
+        .map(([k,a])=>k+(a.above?'🟢':'🔴')).join(' ') : '';
   el.innerHTML = `
     <div class="light"></div>
     <div>
-      <div class="lbl">${rg.label}</div>
-      <div class="act">▶ 紀律動作：${rg.action}</div>
+      <div class="lbl">${green
+        ? '🟢 綠燈 · 趨勢+信用健康 → 持有最強(全押)'
+        : '🔴 紅燈 · '+(!trendOk?'QQQ 跌破200MA':'信用哨示警')+' → 全部轉現金'}</div>
+      <div class="act">▶ 唯一出場線：QQQ 收盤跌破200MA 或 信用哨破。<b>此版只有「全押 / 全出」,沒有減半。</b></div>
     </div>
     <div class="qqq">
-      QQQ <b>${rg.qqq_close}</b><br>
-      21EMA ${rg.ema21} · 50MA ${rg.ma50}<br>
-      200MA ${rg.ma200}
+      QQQ <b>$${qqq.sig_close}</b><br>
+      200MA $${qqq.sig_ma200}（緩衝${qqq.sig_buffer_pct>0?'+':''}${qqq.sig_buffer_pct}%）<br>
+      信用哨 ${cstr}
     </div>`;
 }
 
@@ -375,17 +409,15 @@ function twoStratShell(){
         · 槓桿 <select onchange="setLev(this.value)" style="${inS}">${opt(0.67,'保守 0.67x')}${opt(1,'標準 1.0x')}${opt(1.25,'積極 1.25x')}${opt(1.35,'財富 1.35x')}</select></div>
     </div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
-      ${mb('core','🛡️','純A · 省事','全押SMH擇時 · CAGR+38.6%/回撤-35% · 換手少稅省')}
-      ${mb('balanced','⚖️','A+B各半 · 最穩','各50% · Sharpe1.45最高/回撤-26%最淺 · 不加槓桿')}
-      ${mb('wealth','🚀','A60/B40×1.35 · 財富','同-34%回撤多賺+12%/年 · CAGR+50.8% · 推翻純A定論')}
+      ${mb('core','🛡️','純A · 省事','抱最強單一 · 換手少稅省 · 回撤較深')}
+      ${mb('balanced','⚖️','A+B各半 · 最穩','各50% · Sharpe最高/回撤最淺 · 不加槓桿')}
+      ${mb('wealth','🚀','A60/B40 加槓桿 · 衝報酬','報酬更高但回撤更深(槓桿≤1.5,扣成本後CAGR約27%級)')}
     </div>
     <div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:10px;align-items:stretch">
       <div id="cardA" style="flex:1;min-width:290px"></div>
       <div id="cardB" style="flex:1;min-width:290px"></div>
     </div>
-    <div style="color:var(--muted);font-size:11px;margin-top:8px">📌 <b>核心衛星實證推翻「純A唯一解」</b>:A+B混合Sharpe1.45>純A1.37,加槓桿到同回撤(-34%)→CAGR反超(+50.8 vs +38.6%)。
-      B 已內建<b>最低持有30日鎖</b>(換進至少抱一個月才准換、跌破立刻出=免費降換手+降稅)。
-      槓桿硬上限1.5(Kelly 2-4x是「樣本無真熊市」幻覺);限價別追貴於進場上限;跌破出場價轉現金;信用示警兩策略都砍曝險。</div>
+    <div style="color:var(--muted);font-size:11px;margin-top:8px">限價別追貴於進場上限 · 跌破出場價轉現金 · 信用示警自動砍曝險 · 預設穩健版(輪動+平滑哨,槓桿1.0)。</div>
   </div>`;
 }
 
@@ -480,6 +512,79 @@ function renderCore(cs, sig){
       ${actionTable}
     </div>`;
   updateCards(cs);
+}
+
+function renderAllocation(al){
+  const el = $('#allocationPanel');
+  if(!el) return;
+  if(!al || !al.profiles){ el.innerHTML=''; return; }
+  const shC = s => s>=1.2?'#39d98a':(s>=1.0?'#6fd0ff':(s>=0.8?'#e0b85a':'#e06a6a'));
+  const ddC = d => d>=-25?'#39d98a':(d>=-33?'#e0b85a':'#e06a6a');
+  const reco = al.profiles.find(p=>p.reco) || al.profiles[0];
+  const sleeveRows = (al.sleeves||[]).map(s=>`
+    <tr>
+      <td><b>${s.key}</b> <span style="font-size:11px;color:var(--muted)">${s.name}</span>
+          <div style="font-size:11px;color:var(--muted)">${s.note||''}</div></td>
+      <td style="text-align:right;font-weight:800;color:${shC(s.sharpe)}">${s.sharpe}</td>
+      <td style="text-align:right">${s.cagr>0?'+':''}${s.cagr}%</td>
+      <td style="text-align:right;color:${ddC(s.mdd)}">${s.mdd}%</td>
+      <td style="text-align:right;color:var(--muted)">${s.vol}%</td>
+    </tr>`).join('');
+  const profRows = (al.profiles||[]).map(p=>`
+    <tr style="${p.reco?'background:#0f2e22':''}">
+      <td>${p.reco?'⭐ ':''}<b>${p.label}</b>
+          <div style="font-size:11px;color:var(--muted)">${p.why||''}</div></td>
+      <td style="text-align:center;font-weight:800">${p.core}/${p.sat}/${p.vrp}</td>
+      <td style="text-align:right;font-weight:800;color:${shC(p.sharpe)}">${p.sharpe}</td>
+      <td style="text-align:right">+${p.cagr}%</td>
+      <td style="text-align:right;color:${ddC(p.mdd)}">${p.mdd}%</td>
+    </tr>`).join('');
+  const rules = (al.vrp_rules||[]).map(r=>`<li>${r}</li>`).join('');
+  const cav = (al.caveats||[]).map(r=>`<li>${r}</li>`).join('');
+  const co = al.corr||{};
+  el.innerHTML = `
+    <section>
+      <div class="stitle"><h2>🧮 資產配置建議 — 核心 / 衛星 / VRP</h2>
+        <span class="tag">同一把尺回測 ${al.period||''}</span><div class="line"></div></div>
+      <div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:12px">
+        <div style="flex:1;min-width:260px;background:#0f2e22;border:1px solid #1c5c42;border-radius:10px;padding:12px 16px">
+          <div style="font-size:12px;color:#8fe0b8">⭐ 推薦配置(平衡)</div>
+          <div style="font-size:30px;font-weight:900;letter-spacing:1px;margin:4px 0">
+            <span style="color:#6fd0ff">${reco.core}</span> / <span style="color:#e0b85a">${reco.sat}</span> / <span style="color:#39d98a">${reco.vrp}</span></div>
+          <div style="font-size:12px;color:var(--muted)">核心 / 個股衛星 / VRP(%)</div>
+          <div style="margin-top:8px;font-size:13px">Sharpe <b style="color:${shC(reco.sharpe)}">${reco.sharpe}</b>
+            CAGR <b>+${reco.cagr}%</b>　回撤 <b style="color:${ddC(reco.mdd)}">${reco.mdd}%</b></div>
+          <div style="margin-top:6px;font-size:11.5px;color:#8fe0b8">vs 純核心 ${al.profiles.find(p=>p.core===100)?('Sharpe '+al.profiles.find(p=>p.core===100).sharpe+' / 回撤 '+al.profiles.find(p=>p.core===100).mdd+'%'):''} → 加兩塊 sleeve:Sharpe 升、回撤淺</div>
+        </div>
+        <div style="flex:1;min-width:260px;background:#10243d;border:1px solid #1d3a5e;border-radius:10px;padding:12px 16px">
+          <div style="font-size:12px;color:#9fc2e8;margin-bottom:6px">三塊相關性(低=分散前提)</div>
+          <div style="font-size:13px;line-height:1.9">
+            核心↔衛星 <b>${co['CORE-SAT']}</b>(都是科技動能,高)<br>
+            核心↔VRP <b style="color:#39d98a">${co['CORE-VRP']}</b>(真實PutWrite,分散但不大)<br>
+            衛星↔VRP <b>${co['SAT-VRP']}</b>
+          </div>
+          <div style="margin-top:6px;font-size:11px;color:var(--muted)">VRP 主要作用=砍回撤,不是加報酬(它CAGR只~8%)</div>
+        </div>
+      </div>
+      <div class="tblwrap"><table style="width:100%;border-collapse:collapse">
+        <thead><tr style="color:var(--muted);font-size:12px;text-align:right">
+          <th style="text-align:left">三塊 sleeve 各自(同期回測)</th><th>Sharpe</th><th>CAGR</th><th>最大回撤</th><th>波動</th>
+        </tr></thead><tbody>${sleeveRows}</tbody></table></div>
+      <div class="tblwrap" style="margin-top:12px"><table style="width:100%;border-collapse:collapse">
+        <thead><tr style="color:var(--muted);font-size:12px;text-align:right">
+          <th style="text-align:left">配置檔位(核/衛/VRP)</th><th style="text-align:center">比例</th><th>Sharpe</th><th>CAGR</th><th>最大回撤</th>
+        </tr></thead><tbody>${profRows}</tbody></table></div>
+      <div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:12px">
+        <div style="flex:1;min-width:280px;background:#10243d;border:1px solid #1d3a5e;border-radius:10px;padding:10px 14px">
+          <div style="font-weight:700;color:#cfe0f5;margin-bottom:4px">💡 VRP(PUTW)怎麼做</div>
+          <ul style="margin:0;padding-left:18px;font-size:12px;color:#cfe0f5;line-height:1.7">${rules}</ul>
+        </div>
+        <div style="flex:1;min-width:280px;background:#2a2510;border:1px solid var(--yellow-d);border-radius:10px;padding:10px 14px">
+          <div style="font-weight:700;color:#ffe39a;margin-bottom:4px">⚠️ 誠實保留(別誤讀數字)</div>
+          <ul style="margin:0;padding-left:18px;font-size:12px;color:#ffe39a;line-height:1.7">${cav}</ul>
+        </div>
+      </div>
+    </section>`;
 }
 
 function renderMenu(mn){
@@ -721,11 +826,7 @@ function renderTaiwan(tw){
       <div style="flex:1;min-width:290px">${twCard('🅱️ B · 輪動最強（衛星）','最低持有30日 · '+lockTxt, Bp||'—', B)}</div>
     </div>
     ${watch?`<div style="margin-top:10px;font-size:11px;color:var(--muted)">🔬 觀察候選（歷史不足·不可回測·暫不納入輪動，僅追蹤是否站上200MA）：<br>${watch}</div>`:''}
-    <div style="color:var(--muted);font-size:11px;margin-top:8px">📌 台股實證:趨勢ETF擇時加分、<b>高股息(0056)擇時傷已排除</b>;最佳哨=<b>全球信用+費半(HYG+LQD+SOXX)</b>非本地匯率。
-      擇時=崩盤保險(<b>2008 擇時0% vs 買持-48%</b>),牛市讓利。
-      <br>💡 <b>台股無資本利得稅</b>(僅證交稅0.1%)→<b>輪動B 淨報酬反勝A</b>(+35.1 vs +32.1%),不像美股偏A!台股建議偏 B 或 A+B各半。
-      想衝財富:加 <b>00631L 正2</b>(免融資2x)當衛星,A40/B40+正2 20% → Sharpe2.21/MDD-11%(正2須擇時,崩盤會爆)。
-      <br>⚠️ <b>台股 yfinance 絕對價位可能失真,一律看「%」</b>(站上MA200、距50MA、停損距都是相對值=正確);下單以券商實際報價×這些%換算。台股1張=1000股,ETF可買零股。</div>
+    <div style="color:var(--muted);font-size:11px;margin-top:8px">⚠️ <b>台股看「%」不看絕對價</b>(yfinance台股價可能失真)→ 用券商現價×表上% 換算下單。台股無資本利得稅→偏輪動B。1張=1000股,ETF可買零股。</div>
   </div>`;
 }
 
@@ -791,8 +892,7 @@ function renderBuyList(cs, tw){
     <div style="font-weight:800;font-size:15px">📋 今日掛單建議 <span style="color:var(--muted);font-weight:400;font-size:11px">(依現在位階:該買什麼/別追什麼/掛在哪;收盤訊號)</span></div>
     ${buyTable('🇺🇸 美股', usRows)}
     ${twRows.length?buyTable('🇹🇼 台股（價位用「%」×你券商現價換算,yfinance絕對價可能失真）', twRows):''}
-    <div style="color:var(--muted);font-size:11px;margin-top:8px">🟢可買=站上200MA且沒追高(停損≤12%=便宜) · 🟡別追=已超過進場門檻,掛單等拉回 · 🔴不碰=跌破200MA或哨示警。
-      掛限價別買貴於「掛單價」;跌破「停損」收盤轉現金。曝險照各卡 RiskTarget(越貴抱越少)。</div>
+    <div style="color:var(--muted);font-size:11px;margin-top:8px">🟢可買 · 🟡別追(掛單等拉回) · 🔴不碰(跌破200MA/哨示警) — 別買貴於掛單價,跌破停損轉現金。</div>
   </div>`;
 }
 
@@ -831,13 +931,59 @@ function renderLeaders(ld){
       ${leaderCol('🇺🇸','美股龍頭', ld.leaders.US, false)}
       ${leaderCol('🇹🇼','台股龍頭（價位用%×券商現價）', ld.leaders.TW, true)}
     </div>
-    <div style="color:var(--muted);font-size:11px;margin-top:8px">⚠️ ${ld.note||''}<br>${ld.params_note||''}</div>
+    <div style="color:var(--muted);font-size:11px;margin-top:8px">個股=衛星(小部位、分散產業、財報前減碼);長多龍頭(台積電/NVDA)可核心長抱。</div>
+  </div>`;
+}
+
+// ── ★進取模式(TQQQ/SOXL 槓桿) — 成長階段每日執行面板 ──
+function setAggCap(v){ localStorage.setItem('aggCap', v||0); renderAggressive(window.LAST_AG); }
+function aggCard(v, cap){
+  const green = v.state==='green';
+  const shares = v.etf_price>0 ? Math.floor(cap/v.etf_price) : 0;
+  const bd = green? '#234d34' : '#4d2424';
+  const bg = green? 'linear-gradient(180deg,#0f2a1c,#0b1727)' : 'linear-gradient(180deg,#2a1212,#0b1727)';
+  return `
+  <div style="flex:1;min-width:300px;background:${bg};border:1px solid ${bd};border-radius:12px;padding:14px 16px">
+    <div style="display:flex;justify-content:space-between;align-items:baseline">
+      <div style="font-weight:800;font-size:15px">${v.etf} <span style="color:var(--muted);font-size:11px;font-weight:400">${v.name} · ${v.tag}</span></div>
+      <div style="font-size:11px;color:var(--muted)">回測 ${v.cagr}/${v.mdd}</div>
+    </div>
+    <div style="font-size:19px;font-weight:800;margin:8px 0;color:${green?'#7ee0a0':'#ff8a8a'}">${green?'🟢 綠燈 · 可持有/進場':'🔴 賣出 · 轉現金'}</div>
+    <table style="width:100%;font-size:12.5px;border-collapse:collapse">
+      <tr><td style="color:var(--muted);padding:3px 0">現價</td><td style="text-align:right;font-weight:700">$${v.etf_price}</td></tr>
+      <tr><td style="color:var(--muted);padding:3px 0">本金 $${cap.toLocaleString()} 可買</td><td style="text-align:right;font-weight:800;color:#7ee0a0">${shares} 股</td></tr>
+      <tr><td style="color:var(--muted);padding:3px 0;vertical-align:top">🛑 保命線(${v.signal_tk})</td><td style="text-align:right">收盤跌破 <b style="color:#ff8a8a">$${v.sig_ma200}</b><br><span style="color:var(--muted);font-size:11px">現${v.signal_tk} $${v.sig_close}(緩衝${v.sig_buffer_pct>0?'+':''}${v.sig_buffer_pct}%)</span></td></tr>
+    </table>
+    <div style="font-size:11px;color:var(--muted);margin-top:8px;border-top:1px dashed var(--line);padding-top:7px">${v.action}</div>
+  </div>`;
+}
+function renderAggressive(ag){
+  window.LAST_AG = ag;
+  const el = $('#aggressivePanel'); if(!el) return;
+  if(!ag || !ag.vehicles || !ag.vehicles.length){ el.innerHTML=''; return; }
+  const cap = Number(localStorage.getItem('aggCap')||10000);
+  const inS = 'width:100px;background:#0b1727;color:#fff;border:1px solid #1d3a5e;border-radius:6px;padding:3px 6px';
+  const c = ag.canary||{};
+  const cChip = c.ok ? '🟢 信用哨健康 '+c.healthy+'/'+c.total : '🔴 信用哨示警 '+c.healthy+'/'+c.total;
+  return el.innerHTML = `
+  <div style="background:#0e1b2e;border:1px solid #3a5a82;border-radius:14px;padding:15px 17px;margin:14px 0">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+      <div style="font-weight:800;font-size:16px">🚀 進取模式 <span style="color:var(--muted);font-weight:400;font-size:11px">(TQQQ/SOXL 槓桿 · $30k以下成長階段 · 更新 ${ag.last_updated||''})</span></div>
+      <div style="font-size:12px;color:var(--muted)">本金 $<input type="number" value="${cap}" oninput="setAggCap(this.value)" style="${inS}"> · <b style="color:${c.ok?'#7ee0a0':'#ff8a8a'}">${cChip}</b> · VIX ${ag.vix??'—'}</div>
+    </div>
+    <div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:12px;align-items:stretch">
+      ${ag.vehicles.map(v=>aggCard(v,cap)).join('')}
+    </div>
+    <div style="color:var(--muted);font-size:11.5px;margin-top:10px;background:#0b1727;border:1px solid var(--line);border-radius:8px;padding:9px 11px">
+      <b style="color:var(--txt)">每週只做這件事</b>：每週六看一眼 → 母指數還在200MA上 + 信用哨健康 → 抱住；母指數收盤跌破200MA 或 信用哨破 → 賣光轉現金。<br>
+      一次全投(回測證實分批少賺) · 只看週收盤 · 破線才動 · 別憑感覺砍 · <b style="color:#7ee0a0">狂存錢</b> · 本金長大→降槓桿。
+    </div>
   </div>`;
 }
 
 async function loadAll(){
   try{
-    const [sig, ev, rb, cs, mn, tw, ld] = await Promise.all([
+    const [sig, ev, rb, cs, mn, tw, ld, ag, al] = await Promise.all([
       getJSON('strategy_signals.json'),
       getJSON('backtest_evidence.json'),
       getJSON('robustness.json').catch(()=>null),
@@ -845,9 +991,13 @@ async function loadAll(){
       getJSON('strategy_menu.json').catch(()=>null),
       getJSON('taiwan_status.json').catch(()=>null),
       getJSON('leaders_status.json').catch(()=>null),
+      getJSON('aggressive_status.json').catch(()=>null),
+      getJSON('allocation_status.json').catch(()=>null),
     ]);
     $('#updated').innerHTML = `信號更新 ${sig.last_updated}<br>實證更新 ${ev.last_updated}`;
-    renderRegime(sig.regime);
+    renderRegime(ag);
+    renderAggressive(ag);
+    renderAllocation(al);
     renderBuyList(cs, tw);
     renderCore(cs, sig);
     renderTaiwan(tw);

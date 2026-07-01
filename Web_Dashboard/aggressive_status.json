@@ -1,0 +1,74 @@
+{
+  "last_updated": "2026-06-29 23:16:02",
+  "vix": 18.3,
+  "canary": {
+    "ok": true,
+    "healthy": 3,
+    "total": 3,
+    "assets": {
+      "HYG": {
+        "close": 79.92,
+        "ma200": 78.68,
+        "dist_pct": 1.6,
+        "dist50_pct": 0.3,
+        "above": true
+      },
+      "LQD": {
+        "close": 109.61,
+        "ma200": 108.44,
+        "dist_pct": 1.1,
+        "dist50_pct": 1.0,
+        "above": true
+      },
+      "SOXX": {
+        "close": 598.59,
+        "ma200": 370.67,
+        "dist_pct": 61.5,
+        "dist50_pct": 12.1,
+        "above": true
+      }
+    }
+  },
+  "vehicles": [
+    {
+      "etf": "TQQQ",
+      "signal_tk": "QQQ",
+      "name": "3x那斯達克",
+      "tag": "較能睡·先驗證心臟",
+      "cagr": "+39%",
+      "mdd": "-47%",
+      "etf_price": 74.96,
+      "sig_close": 716.59,
+      "sig_ma200": 631.35,
+      "sig_buffer_pct": 13.5,
+      "sig_dist50": 1.8,
+      "state": "green",
+      "clean_entry": true,
+      "action": "🟢 綠燈：可持有/進場 TQQQ（母指數進場乾淨）",
+      "sell_line_note": "QQQ 收盤跌破 $631(其200MA) → 賣光 TQQQ"
+    },
+    {
+      "etf": "SOXL",
+      "signal_tk": "SMH",
+      "name": "3x半導體",
+      "tag": "報酬最高·最兇",
+      "cagr": "+61%",
+      "mdd": "-70%",
+      "etf_price": 220.99,
+      "sig_close": 620.02,
+      "sig_ma200": 420.9,
+      "sig_buffer_pct": 47.3,
+      "sig_dist50": 8.8,
+      "state": "green",
+      "clean_entry": false,
+      "action": "🟢 綠燈：可持有/進場 SOXL（母指數已延伸,進場偏追高·小心）",
+      "sell_line_note": "SMH 收盤跌破 $421(其200MA) → 賣光 SOXL"
+    }
+  ],
+  "note": "進取模式給「$30k以下·要成長·能扛深回撤」用。一次全投(回測證實分批少賺);母指數跌破200MA或信用哨破→賣光;只看週收盤;狂存錢。本金長大→降槓桿。",
+  "rules": [
+    "母指數站上200MA + 信用哨(HYG/LQD/SOXX)健康 = 綠燈,持有/進場",
+    "母指數收盤跌破200MA 或 信用哨任一破 = 🔴賣光轉現金",
+    "只看週五收盤 · 破線才動 · 別憑感覺砍 · 狂存錢"
+  ]
+}

@@ -36,10 +36,13 @@ URL = f'http://localhost:{PORT}/strategy_dashboard.html'
 GENERATORS = [
     ('core_status.py',      '美股兩策略 A抱SMH / B輪動最強(+最低30日鎖)', True),
     ('taiwan_status.py',    '台股兩策略 A抱0052 / B輪動最強(全球信用費半哨)', True),
+    ('aggressive_status.py','進取模式 TQQQ/SOXL 槓桿訊號 aggressive_status.json', True),
     ('leaders_status.py',   '台美股產業龍頭個股(衛星) leaders_status.json', True),
     ('generate_signals.py', '個股衛星信號 strategy_signals.json',        True),
     ('generate_evidence.py','回測實證 backtest_evidence.json',           True),
     ('strategy_menu.py',    '策略選單 strategy_menu.json',               False),
+    (os.path.join('alpha', 'allocation_status.py'),
+     '資產配置建議 核心/衛星/VRP allocation_status.json',                 False),
 ]
 
 
