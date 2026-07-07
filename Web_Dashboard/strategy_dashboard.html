@@ -995,11 +995,11 @@ async function loadAll(){
       getJSON('allocation_status.json').catch(()=>null),
     ]);
     $('#updated').innerHTML =
-      `🟢 指數即時資料 <b>${cs?cs.last_updated:'—'}</b>(台北時間·每小時自動)<br>`+
-      `🟢 個股信號 <b>${sig.last_updated}</b>(台北時間·每日收盤後自動)<br>`+
+      `🟢 指數即時資料 <b>${cs?cs.last_updated:'—'}</b>(台北時間·每天 09:00/21:00 自動)<br>`+
+      `🟢 個股信號 <b>${sig.last_updated}</b>(台北時間·每天早上 09:00 自動)<br>`+
       `<span style="color:var(--muted)">🔒 配置/回測實證(靜態·本機 push 才更新)</span><br>`+
       `<span style="color:var(--muted);font-size:11px">↻ 本次載入 ${new Date().toLocaleTimeString('zh-TW')}`+
-      `(按↻只是重抓伺服器現有資料,不會重跑行情;資料時間由上方伺服器每小時/每日自動更新)</span>`;
+      `(按↻只是重抓伺服器現有資料,不會重跑行情;資料時間由伺服器每天 09:00/21:00 自動更新)</span>`;
     renderRegime(ag);
     renderAggressive(ag);
     renderAllocation(al);

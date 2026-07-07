@@ -4,8 +4,9 @@ name: Deploy dashboard to GitHub Pages
 # 也支援手動觸發(Actions 頁按 Run workflow)與 Web_Dashboard 有改動時自動部署。
 on:
   schedule:
-    - cron: '17 * * * 1-5'    # 每小時:輕量指數核心/台股/龍頭(交易日整天)
-    - cron: '40 21 * * 1-5'   # 每日美股收盤後一次:重掃 S&P500 個股信號
+    # 每天更新兩次(台灣時間;GitHub cron 用 UTC,台灣=UTC+8)
+    - cron: '0 1 * * *'    # 09:00 台灣(早上九點)— 同時重掃 S&P500 個股信號(含昨晚美股收盤)
+    - cron: '0 13 * * *'   # 21:00 台灣(晚上九點)— 台股收盤後、更新指數/台股/龍頭
   workflow_dispatch:
   push:
     branches: [main]
@@ -40,18 +41,18 @@ jobs:
       - name: Install deps
         run: pip install --quiet yfinance pandas numpy scipy requests lxml python-dotenv
 
-      # 每小時重算「輕量」指數核心/台股/龍頭(各下載約 5-45 檔,雲端可靠)。
+      # 每次(9am/9pm 台灣)重算「輕量」指數核心/台股/龍頭(各下載約 5-45 檔,雲端可靠)。
       # 失敗不擋部署 → 該面板沿用 repo 內已 commit 的 baseline JSON(不會壞版)。
-      - name: Regenerate live index status (hourly, best-effort)
+      - name: Regenerate live index status (best-effort)
         continue-on-error: true
         run: |
           python core_status.py || echo "core_status skipped"
           python taiwan_status.py || echo "taiwan_status skipped"
           python leaders_status.py || echo "leaders_status skipped"
 
-      # 個股信號 = 重掃 S&P500(慢、會被限流),只在「每日收盤後那班」或手動觸發時跑一次。
-      - name: Regenerate stock signals (daily / manual only, best-effort)
-        if: github.event.schedule == '40 21 * * 1-5' || github.event_name == 'workflow_dispatch'
+      # 個股信號 = 重掃 S&P500(慢、會被限流),只在「早上9點那班」(含昨晚美股收盤)或手動觸發時跑。
+      - name: Regenerate stock signals (morning / manual only, best-effort)
+        if: github.event.schedule == '0 1 * * *' || github.event_name == 'workflow_dispatch'
         continue-on-error: true
         run: python generate_signals.py || echo "generate_signals skipped"
 
