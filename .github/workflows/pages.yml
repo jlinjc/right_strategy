@@ -51,9 +51,11 @@ jobs:
           python taiwan_status.py || echo "taiwan_status skipped"
           python leaders_status.py || echo "leaders_status skipped"
 
-      # 個股信號 = 重掃 S&P500(慢、會被限流),只在「早上9點那班」(含昨晚美股收盤)或手動觸發時跑。
-      - name: Regenerate stock signals (morning / manual only, best-effort)
-        if: github.event.schedule == '0 1 * * *' || github.event_name == 'workflow_dispatch'
+      # 個股信號 = 重掃 S&P500(慢、會被限流)。依 Jason 要求「每班都跑」:所有排程班次 + 手動都跑
+      #（但 push 不跑,避免每次改 dashboard 都觸發 15 分鐘重掃)。失敗→沿用 baseline,不壞版。
+      #   注意:21:00 台灣美股未開盤(同早上數字)、22:30 台灣美股剛開盤(盤中暫定值,決策仍看收盤=隔天早上班)。
+      - name: Regenerate stock signals (every schedule / manual, best-effort)
+        if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
         continue-on-error: true
         run: python generate_signals.py || echo "generate_signals skipped"
 
