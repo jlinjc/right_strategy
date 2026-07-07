@@ -1,7 +1,7 @@
 {
   "market": "TW",
   "currency": "TWD",
-  "last_updated": "2026-07-08 00:41:37",
+  "last_updated": "2026-07-08 00:44:07",
   "ma_window": 200,
   "panic_vix": 30.0,
   "vix": 2.11,
@@ -296,9 +296,9 @@
     "assets": {
       "HYG": {
         "name": "美高收益債",
-        "close": 79.81,
+        "close": 79.8,
         "ma200": 78.73,
-        "dist_pct": 1.36,
+        "dist_pct": 1.35,
         "ok": true
       },
       "LQD": {
@@ -310,9 +310,9 @@
       },
       "SOXX": {
         "name": "費半SOXX",
-        "close": 550.17,
+        "close": 551.43,
         "ma200": 379.04,
-        "dist_pct": 45.15,
+        "dist_pct": 45.48,
         "ok": true
       }
     },

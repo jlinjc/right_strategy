@@ -1,19 +1,8 @@
 {
   "AMD": "Technology",
-  "CAT": "Industrials",
-  "FIX": "Industrials",
-  "GEV": "Industrials",
-  "GNRC": "Industrials",
-  "GWW": "Industrials",
-  "HST": "Real Estate",
-  "INTC": "Technology",
-  "IRM": "Real Estate",
-  "KLAC": "Technology",
-  "LRCX": "Technology",
-  "MU": "Technology",
-  "NTRS": "Financial Services",
-  "SNDK": "Technology",
-  "STT": "Financial Services",
-  "TER": "Technology",
-  "WDC": "Technology"
+  "CVS": "Healthcare",
+  "DELL": "Technology",
+  "GL": "Financial Services",
+  "IBKR": "Financial Services",
+  "SPG": "Real Estate"
 }
