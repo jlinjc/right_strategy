@@ -255,7 +255,7 @@ def main():
                 d['entry_state'] = 'no_entry'
                 d['entry_action'] = '全示警期間不進場(等HYG/LQD/SMH站回200MA)'
             else:
-                d['hold_action'] += f'  ⚠️部分示警→曝險×{ch:.0%}'
+                d['hold_action'] += f'  🟠部分示警→減碼半倉(仍可買·量×{ch:.0%})'
                 d['action'] = d['hold_action']
 
     # 路線B 最低持有30日鎖(讀上次json)

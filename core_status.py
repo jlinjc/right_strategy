@@ -232,10 +232,11 @@ def combine(primary: dict, canary: dict) -> dict:
         return {'state': 'risk_off', 'action': '出場：核心跌破200MA + 信用全示警(雙確認)'}
     if credit_off:
         return {'state': 'credit_warning',
-                'action': '⚠️ 信用全示警(HYG+LQD皆跌破200MA)：即使核心仍強,曝險砍0(信用領先股市)'}
+                'action': '🔴 信用全示警(HYG+LQD皆跌破200MA)：清倉、不新增倉,等信用站回(這是「不買」)'}
     if credit_partial:
         return {'state': 'credit_warning',
-                'action': f'⚠️ 信用部分示警 → 曝險×{health:.0%}(平滑減碼,信用領先)'}
+                'action': f'🟠 信用部分示警：核心健康、仍可進場,但全體曝險上限砍到 ×{health:.0%}'
+                          f'——是「減碼半倉」不是「不能買」(下方每筆建議量已含此減碼)'}
     return {'state': 'core_warning', 'action': '核心跌破200MA → 出場(信用尚健康)'}
 
 

@@ -836,6 +836,8 @@ function buyRows(cores, isTW, heldTk, strongestTk){
   for(const tk in cores){
     const d=cores[tk]; if(!d || d.watch_only) continue;
     const cut=d.credit_cut;
+    const cm = (d.credit_mult!=null && d.credit_mult<1) ? d.credit_mult : 1;   // 信用部分示警的減碼倍率
+    const cnote = cm<1 ? `；🟠信用示警→此建議量已×${Math.round(cm*100)}%(半倉,仍可買)` : '';
     const tag = tk===heldTk ? '🅱️持有' : (tk===strongestTk ? '👑最強' : '');
     let bucket, action, limit, reason, color;
     if(cut || d.state==='risk_off' || d.entry_state==='no_entry' || d.dist_pct<0){
@@ -844,14 +846,15 @@ function buyRows(cores, isTW, heldTk, strongestTk){
     } else if(d.entry_state==='extended'){
       bucket=2; color='#e0b46a'; action='🟡 別追高';
       limit = isTW ? `等拉回:現價需回到 +${d.entry_cap_pct}% 以內` : `等拉回 ≤ $${d.entry_cap}`;
-      reason = `距50MA +${d.dist50_pct}% 已超過門檻 +${Math.round((d.entry_thr-1)*100)}%＝追高區,別追`;
+      reason = `距50MA +${d.dist50_pct}% 已超過門檻 +${Math.round((d.entry_thr-1)*100)}%＝追高區,別追` + cnote;
     } else if(d.entry_state==='can_enter'){
       const cheap = d.stop_risk_pct<=12;
-      bucket = cheap?0:1; color='#7ee0a0'; action = cheap?'🟢 可買(便宜)':'🟢 可買(偏貴小量)';
+      bucket = cheap?0:1; color='#7ee0a0';
+      action = (cheap?'🟢 可買(便宜)':'🟢 可買(偏貴小量)') + (cm<1?'·半量':'');
       limit = isTW ? `限價 ≤ 現價 +${d.entry_cap_pct}%` : `限價 ≤ $${d.entry_cap}`;
-      reason = cheap
+      reason = (cheap
         ? `貼近均線,停損僅 ${d.stop_risk_pct}%＝便宜,可進。曝險建議 ${Math.round((d.suggested_expo||0)*100)}%`
-        : `在趨勢中但離200MA遠(停損 ${d.stop_risk_pct}%)→曝險自動調小到 ${Math.round((d.suggested_expo||0)*100)}%,只小量`;
+        : `在趨勢中但離200MA遠(停損 ${d.stop_risk_pct}%)→曝險自動調小到 ${Math.round((d.suggested_expo||0)*100)}%,只小量`) + cnote;
     } else { continue; }
     const stop = isTW ? `現價 ${d.exit_pct}%` : `$${d.exit_price}`;
     rows.push({bucket,tk,name:d.name||'',tag,action,color,limit,stop,
@@ -877,6 +880,14 @@ function buyTable(title, rows){
         <th style="padding:3px 6px">掛單價(限價)</th><th style="padding:3px 6px">停損</th><th style="padding:3px 6px">原因</th></tr>
       ${tr}</table></div>`;
 }
+// 由信用哨決定的「全體曝險上限」——買單/核心共用的單一真相來源
+function regimeLine(can, label){
+  if(!can || can.health==null) return '';
+  const h = can.health;
+  if(h>=1)  return `<div style="color:#7ee0a0;font-size:12.5px;margin:2px 0"><b>🟢 ${label} 曝險上限 100%</b>:信用健康,可滿倉布局</div>`;
+  if(h>0)   return `<div style="color:#e0b46a;font-size:12.5px;margin:2px 0"><b>🟠 ${label} 曝險上限 ×${Math.round(h*100)}%(半倉)</b>:信用部分示警 → <b>仍可買,但每筆量已砍半</b>,不是不能買;跌破全部才清倉</div>`;
+  return `<div style="color:#e06a6a;font-size:12.5px;margin:2px 0"><b>🔴 ${label} 曝險 0%(清倉不買)</b>:信用全示警,等信用站回200MA</div>`;
+}
 function renderBuyList(cs, tw){
   const el=$('#buyList'); if(!el) return;
   let usRows=[], twRows=[];
@@ -890,9 +901,14 @@ function renderBuyList(cs, tw){
   el.innerHTML = `
   <div style="background:#0e1b2e;border:1px solid #2a4a72;border-radius:12px;padding:14px 16px;margin:10px 0">
     <div style="font-weight:800;font-size:15px">📋 今日掛單建議 <span style="color:var(--muted);font-weight:400;font-size:11px">(依現在位階:該買什麼/別追什麼/掛在哪;收盤訊號)</span></div>
+    <div style="background:#0b1727;border:1px solid #2a4a72;border-radius:8px;padding:8px 12px;margin:8px 0">
+      <div style="font-weight:700;color:#cfe0f5;font-size:12px;margin-bottom:3px">🚦 當前曝險上限(由信用哨決定;下方每筆「建議量」都已含此上限,不必再自己乘)</div>
+      ${regimeLine(cs&&cs.canary, '🇺🇸 美股')}
+      ${tw&&tw.canary?regimeLine(tw.canary, '🇹🇼 台股'):''}
+    </div>
     ${buyTable('🇺🇸 美股', usRows)}
     ${twRows.length?buyTable('🇹🇼 台股（價位用「%」×你券商現價換算,yfinance絕對價可能失真）', twRows):''}
-    <div style="color:var(--muted);font-size:11px;margin-top:8px">🟢可買 · 🟡別追(掛單等拉回) · 🔴不碰(跌破200MA/哨示警) — 別買貴於掛單價,跌破停損轉現金。</div>
+    <div style="color:var(--muted);font-size:11px;margin-top:8px">🟢可買 · 🟡別追(等拉回) · 🔴不碰(跌破200MA或信用<b>全</b>示警) · 🟠信用<b>部分</b>示警=可買但每筆量砍半(見上方上限) — 別買貴於掛單價,跌破停損轉現金。</div>
   </div>`;
 }
 
