@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>趨勢擇時作戰中心 · 200MA + 信用哨</title>
+<script src="https://unpkg.com/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.production.js"></script>
 <style>
   :root{
     --bg:#0a0e17; --panel:#121826; --panel2:#1a2233; --line:#26304a;
@@ -198,6 +199,12 @@
 
   <!-- 台股版面板(同一套引擎搬到台股) -->
   <div id="taiwanPanel"></div>
+
+  <!-- ★每日K棒 PIT 逐日標註(視覺化:每根K在「當天」會被標成什麼) -->
+  <details class="grp" id="kbarGroup" open>
+    <summary>🕯️ 每日K棒標註 — 每根K在「當天」會被標成什麼(PIT·無未來函數) <span class="ar">▸</span></summary>
+    <div class="gbody"><div id="kbarPanel"></div></div>
+  </details>
 
   <!-- ↓↓ 以下為「詳細資料」,預設收合,保持上方一目了然 ↓↓ -->
 
@@ -997,9 +1004,129 @@ function renderAggressive(ag){
   </div>`;
 }
 
+// ── 每日K棒 PIT 標註(視覺化) ──
+const KB_TONE = {green:'#2ecc71', lime:'#a3e635', amber:'#ffcb45', red:'#ff5a5a'};
+let _kb = {chart:null, candle:null, vol:null, ma:null, exit:null, byTime:{}, cur:null, built:false};
+const _kbTimeStr = t => (typeof t==='string') ? t : (t&&t.year ? `${t.year}-${String(t.month).padStart(2,'0')}-${String(t.day).padStart(2,'0')}` : ''+t);
+
+function _kbInitChart(){
+  if(_kb.chart || typeof LightweightCharts==='undefined') return;
+  const dom = document.getElementById('kbChart');
+  if(!dom) return;
+  _kb.chart = LightweightCharts.createChart(dom, {
+    layout:{background:{type:'solid',color:'transparent'},textColor:'#8a96ad'},
+    grid:{vertLines:{color:'rgba(255,255,255,0.03)'},horzLines:{color:'rgba(255,255,255,0.03)'}},
+    crosshair:{mode:LightweightCharts.CrosshairMode.Normal},
+    rightPriceScale:{borderColor:'rgba(255,255,255,0.08)'},
+    timeScale:{borderColor:'rgba(255,255,255,0.08)',timeVisible:false}
+  });
+  _kb.candle = _kb.chart.addCandlestickSeries({upColor:'#ff5a5a',downColor:'#2ecc71',borderUpColor:'#ff5a5a',borderDownColor:'#2ecc71',wickUpColor:'#ff5a5a',wickDownColor:'#2ecc71'});
+  _kb.candle.priceScale().applyOptions({scaleMargins:{top:0.05,bottom:0.28}});
+  _kb.ma = _kb.chart.addLineSeries({color:'rgba(138,150,173,0.7)',lineWidth:1,priceLineVisible:false,lastValueVisible:false});
+  _kb.exit = _kb.chart.addLineSeries({color:'rgba(255,90,90,0.55)',lineWidth:1,lineStyle:2,priceLineVisible:false,lastValueVisible:false});
+  _kb.vol = _kb.chart.addHistogramSeries({priceFormat:{type:'volume'},priceScaleId:''});
+  _kb.vol.priceScale().applyOptions({scaleMargins:{top:0.8,bottom:0}});
+  new ResizeObserver(es=>{if(es.length)_kb.chart.applyOptions({width:es[0].contentRect.width,height:es[0].contentRect.height});}).observe(dom);
+  const tip = document.getElementById('kbTip');
+  _kb.chart.subscribeCrosshairMove(p=>{
+    if(!p||!p.time||!p.point){tip.style.display='none';return;}
+    const b = _kb.byTime[_kbTimeStr(p.time)];
+    if(!b){tip.style.display='none';return;}
+    const c = KB_TONE[b.tone]||'#8a96ad';
+    const ex = (b.expo==null)?'維持':(b.expo*100).toFixed(0)+'%';
+    tip.innerHTML = `<div style="color:#cbd5e1;margin-bottom:3px">${b.time}</div>`
+      +`<div style="color:${c};font-weight:600;margin-bottom:3px">● ${b.label}</div>`
+      +`<div style="color:#8a96ad">收 ${b.close} · 200MA ${b.ma200} · 停損線 ${b.exit}</div>`
+      +`<div style="color:#8a96ad">建議曝險 ${ex}</div>`
+      +(b.note?`<div style="color:#64748b;margin-top:3px;font-size:11px">${b.note}</div>`:'');
+    tip.style.display='block';
+    const w=tip.offsetWidth, cw=document.getElementById('kbChart').clientWidth;
+    let x=p.point.x+16; if(x+w>cw) x=p.point.x-w-16;
+    tip.style.left=Math.max(0,x)+'px'; tip.style.top=Math.max(0,p.point.y-10)+'px';
+  });
+}
+
+function renderKbar(kb){
+  const host = document.getElementById('kbarPanel');
+  if(!host) return;
+  if(!kb || !kb.tickers || !kb.tickers.length){ host.innerHTML='<div style="color:var(--muted);padding:10px">尚無 kbar_annotations.json(執行 python generate_kbar_annotations.py)</div>'; return; }
+  _kb.data = kb;
+  if(!_kb.built){
+    const legend = [['green','可買/可小買'],['lime','偏貴少量'],['amber','觀望/追高/壓力/逼近停損/恐慌觀察'],['red','跌破出場/信用清倉']]
+      .map(([k,v])=>`<span><i style="display:inline-block;width:11px;height:11px;background:${KB_TONE[k]};border-radius:2px;vertical-align:middle"></i> ${v}</span>`).join('');
+    host.innerHTML =
+      `<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:8px">`
+      +`<div id="kbTickers" style="display:flex;gap:6px;flex-wrap:wrap"></div>`
+      +`<div style="margin-left:auto;font-size:11px;color:var(--muted);max-width:430px;text-align:right">${kb.pit_note||''}</div></div>`
+      +`<div style="display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin-bottom:6px">${legend}`
+      +`<span style="color:#64748b">底部量條=當日建議色 · hover任一K棒看標註 · ▲▼=轉折</span></div>`
+      +`<div id="kbLatest" style="font-size:13px;margin-bottom:8px;padding:7px 10px;background:var(--panel2);border-radius:6px"></div>`
+      +`<div style="position:relative"><div id="kbChart" style="width:100%;height:440px"></div>`
+      +`<div id="kbTip" style="position:absolute;display:none;pointer-events:none;z-index:20;background:#0d1424f2;border:1px solid var(--line);border-radius:6px;padding:8px 10px;font-size:12px;color:var(--txt);max-width:280px"></div></div>`
+      +`<div style="margin-top:10px;overflow:auto;max-height:280px"><table id="kbTable" style="width:100%;border-collapse:collapse;font-size:12px"></table></div>`;
+    const box = document.getElementById('kbTickers');
+    kb.tickers.forEach(t=>{
+      const btn=document.createElement('button');
+      btn.textContent=t.symbol.replace('.TW','')+' '+t.name;
+      btn.dataset.sym=t.symbol;
+      btn.style.cssText='padding:5px 10px;font-size:12px;cursor:pointer;border:1px solid var(--line);background:var(--panel2);color:var(--txt);border-radius:5px';
+      btn.onclick=()=>_kbSelect(t.symbol);
+      box.appendChild(btn);
+    });
+    _kbInitChart();
+    _kb.built=true;
+  }
+  _kbSelect(_kb.cur || kb.tickers[0].symbol);
+}
+
+function _kbSelect(sym){
+  const t = _kb.data.tickers.find(x=>x.symbol===sym);
+  if(!t || !_kb.candle) return;
+  _kb.cur = sym;
+  document.querySelectorAll('#kbTickers button').forEach(b=>{
+    const on=b.dataset.sym===sym;
+    b.style.background=on?'rgba(77,163,255,0.25)':'var(--panel2)';
+    b.style.borderColor=on?'var(--accent)':'var(--line)';
+  });
+  const bars=t.bars;
+  _kb.byTime={}; bars.forEach(b=>{_kb.byTime[b.time]=b;});
+  _kb.candle.setData(bars.map(b=>({time:b.time,open:b.open,high:b.high,low:b.low,close:b.close})));
+  _kb.vol.setData(bars.map(b=>({time:b.time,value:b.volume,color:(KB_TONE[b.tone]||'#334155')+'cc'})));
+  _kb.ma.setData(bars.map(b=>({time:b.time,value:b.ma200})));
+  _kb.exit.setData(bars.map(b=>({time:b.time,value:b.exit})));
+  const markers=[]; let prev=null;
+  bars.forEach(b=>{
+    if(b.tone!==prev){
+      const shape=b.tone==='red'?'arrowDown':((b.tone==='green'||b.tone==='lime')?'arrowUp':'circle');
+      markers.push({time:b.time,position:b.tone==='red'?'aboveBar':'belowBar',color:KB_TONE[b.tone]||'#8a96ad',shape,text:b.label});
+      prev=b.tone;
+    }
+  });
+  _kb.candle.setMarkers(markers);
+  const last=bars[bars.length-1], col=KB_TONE[last.tone]||'#8a96ad';
+  const ex=(last.expo==null)?'維持':(last.expo*100).toFixed(0)+'%';
+  document.getElementById('kbLatest').innerHTML =
+    `最新 <b>${t.symbol.replace('.TW','')}</b> [${last.time}] 收 ${last.close}　`
+    +`<span style="color:${col};font-weight:700">● ${last.label}</span>　建議曝險 ${ex}`
+    +`　<span style="color:var(--muted)">進場≤×${t.params.entry_thr} 出場×${t.params.exit_buf} · 停損線 ${last.exit}</span>`;
+  const rows=bars.slice(-40).reverse().map(b=>{
+    const c=KB_TONE[b.tone]||'#8a96ad', e2=(b.expo==null)?'維持':(b.expo*100).toFixed(0)+'%';
+    return `<tr style="border-bottom:1px solid rgba(255,255,255,0.05)"><td style="padding:4px 8px;color:var(--muted)">${b.time}</td>`
+      +`<td style="padding:4px 8px;text-align:right">${b.close}</td>`
+      +`<td style="padding:4px 8px"><span style="color:${c}">●</span> ${b.label}</td>`
+      +`<td style="padding:4px 8px;text-align:right;color:var(--muted)">${e2}</td>`
+      +`<td style="padding:4px 8px;text-align:right;color:#64748b">${b.exit}</td></tr>`;
+  }).join('');
+  document.getElementById('kbTable').innerHTML =
+    `<thead><tr style="color:#64748b;text-align:left;border-bottom:1px solid var(--line)"><th style="padding:4px 8px">日期</th>`
+    +`<th style="padding:4px 8px;text-align:right">收盤</th><th style="padding:4px 8px">當日標註(PIT)</th>`
+    +`<th style="padding:4px 8px;text-align:right">曝險</th><th style="padding:4px 8px;text-align:right">停損線</th></tr></thead><tbody>${rows}</tbody>`;
+  try{ _kb.chart.timeScale().fitContent(); }catch(e){}
+}
+
 async function loadAll(){
   try{
-    const [sig, ev, rb, cs, mn, tw, ld, ag, al] = await Promise.all([
+    const [sig, ev, rb, cs, mn, tw, ld, ag, al, kb] = await Promise.all([
       getJSON('strategy_signals.json'),
       getJSON('backtest_evidence.json'),
       getJSON('robustness.json').catch(()=>null),
@@ -1009,6 +1136,7 @@ async function loadAll(){
       getJSON('leaders_status.json').catch(()=>null),
       getJSON('aggressive_status.json').catch(()=>null),
       getJSON('allocation_status.json').catch(()=>null),
+      getJSON('kbar_annotations.json').catch(()=>null),
     ]);
     $('#updated').innerHTML =
       `🟢 指數即時資料 <b>${cs?cs.last_updated:'—'}</b>(台北時間·每天 09:00/21:00/22:30 自動)<br>`+
@@ -1029,6 +1157,7 @@ async function loadAll(){
     renderSignals(sig);
     renderWatch(sig);
     renderEvidence(ev);
+    renderKbar(kb);
     $('#foot').textContent = `${sig.config.universe||''}　|　進場：${sig.config.entry}　|　出場：${sig.config.exit}`;
   }catch(e){
     $('#regime').innerHTML = '<div class="lbl" style="color:var(--red)">⚠️ 資料載入失敗</div>'+

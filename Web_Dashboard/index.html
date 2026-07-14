@@ -28,6 +28,9 @@
                 <a href="#" class="nav-link active" data-view="dashboard">
                     <span class="nav-icon">📡</span> 即時儀表板
                 </a>
+                <a href="#" class="nav-link" data-view="kbar-annot">
+                    <span class="nav-icon">🕯️</span> 每日K棒標註
+                </a>
                 <a href="#" class="nav-link" data-view="heatmap">
                     <span class="nav-icon">🧊</span> TD9 陣列熱力圖
                 </a>
@@ -639,6 +642,29 @@
             </div>
 
             <!-- ========== VIEW 2: TD9 陣列熱力圖 ========== -->
+            <!-- ========== VIEW: 每日K棒標註(PIT) ========== -->
+            <div class="view-panel" id="view-kbar-annot">
+                <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-bottom:10px;">
+                    <div id="kbar-tickers" style="display:flex; gap:6px; flex-wrap:wrap;"></div>
+                    <div id="kbar-pit" style="margin-left:auto; font-size:11px; color:#64748b; max-width:420px; text-align:right;"></div>
+                </div>
+                <div style="display:flex; gap:16px; flex-wrap:wrap; font-size:12px; color:#94a3b8; margin-bottom:8px;">
+                    <span><i style="display:inline-block;width:11px;height:11px;background:#22c55e;border-radius:2px;vertical-align:middle;"></i> 可買/可小買</span>
+                    <span><i style="display:inline-block;width:11px;height:11px;background:#a3e635;border-radius:2px;vertical-align:middle;"></i> 偏貴少量</span>
+                    <span><i style="display:inline-block;width:11px;height:11px;background:#f59e0b;border-radius:2px;vertical-align:middle;"></i> 觀望/追高/壓力/逼近停損/恐慌觀察</span>
+                    <span><i style="display:inline-block;width:11px;height:11px;background:#ef4444;border-radius:2px;vertical-align:middle;"></i> 跌破出場/信用清倉</span>
+                    <span style="color:#64748b;">(底部量能條=當日建議顏色;hover任一K棒看標註;markers=轉折)</span>
+                </div>
+                <div id="kbar-latest" style="font-family:var(--font-mono); font-size:13px; margin-bottom:8px; padding:8px 12px; background:rgba(255,255,255,0.03); border-radius:6px;"></div>
+                <div style="position:relative;">
+                    <div id="kbar-chart" style="width:100%; height:440px;"></div>
+                    <div id="kbar-tooltip" style="position:absolute; display:none; pointer-events:none; z-index:20; background:rgba(15,23,42,0.96); border:1px solid rgba(255,255,255,0.12); border-radius:6px; padding:8px 10px; font-size:12px; font-family:var(--font-mono); color:#e2e8f0; max-width:280px; box-shadow:0 4px 16px rgba(0,0,0,0.5);"></div>
+                </div>
+                <div style="margin-top:12px; overflow:auto; max-height:280px;">
+                    <table id="kbar-table" style="width:100%; border-collapse:collapse; font-size:12px; font-family:var(--font-mono);"></table>
+                </div>
+            </div>
+
             <div class="view-panel" id="view-heatmap">
                 <div class="heatmap-header">
                     <h3>TD Sequential 全景掃描 <span class="subtitle">55 檔 AI/Tech 股 × TD 計數值</span></h3>

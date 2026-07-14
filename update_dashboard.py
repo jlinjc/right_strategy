@@ -40,6 +40,7 @@ GENERATORS = [
     ('leaders_status.py',   '台美股產業龍頭個股(衛星) leaders_status.json', True),
     ('generate_signals.py', '個股衛星信號 strategy_signals.json',        True),
     ('generate_evidence.py','回測實證 backtest_evidence.json',           True),
+    ('generate_kbar_annotations.py', '每日K棒PIT逐日標註 kbar_annotations.json', True),
     ('strategy_menu.py',    '策略選單 strategy_menu.json',               False),
     (os.path.join('alpha', 'allocation_status.py'),
      '資產配置建議 核心/衛星/VRP allocation_status.json',                 False),

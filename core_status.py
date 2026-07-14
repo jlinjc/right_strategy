@@ -45,6 +45,28 @@ MA_FAST = 50
 PANIC_VIX = 30.0             # VIX 高於此 = 恐慌(啟動容忍出場)
 PANIC_DELAY = 3              # 恐慌中跌破,給幾個交易日確認再砍
 
+# ★ 裸價格結構讀數(research_price_action.py,跨 SMH/QQQ/SPY 三指數驗證)——目標=減少犯錯/找對下手點:
+#   F4 上方壓力:現價卡在前波高點正下方→期望值明顯較差(3指數一致:藍天格報酬約高一倍)。
+#   F5 突破量能:創新高當天『爆量』=短線耗竭別追那根(反教科書,3指數一致);『無量緩破』才是健康續勢。
+#   R:R:下檔=到停損線、上檔=到最近前高壓力(藍天=開放)→量化「這是不是好下手點」。
+#   鋸齒區:離200MA太近(±CHOP_ZONE_PCT)=剛站上假訊號多(research_entry_timing:剛站上勝率僅52%)→降信心。
+#   ⚠️量級誠實:這些是『減少犯錯/挑點』的結構提示,不改 Sharpe 量級(同所有邊際優化);價值在紀律非印鈔。
+PIVOT_K = 5                  # fractal pivot:左右各 k 根才確認(PIT,不看未來)
+RESIST_LOOKBACK = 120        # 找上方壓力的回看天數
+BREAKOUT_WIN = 60            # 創 N 日新高 = 突破
+VOL_WIN = 20                 # 相對成交量基準(20 日均量)
+BLOWOFF_VOL = 1.5            # 突破當日量 > 此倍 = 爆量耗竭(別追)
+QUIET_VOL = 1.0             # 突破當日量 < 此倍 = 無量緩破(健康續勢)
+CHOP_ZONE_PCT = 3.0          # 離 200MA ±此% 內 = 鋸齒區(剛站上,訊號可信度低)
+
+# ★ 恐慌 base-rate(2006-2026,5指數 SMH/QQQ/SPY/XLK/SOXX 彙總,跌破200MA+VIX>30 的歷史前瞻報酬)——防手賤砍底:
+#   砍在此情境的當下,歷史上 67% 的時候 21 日後更高(中位 +3.3%)、74% 的時候 63 日後更高(中位 +8.3%)。
+#   ⚠️這支持『恐慌容忍出場(別砍V底頭3日)』,不是『永不出場』——系統仍會在確認跌破後出場。
+PANIC_BASE_RATE_NOTE = ('📊 歷史基準率(跌破200MA+VIX>30,2006-26/5指數):未來21日中位 +3.3%、67%上漲;'
+                        '63日中位 +8.3%、74%上漲 → 砍在此刻歷史上約 2/3 是砍早了。看完3日確認再說,別砍V底。')
+PANIC_BASE_RATE = {'fwd21_median': 3.3, 'fwd21_up_pct': 67, 'fwd63_median': 8.3, 'fwd63_up_pct': 74,
+                   'note': PANIC_BASE_RATE_NOTE}
+
 # ★ 每指數一表統管(進場門檻 / 出場緩衝 / 風險下注 budget / 槓桿上限)
 #   entry_thr = 進場「不追高」上限(×50MA)   exit_buf = 停損線(×200MA)
 #   budget/cap = RiskTarget 倉位:曝險 = clip(budget / 停損距, 0, cap)
@@ -99,8 +121,66 @@ def _trailing_below(close: pd.Series, ma_series: pd.Series, buf_mult: float) -> 
     return cnt
 
 
-def core_signal(close: pd.Series, vix_last: float | None, ticker: str) -> dict:
-    """核心擇時 + 恐慌容忍 + 進場判定 + RiskTarget 倉位,用該指數自己的參數。"""
+def _structure_read(ohlc: pd.DataFrame, last: float, exit_price: float, dist_pct: float) -> dict:
+    """裸價格結構讀數(F4 上方壓力 + F5 突破量能 + R:R + 鋸齒區信心)。
+    ohlc 需含 High/Low/Close/Volume。壓力用『已確認』fractal swing high(pivot 到 i+k 才確認 → 無 look-ahead)。"""
+    try:
+        high = ohlc['High'].values
+        close = ohlc['Close']
+        vol = ohlc['Volume']
+    except Exception:
+        return {}
+    n = len(high)
+    k = PIVOT_K
+    if n < 2 * k + 2:
+        return {}
+    # 回看窗內、已確認的 swing high(i 的左右各 k 根皆不高於它)
+    lo = max(k, n - RESIST_LOOKBACK - k)
+    piv_highs = [float(high[i]) for i in range(lo, n - k)
+                 if high[i] == high[i - k:i + k + 1].max()]
+    above = [p for p in piv_highs if p > last]
+    resist = min(above) if above else None                    # 最近的上方壓力(最低的前高)
+    resi_room = round((resist / last - 1) * 100, 1) if resist else None
+
+    # R:R:下檔到停損線、上檔到壓力(藍天=無壓=開放,不給比值)
+    downside = (last - exit_price) / last
+    rr = round(((resist - last) / last) / downside, 2) if (resist and downside > 0) else None
+
+    # F5 突破量能:今日是否創 BREAKOUT_WIN 日新高 + 當日相對量
+    relvol = float(vol.iloc[-1] / vol.iloc[-VOL_WIN:].mean()) if len(vol) >= VOL_WIN else None
+    prior_max = float(close.iloc[-BREAKOUT_WIN - 1:-1].max()) if len(close) > BREAKOUT_WIN else None
+    breakout = None
+    if prior_max is not None and relvol is not None and last >= prior_max:
+        breakout = 'blowoff' if relvol >= BLOWOFF_VOL else ('quiet' if relvol <= QUIET_VOL else 'normal')
+
+    chop = abs(dist_pct) <= CHOP_ZONE_PCT
+
+    notes = []
+    if chop:
+        notes.append(f'⚠️鋸齒區(離200MA {dist_pct:+.0f}%,剛站上假訊號多、信心低)')
+    if resist:
+        if resi_room is not None and resi_room <= 3:
+            notes.append(f'⚠️頭上前高壓力 ${resist:.2f}(僅 +{resi_room:.0f}%,期望值較差,宜等突破)')
+        else:
+            notes.append(f'上方壓力 ${resist:.2f}(+{resi_room:.0f}%'
+                         + (f',R:R {rr}' if rr else '') + ')')
+    else:
+        notes.append('藍天無壓(F4:上檔開放=報酬最高格)')
+    if breakout == 'blowoff':
+        notes.append(f'🚫爆量突破(量 {relvol:.1f}倍=短線耗竭,別追那根)')
+    elif breakout == 'quiet':
+        notes.append(f'✅無量緩破(量 {relvol:.1f}倍=健康續勢)')
+
+    return {'resist_price': round(resist, 2) if resist else None,
+            'resi_room_pct': resi_room, 'rr_ratio': rr,
+            'breakout': breakout, 'breakout_relvol': round(relvol, 2) if relvol is not None else None,
+            'chop_zone': chop, 'structure_note': ' · '.join(notes)}
+
+
+def core_signal(close: pd.Series, vix_last: float | None, ticker: str,
+                ohlc: pd.DataFrame | None = None) -> dict:
+    """核心擇時 + 恐慌容忍 + 進場判定 + RiskTarget 倉位,用該指數自己的參數。
+    ohlc(可選,OHLCV)→ 加裸價格結構讀數(上方壓力/突破量能/R:R/鋸齒區)輔助下手決策。"""
     p = PARAMS.get(ticker, DEFAULT_PARAM)
     thr, buf = p['entry_thr'], p['exit_buf']
     budget, cap = p['budget'] * RISK_MULT, p['cap'] * RISK_MULT
@@ -117,6 +197,7 @@ def core_signal(close: pd.Series, vix_last: float | None, ticker: str) -> dict:
     exit_price = round(ma * buf, 2)          # 停損/出場線(該指數緩衝)
     entry_cap = round(ma50 * thr, 2)         # 進場上限價(超過=追高)
     stop_risk = round((last - exit_price) / last * 100, 1)   # 現在進場的話,停損在下方幾%
+    struct = _structure_read(ohlc, last, exit_price, dist) if ohlc is not None else {}
 
     # ★ 橫斷面相對強度:多核心皆 risk_on 時,決定該持有哪一個(#4:持有最強)
     #   rs_score = voladj 126日(最高Sharpe1.37,穩健,預設選股)
@@ -148,7 +229,7 @@ def core_signal(close: pd.Series, vix_last: float | None, ticker: str) -> dict:
         if panic and days_below < PANIC_DELAY:
             state = 'panic_watch'
             hold_action = (f'恐慌觀察：VIX {vix_last:.0f}>{PANIC_VIX:.0f}、跌破{days_below}日,'
-                           f'給{PANIC_DELAY}日確認別砍V底(維持現倉、別加減)')
+                           f'給{PANIC_DELAY}日確認別砍V底(維持現倉、別加減)  {PANIC_BASE_RATE_NOTE}')
             suggested_expo = None
         else:
             reason = f'(恐慌已連{days_below}日確認)' if panic else ''
@@ -174,6 +255,10 @@ def core_signal(close: pd.Series, vix_last: float | None, ticker: str) -> dict:
         entry_action = (f'可進場(距50MA +{dist50:.0f}% ≤ 門檻 +{(thr-1)*100:.0f}%)'
                         f'；停損距 -{stop_risk:.0f}% → 建議曝險 {expo_raw*100:.0f}%{extra}')
 
+    snote = struct.get('structure_note')
+    if snote and entry_state in ('can_enter', 'extended'):
+        entry_action = entry_action + '  │ 結構:' + snote
+
     return {'ma200': round(ma, 2), 'ma50': round(ma50, 2), 'close': round(last, 2),
             'dist_pct': round(dist, 2), 'dist50_pct': round(dist50, 2),
             'entry_thr': thr, 'exit_buf': buf, 'budget': round(budget, 3), 'cap': round(cap, 2),
@@ -181,7 +266,7 @@ def core_signal(close: pd.Series, vix_last: float | None, ticker: str) -> dict:
             'suggested_expo': suggested_expo, 'rs_score': rs_score, 'rs_csm': rs_csm, 'is_strongest': False,
             'days_below': days_below, 'panic': panic,
             'state': state, 'action': hold_action, 'hold_action': hold_action,
-            'entry_state': entry_state, 'entry_action': entry_action}
+            'entry_state': entry_state, 'entry_action': entry_action, **struct}
 
 
 def canary_signal(credit_closes: dict) -> dict:
@@ -278,6 +363,52 @@ def compute_rotation_hold(out: dict, today_strongest, prev: dict | None, today_s
             'min_hold_days': MIN_HOLD_DAYS, 'forced_out_prev': forced_out}
 
 
+def _intraday_tentative() -> tuple[bool, str]:
+    """判斷現在是否美股盤中(訊號基於日收盤 → 盤中=暫定,別看盤中殺盤犯錯)。純時間判斷、無資料相依。
+       美股常規時段 09:30–16:00 ET。回傳 (是否暫定, 說明)。"""
+    try:
+        from zoneinfo import ZoneInfo
+        now_et = datetime.now(ZoneInfo('America/New_York'))
+    except Exception:
+        return False, ''
+    if now_et.weekday() >= 5:                       # 週末 → 用上一個收盤,非暫定
+        return False, ''
+    open_t = now_et.replace(hour=9, minute=30, second=0, microsecond=0)
+    close_t = now_et.replace(hour=16, minute=0, second=0, microsecond=0)
+    if open_t <= now_et < close_t:
+        return True, ('⏳ 盤中暫定：以下用『當下未收盤價』計=雜訊。美股 04:00(台灣)收盤才算數;'
+                      '沒破停損線就別動手,別被盤中殺盤騙去犯錯。')
+    return False, ''
+
+
+def daily_verdict(out: dict, combined: dict | None, rotation_hold: dict,
+                  canary: dict | None, intraday: bool) -> str:
+    """把 5 指數 + 信用 + 輪動壓成一行『今日核心該做什麼』,降 over-trading / 讀太細。"""
+    if not out:
+        return '今日核心動作:無資料'
+    if canary and canary.get('health', 1) <= 0:
+        return '🔴 今日核心動作【清倉/不進場】:信用全示警(HYG+LQD 皆跌破200MA),等信用站回。'
+    held = rotation_hold.get('ticker') if rotation_hold else None
+    seg = []
+    if held and held in out:
+        d = out[held]
+        expo = d.get('suggested_expo')
+        exs = f"{expo*100:.0f}%" if expo is not None else '維持'
+        seg.append(f'持有 {held}(曝險 {exs})')
+        if rotation_hold.get('locked'):
+            seg.append(f'鎖定中(還 {rotation_hold.get("lock_days_left")} 日才准換)')
+        if d.get('resi_room_pct') is not None and d.get('resi_room_pct') <= 3:
+            seg.append(f'⚠️{held}頭上前高壓力僅 +{d["resi_room_pct"]:.0f}%,空手宜等突破')
+        elif d.get('chop_zone'):
+            seg.append(f'⚠️{held}在鋸齒區(離200MA近),信心低')
+    else:
+        seg.append('空手(無核心站上200MA 或 信用砍0)')
+    if combined and combined.get('state') == 'credit_warning':
+        seg.append('信用部分示警 → 全體曝險減半')
+    core = '今日核心動作【' + ' · '.join(seg) + '】其餘無動作,沒破停損線就別動手。'
+    return ('⏳ ' + core) if intraday else core
+
+
 def main():
     tickers = CORE_TICKERS + CREDIT_TICKERS + [PANIC_TICKER]
     print(f"📥 下載核心指數 + 信用breadth(HYG+LQD) + 恐慌計 ({'/'.join(tickers)}, 2y)...")
@@ -297,7 +428,7 @@ def main():
         try:
             s = raw[tk]['Close'].dropna()
             if len(s) >= MA:
-                out[tk] = core_signal(s, vix_last, tk)
+                out[tk] = core_signal(s, vix_last, tk, ohlc=raw[tk].dropna(subset=['Close']))
         except Exception:
             pass
 
@@ -365,8 +496,14 @@ def main():
     if rotation_hold.get('ticker') and rotation_hold['ticker'] in out:
         out[rotation_hold['ticker']]['is_held'] = True
 
+    # ★ 盤中 guard(擋盤中手賤)+ 今日單一結論(降 over-trading)
+    intraday_flag, intraday_note = _intraday_tentative()
+    verdict = daily_verdict(out, combined, rotation_hold, canary, intraday_flag)
+
     data = {
         'last_updated': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+        'intraday_tentative': intraday_flag, 'intraday_note': intraday_note,
+        'daily_verdict': verdict, 'panic_base_rate': PANIC_BASE_RATE,
         'ma_window': MA, 'panic_vix': PANIC_VIX, 'panic_delay': PANIC_DELAY,
         'vix': round(vix_last, 2) if vix_last is not None else None,
         'primary': primary_tk, 'risk_mult': RISK_MULT, 'strongest': strongest,
@@ -410,6 +547,11 @@ def main():
     entry_emoji = {'can_enter': '🟢', 'extended': '🟡', 'no_entry': '🔴'}
     vix_str = f"{vix_last:.1f}" if vix_last is not None else "N/A"
     print(f"\n  恐慌計 VIX = {vix_str} ({'🔴恐慌中' if vix_last and vix_last > PANIC_VIX else '🟢平靜'})")
+    if intraday_note:
+        print(f"\n  {intraday_note}")
+    print(f"\n  👉 {verdict}")
+    if vix_last is not None and vix_last > PANIC_VIX:
+        print(f"  {PANIC_BASE_RATE_NOTE}")
     print(f"\n  核心擇時狀態 (每指數自校參數 + 恐慌容忍VIX>{PANIC_VIX:.0f}給{PANIC_DELAY}日):")
     for tk, d in out.items():
         below = f" [跌破{d['days_below']}日]" if d['days_below'] > 0 else ""
@@ -420,6 +562,8 @@ def main():
               f"  參數:進場≤+{(d['entry_thr']-1)*100:.0f}% 出場×{d['exit_buf']:.2f} budget{d['budget']}{below}")
         print(f"          🏠 持有→ {d['action']}")
         print(f"          💵 空手→ {entry_emoji[d['entry_state']]} {d['entry_action']}")
+        if d.get('structure_note'):
+            print(f"          📐 結構→ {d['structure_note']}")
         print(f"          📊 RiskTarget 建議曝險 {ex} = clip(budget {d['budget']} / 停損距 {d['stop_risk_pct']:.0f}%, 0, cap {d['cap']:.1f})")
         print(f"          🛑 停損線 ${d['exit_price']:.2f}(現價進場停損距 -{d['stop_risk_pct']:.0f}%) · 進場上限 ${d['entry_cap']:.2f} · 不停利")
     if canary:

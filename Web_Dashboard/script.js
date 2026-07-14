@@ -39,6 +39,7 @@ const viewTitles = {
     'ai-report': 'AI 深度投研報告',
     'alerts-history': '系統警報紀錄',
     'settings': '掃描器參數設定',
+    'kbar-annot': '每日K棒標註 (PIT 逐日建議)',
 };
 
 const SECTOR_MAP = {
@@ -77,6 +78,7 @@ document.querySelectorAll('.nav-link').forEach(link => {
         if (target === 'heatmap') renderHeatmap();
         if (target === 'alerts-history') renderAlertsHistory();
         if (target === 'power-gauge') loadAndRenderPowerGauge();
+        if (target === 'kbar-annot') renderKbarAnnot();
     });
 });
 
@@ -3722,3 +3724,140 @@ document.getElementById('btn-scan-exits')?.addEventListener('click', function() 
         alert("出場掃描網路錯誤");
     });
 });
+
+// ==========================================
+//  每日K棒 PIT 標註頁
+// ==========================================
+const KBAR_TONE = { green: '#22c55e', lime: '#a3e635', amber: '#f59e0b', red: '#ef4444' };
+let _kbar = { chart: null, candle: null, vol: null, ma: null, exit: null, data: null, cur: null, byTime: {} };
+
+function _kbarTimeStr(t) {
+    if (typeof t === 'string') return t;
+    if (t && t.year) return `${t.year}-${String(t.month).padStart(2, '0')}-${String(t.day).padStart(2, '0')}`;
+    return '' + t;
+}
+
+function _initKbarChart() {
+    if (_kbar.chart) return;
+    const dom = document.getElementById('kbar-chart');
+    if (!dom || typeof LightweightCharts === 'undefined') return;
+    _kbar.chart = LightweightCharts.createChart(dom, {
+        layout: { background: { type: 'solid', color: 'transparent' }, textColor: '#94a3b8' },
+        grid: { vertLines: { color: 'rgba(255,255,255,0.03)' }, horzLines: { color: 'rgba(255,255,255,0.03)' } },
+        crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
+        rightPriceScale: { borderColor: 'rgba(255,255,255,0.08)' },
+        timeScale: { borderColor: 'rgba(255,255,255,0.08)', timeVisible: false }
+    });
+    _kbar.candle = _kbar.chart.addCandlestickSeries({
+        upColor: '#ef4444', downColor: '#10b981', borderDownColor: '#10b981',
+        borderUpColor: '#ef4444', wickDownColor: '#10b981', wickUpColor: '#ef4444'
+    });
+    _kbar.candle.priceScale().applyOptions({ scaleMargins: { top: 0.05, bottom: 0.28 } });
+    _kbar.ma = _kbar.chart.addLineSeries({ color: 'rgba(148,163,184,0.7)', lineWidth: 1, priceLineVisible: false, lastValueVisible: false });
+    _kbar.exit = _kbar.chart.addLineSeries({ color: 'rgba(239,68,68,0.55)', lineWidth: 1, lineStyle: 2, priceLineVisible: false, lastValueVisible: false });
+    _kbar.vol = _kbar.chart.addHistogramSeries({ priceFormat: { type: 'volume' }, priceScaleId: '' });
+    _kbar.vol.priceScale().applyOptions({ scaleMargins: { top: 0.8, bottom: 0 } });
+    new ResizeObserver(es => { if (es.length) _kbar.chart.applyOptions({ width: es[0].contentRect.width, height: es[0].contentRect.height }); }).observe(dom);
+
+    const tip = document.getElementById('kbar-tooltip');
+    _kbar.chart.subscribeCrosshairMove(param => {
+        if (!param || !param.time || !param.point) { tip.style.display = 'none'; return; }
+        const b = _kbar.byTime[_kbarTimeStr(param.time)];
+        if (!b) { tip.style.display = 'none'; return; }
+        const col = KBAR_TONE[b.tone] || '#94a3b8';
+        const ex = (b.expo === null || b.expo === undefined) ? '維持' : (b.expo * 100).toFixed(0) + '%';
+        tip.innerHTML = `<div style="color:#cbd5e1;margin-bottom:3px;">${b.time}</div>`
+            + `<div style="color:${col};font-weight:600;margin-bottom:3px;">● ${b.label}</div>`
+            + `<div style="color:#94a3b8;">收 ${b.close} · 200MA ${b.ma200} · 停損線 ${b.exit}</div>`
+            + `<div style="color:#94a3b8;">建議曝險 ${ex}</div>`
+            + (b.note ? `<div style="color:#64748b;margin-top:3px;font-size:11px;">${b.note}</div>` : '');
+        tip.style.display = 'block';
+        const w = tip.offsetWidth, cw = document.getElementById('kbar-chart').clientWidth;
+        let x = param.point.x + 16; if (x + w > cw) x = param.point.x - w - 16;
+        tip.style.left = Math.max(0, x) + 'px';
+        tip.style.top = Math.max(0, param.point.y - 10) + 'px';
+    });
+}
+
+async function renderKbarAnnot() {
+    _initKbarChart();
+    if (!_kbar.data) {
+        try {
+            const res = await fetch('kbar_annotations.json?t=' + Date.now());
+            _kbar.data = await res.json();
+        } catch (e) { document.getElementById('kbar-latest').textContent = '載入失敗:kbar_annotations.json'; return; }
+        document.getElementById('kbar-pit').textContent = _kbar.data.pit_note || '';
+        const box = document.getElementById('kbar-tickers');
+        box.innerHTML = '';
+        _kbar.data.tickers.forEach(t => {
+            const btn = document.createElement('button');
+            btn.className = 'btn-tf';
+            btn.textContent = t.symbol.replace('.TW', '') + ' ' + t.name;
+            btn.style.cssText = 'padding:5px 10px;font-size:12px;cursor:pointer;border:1px solid rgba(255,255,255,0.12);background:rgba(255,255,255,0.03);color:#cbd5e1;border-radius:5px;';
+            btn.onclick = () => _selectKbar(t.symbol);
+            btn.dataset.sym = t.symbol;
+            box.appendChild(btn);
+        });
+    }
+    _selectKbar(_kbar.cur || (_kbar.data.tickers[0] && _kbar.data.tickers[0].symbol));
+}
+
+function _selectKbar(sym) {
+    if (!_kbar.data) return;
+    const t = _kbar.data.tickers.find(x => x.symbol === sym);
+    if (!t) return;
+    _kbar.cur = sym;
+    document.querySelectorAll('#kbar-tickers .btn-tf').forEach(b => {
+        const on = b.dataset.sym === sym;
+        b.style.background = on ? 'rgba(59,130,246,0.25)' : 'rgba(255,255,255,0.03)';
+        b.style.borderColor = on ? 'rgba(59,130,246,0.6)' : 'rgba(255,255,255,0.12)';
+    });
+    const bars = t.bars;
+    _kbar.byTime = {};
+    bars.forEach(b => { _kbar.byTime[b.time] = b; });
+    _kbar.candle.setData(bars.map(b => ({ time: b.time, open: b.open, high: b.high, low: b.low, close: b.close })));
+    _kbar.vol.setData(bars.map(b => ({ time: b.time, value: b.volume, color: (KBAR_TONE[b.tone] || '#334155') + 'cc' })));
+    _kbar.ma.setData(bars.map(b => ({ time: b.time, value: b.ma200 })));
+    _kbar.exit.setData(bars.map(b => ({ time: b.time, value: b.exit })));
+
+    // markers:只在 tone 轉折處標,避免 2600 根全標
+    const markers = [];
+    let prev = null;
+    bars.forEach(b => {
+        if (b.tone !== prev) {
+            const shape = b.tone === 'red' ? 'arrowDown' : (b.tone === 'green' || b.tone === 'lime' ? 'arrowUp' : 'circle');
+            const pos = b.tone === 'red' ? 'aboveBar' : 'belowBar';
+            markers.push({ time: b.time, position: pos, color: KBAR_TONE[b.tone] || '#94a3b8', shape, text: b.label });
+            prev = b.tone;
+        }
+    });
+    _kbar.candle.setMarkers(markers);
+
+    // 最新一根
+    const last = bars[bars.length - 1];
+    const col = KBAR_TONE[last.tone] || '#94a3b8';
+    const ex = (last.expo === null || last.expo === undefined) ? '維持' : (last.expo * 100).toFixed(0) + '%';
+    document.getElementById('kbar-latest').innerHTML =
+        `最新 <b>${t.symbol.replace('.TW', '')}</b> [${last.time}] 收 ${last.close}　`
+        + `<span style="color:${col};font-weight:700;">● ${last.label}</span>　建議曝險 ${ex}`
+        + `　<span style="color:#64748b;">進場門檻×${t.params.entry_thr} 出場×${t.params.exit_buf} · 停損線 ${last.exit}</span>`;
+
+    // 近40日表
+    const rows = bars.slice(-40).reverse().map(b => {
+        const c = KBAR_TONE[b.tone] || '#94a3b8';
+        const ex2 = (b.expo === null || b.expo === undefined) ? '維持' : (b.expo * 100).toFixed(0) + '%';
+        return `<tr style="border-bottom:1px solid rgba(255,255,255,0.05);">`
+            + `<td style="padding:4px 8px;color:#94a3b8;">${b.time}</td>`
+            + `<td style="padding:4px 8px;text-align:right;">${b.close}</td>`
+            + `<td style="padding:4px 8px;"><span style="color:${c};">●</span> ${b.label}</td>`
+            + `<td style="padding:4px 8px;text-align:right;color:#94a3b8;">${ex2}</td>`
+            + `<td style="padding:4px 8px;text-align:right;color:#64748b;">${b.exit}</td></tr>`;
+    }).join('');
+    document.getElementById('kbar-table').innerHTML =
+        `<thead><tr style="color:#64748b;text-align:left;border-bottom:1px solid rgba(255,255,255,0.1);">`
+        + `<th style="padding:4px 8px;">日期</th><th style="padding:4px 8px;text-align:right;">收盤</th>`
+        + `<th style="padding:4px 8px;">當日標註(PIT)</th><th style="padding:4px 8px;text-align:right;">曝險</th>`
+        + `<th style="padding:4px 8px;text-align:right;">停損線</th></tr></thead><tbody>${rows}</tbody>`;
+
+    try { _kbar.chart.timeScale().fitContent(); } catch (e) { }
+}
