@@ -86,6 +86,21 @@ def _canary_health(dates: pd.DatetimeIndex, canary_closes: dict) -> np.ndarray:
     return H.fillna(1.0).values                          # 暖身前視為健康(不誤砍)
 
 
+def _kcat(label: str) -> str:
+    if '信用示警' in label: return 'credit_clear'
+    if '跌破線' in label:   return 'exit'
+    if '恐慌觀察' in label: return 'panic_watch'
+    if '逼近停損' in label: return 'near_stop'
+    if '爆量突破' in label: return 'blowoff'
+    if '頭上壓力' in label: return 'resistance'
+    if '鋸齒' in label:     return 'chop'
+    if '追高' in label:     return 'chase'
+    if '偏貴' in label:     return 'expensive'
+    if '可小買' in label:   return 'buy_small'
+    if '可買' in label:     return 'buy_full'
+    return 'other'
+
+
 def annotate(ohlc: pd.DataFrame, params: dict, vix: pd.Series, canary_closes: dict) -> list:
     """對單一標的逐日產生 PIT 標註。回傳 bars list。"""
     df = ohlc
@@ -105,6 +120,9 @@ def annotate(ohlc: pd.DataFrame, params: dict, vix: pd.Series, canary_closes: di
     vix_al = vix.reindex(dates).ffill().values if vix is not None else np.full(len(dates), np.nan)
     health = _canary_health(dates, canary_closes)
     resist = _resistances(high, close, C.PIVOT_K, C.RESIST_LOOKBACK)
+    slope20 = s_close.rolling(C.MA).mean().diff(20).values     # MA200 斜率(20日)
+    _n = len(close)
+    f63 = np.array([close[i + 63] / close[i] - 1 if i + 63 < _n else np.nan for i in range(_n)])  # 事後63日(診斷證據)
 
     thr, buf = params['entry_thr'], params['exit_buf']
     budget, cap = params['budget'], params['cap']
@@ -186,6 +204,29 @@ def annotate(ohlc: pd.DataFrame, params: dict, vix: pd.Series, canary_closes: di
         if 0 < h < 1:
             note_bits.append(f'信用部分示警→曝險×{h:.0%}')
 
+        # ── 診斷(PIT 偵測條件 + 事後63日證據):找標籤不合邏輯/更好操作處 ──
+        cg = _kcat(label)
+        vix_now = vix_al[t]; vix5 = vix_al[t - 5] if t >= 5 else np.nan
+        vspk = np.nanmax(vix_al[max(0, t - 20):t + 1]) if t > 0 else vix_now
+        vfall = (not np.isnan(vix_now)) and (not np.isnan(vix5)) and vix_now < vix5
+        slope_up = (not np.isnan(slope20[t])) and slope20[t] > 0
+        dg = None
+        if cg == 'credit_clear' and c >= ma and (not np.isnan(vspk)) and vspk > C.PANIC_VIX and vfall:
+            dg = ('D1', 'V底回補漏接', '🟢 勇敢買:指數已收復200MA、VIX從尖峰回落→別等信用慢哨,直接回補', 'high')
+        elif cg == 'exit' and days_below[t] <= 2:
+            dg = ('D2', '出場洗損風險', '🟠 第1天別砍:改「跌破觀察」,連續3日+信用同壞才出(常反彈)', 'high')
+        elif cg == 'expensive':
+            dg = ('D3', '偏貴誤標', '空手改「別追高(等拉回)」;曝險已極低=其實別新進,持有者續抱', 'med')
+        elif cg == 'chop' and slope_up:
+            dg = ('D4', '鋸齒誤判', 'MA200上彎=發射台,改「可買」別觀望', 'med')
+        elif cg == 'buy_full' and expo is not None and expo >= cap * 0.95 and (not slope_up or h < 1):
+            dg = ('D5', '做頭型滿槓桿', '拉回若為較低高點/信用轉弱→別上滿150%,減半', 'low')
+        diag = None
+        if dg:
+            fwd = round(float(f63[t]) * 100, 1) if not np.isnan(f63[t]) else None
+            diag = {'code': dg[0], 'name': dg[1], 'better': dg[2], 'sev': dg[3],
+                    'original': label, 'fwd63': fwd}
+
         bars.append({
             'time': d.strftime('%Y-%m-%d'),
             'open': round(float(openp[t]), 2), 'high': round(float(high[t]), 2),
@@ -193,8 +234,16 @@ def annotate(ohlc: pd.DataFrame, params: dict, vix: pd.Series, canary_closes: di
             'volume': float(vol[t]),
             'ma200': round(float(ma), 2), 'exit': round(float(ep), 2),
             'label': label, 'tone': tone,
-            'expo': expo, 'note': ' · '.join(note_bits),
+            'expo': expo, 'note': ' · '.join(note_bits), 'diag': diag,
         })
+
+    # 同類診斷連續多日→只留每段第一天(避免markers爆量)
+    prev = None
+    for b in bars:
+        code = b['diag']['code'] if b.get('diag') else None
+        if code is not None and code == prev:
+            b['diag'] = None
+        prev = code
     return bars
 
 

@@ -194,6 +194,7 @@
     <button class="tabbtn" data-tab="config">💼 配置 / 策略</button>
     <button class="tabbtn" data-tab="taiwan">🌏 台股</button>
     <button class="tabbtn" data-tab="kbar">🕯️ 每日K棒</button>
+    <button class="tabbtn" data-tab="diag">🔧 信號診斷</button>
     <button class="tabbtn" data-tab="satellite">🏆 個股衛星</button>
   </nav>
 
@@ -229,6 +230,10 @@
   <!-- ★每日K棒 PIT 逐日標註(視覺化:每根K在「當天」會被標成什麼) -->
   <div id="kbarPanel"></div>
   </div><!-- /tab-kbar -->
+
+  <div class="tabpane" id="tab-diag">
+  <div id="diagPanel"></div>
+  </div><!-- /tab-diag -->
 
   <div class="tabpane" id="tab-satellite">
   <!-- ↓↓ 個股衛星(獨立系統) ↓↓ -->
@@ -1044,6 +1049,12 @@ document.querySelectorAll('#tabbar .tabbtn').forEach(btn=>{
         _kb.chart.timeScale().fitContent();
       }catch(e){}
     }
+    if(tab==='diag' && _dg.chart){
+      try{ const d=document.getElementById('dgChart');
+        _dg.chart.applyOptions({width:d.clientWidth,height:d.clientHeight||420});
+        _dg.chart.timeScale().fitContent();
+      }catch(e){}
+    }
     window.scrollTo({top:0,behavior:'smooth'});
   });
 });
@@ -1168,6 +1179,106 @@ function _kbSelect(sym){
   try{ _kb.chart.timeScale().fitContent(); }catch(e){}
 }
 
+// ── 信號診斷(用後見之明標出可改善的決策點,供下一步改動) ──
+const DG_COL = {D1:'#2ecc71', D2:'#ffcb45', D3:'#ff9d5a', D4:'#4da3ff', D5:'#b085ff'};
+const DG_NAME = {D1:'V底回補漏接', D2:'出場洗損', D3:'偏貴誤標', D4:'鋸齒誤判', D5:'做頭滿槓桿'};
+let _dg = {chart:null, candle:null, ma:null, exit:null, byTime:{}, cur:null, built:false, data:null};
+
+function _dgInitChart(){
+  if(_dg.chart || typeof LightweightCharts==='undefined') return;
+  const dom=document.getElementById('dgChart'); if(!dom) return;
+  _dg.chart = LightweightCharts.createChart(dom,{
+    layout:{background:{type:'solid',color:'transparent'},textColor:'#8a96ad'},
+    grid:{vertLines:{color:'rgba(255,255,255,0.03)'},horzLines:{color:'rgba(255,255,255,0.03)'}},
+    crosshair:{mode:LightweightCharts.CrosshairMode.Normal},
+    rightPriceScale:{borderColor:'rgba(255,255,255,0.08)'},
+    timeScale:{borderColor:'rgba(255,255,255,0.08)',timeVisible:false}
+  });
+  _dg.candle = _dg.chart.addCandlestickSeries({upColor:'#ff5a5a',downColor:'#2ecc71',borderUpColor:'#ff5a5a',borderDownColor:'#2ecc71',wickUpColor:'#ff5a5a',wickDownColor:'#2ecc71'});
+  _dg.ma = _dg.chart.addLineSeries({color:'rgba(138,150,173,0.7)',lineWidth:1,priceLineVisible:false,lastValueVisible:false});
+  _dg.exit = _dg.chart.addLineSeries({color:'rgba(255,90,90,0.55)',lineWidth:1,lineStyle:2,priceLineVisible:false,lastValueVisible:false});
+  new ResizeObserver(es=>{if(es.length)_dg.chart.applyOptions({width:es[0].contentRect.width,height:es[0].contentRect.height});}).observe(dom);
+  const tip=document.getElementById('dgTip');
+  _dg.chart.subscribeCrosshairMove(p=>{
+    if(!p||!p.time||!p.point){tip.style.display='none';return;}
+    const b=_dg.byTime[_kbTimeStr(p.time)];
+    if(!b||!b.diag){tip.style.display='none';return;}
+    const g=b.diag, col=DG_COL[g.code]||'#8a96ad';
+    const fwd=(g.fwd63==null)?'—':((g.fwd63>0?'+':'')+g.fwd63+'%');
+    tip.innerHTML = `<div style="color:#cbd5e1;margin-bottom:3px">${b.time}</div>`
+      +`<div style="color:${col};font-weight:700">${g.code} ${g.name}</div>`
+      +`<div style="color:#8a96ad;margin:3px 0">原本標:${g.original}</div>`
+      +`<div style="color:#e6ecf5">建議:${g.better}</div>`
+      +`<div style="margin-top:3px">事後63日:<b style="color:${g.fwd63>0?'#2ecc71':'#ff5a5a'}">${fwd}</b></div>`;
+    tip.style.display='block';
+    const w=tip.offsetWidth, cw=dom.clientWidth;
+    let x=p.point.x+16; if(x+w>cw) x=p.point.x-w-16;
+    tip.style.left=Math.max(0,x)+'px'; tip.style.top=Math.max(0,p.point.y-10)+'px';
+  });
+}
+
+function renderDiag(kb){
+  const host=document.getElementById('diagPanel'); if(!host) return;
+  if(!kb||!kb.tickers||!kb.tickers.length){host.innerHTML='<div style="color:var(--muted);padding:10px">尚無資料</div>';return;}
+  _dg.data=kb;
+  if(!_dg.built){
+    const legend=Object.keys(DG_COL).map(k=>`<span><i style="display:inline-block;width:11px;height:11px;background:${DG_COL[k]};border-radius:2px;vertical-align:middle"></i> ${k} ${DG_NAME[k]}</span>`).join('');
+    host.innerHTML =
+      `<div style="background:#1a2233;border:1px solid var(--line);border-radius:8px;padding:9px 12px;font-size:12px;color:var(--muted);margin-bottom:10px">🔍 此頁用<b style="color:#e6ecf5">後見之明(事後63日報酬)</b>標出策略歷史上<b style="color:#e6ecf5">可能出錯/可改善</b>的決策點——不是即時訊號,是做下一步改動的診斷。hover任一標記看「原本→建議→事後真的漲跌」。fwd63 綠=之後漲(在該賣處=洗損、在該買處=漏接)。</div>`
+      +`<div id="dgTickers" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px"></div>`
+      +`<div style="display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin-bottom:6px">${legend}</div>`
+      +`<div id="dgSummary" style="font-size:12.5px;margin-bottom:8px;line-height:1.9"></div>`
+      +`<div style="position:relative"><div id="dgChart" style="width:100%;height:420px"></div>`
+      +`<div id="dgTip" style="position:absolute;display:none;pointer-events:none;z-index:20;background:#0d1424f2;border:1px solid var(--line);border-radius:6px;padding:8px 10px;font-size:12px;color:var(--txt);max-width:300px"></div></div>`
+      +`<div style="margin-top:10px;overflow:auto;max-height:300px"><table id="dgTable" style="width:100%;border-collapse:collapse;font-size:12px"></table></div>`;
+    const box=document.getElementById('dgTickers');
+    kb.tickers.forEach(t=>{
+      const btn=document.createElement('button');
+      btn.textContent=t.symbol.replace('.TW','');
+      btn.dataset.sym=t.symbol;
+      btn.style.cssText='padding:5px 10px;font-size:12px;cursor:pointer;border:1px solid var(--line);background:var(--panel2);color:var(--txt);border-radius:5px';
+      btn.onclick=()=>_dgSelect(t.symbol);
+      box.appendChild(btn);
+    });
+    _dgInitChart();
+    _dg.built=true;
+  }
+  _dgSelect(_dg.cur || 'QQQ');
+}
+
+function _dgSelect(sym){
+  const t=_dg.data.tickers.find(x=>x.symbol===sym) || _dg.data.tickers[0];
+  if(!t||!_dg.candle) return;
+  _dg.cur=t.symbol;
+  document.querySelectorAll('#dgTickers button').forEach(b=>{const on=b.dataset.sym===t.symbol; b.style.background=on?'rgba(77,163,255,0.25)':'var(--panel2)'; b.style.borderColor=on?'var(--accent)':'var(--line)';});
+  const bars=t.bars;
+  _dg.byTime={}; bars.forEach(b=>{_dg.byTime[b.time]=b;});
+  _dg.candle.setData(bars.map(b=>({time:b.time,open:b.open,high:b.high,low:b.low,close:b.close})));
+  _dg.ma.setData(bars.map(b=>({time:b.time,value:b.ma200})));
+  _dg.exit.setData(bars.map(b=>({time:b.time,value:b.exit})));
+  const events=bars.filter(b=>b.diag);
+  _dg.candle.setMarkers(events.map(b=>{const g=b.diag, up=(g.code==='D1'||g.code==='D4');
+    return {time:b.time, position:up?'belowBar':'aboveBar', color:DG_COL[g.code]||'#8a96ad', shape:up?'arrowUp':(g.code==='D2'?'arrowDown':'circle'), text:g.code};}));
+  const cnt={}, fwds={};
+  events.forEach(b=>{const c=b.diag.code; cnt[c]=(cnt[c]||0)+1; if(b.diag.fwd63!=null)(fwds[c]=fwds[c]||[]).push(b.diag.fwd63);});
+  const med=a=>{if(!a||!a.length)return null; const s=[...a].sort((x,y)=>x-y); return s[Math.floor(s.length/2)];};
+  document.getElementById('dgSummary').innerHTML = Object.keys(DG_COL).filter(c=>cnt[c]).map(c=>{
+    const m=med(fwds[c]); return `<span style="color:${DG_COL[c]}">●</span> ${c} ${DG_NAME[c]}:<b>${cnt[c]}</b>次(事後63d中位 ${m==null?'—':(m>0?'+':'')+m+'%'})`;
+  }).join('　·　') || '<span style="color:var(--muted)">此標的無診斷事件</span>';
+  const rows=events.slice().reverse().map(b=>{
+    const g=b.diag, col=DG_COL[g.code]||'#8a96ad';
+    const fwd=(g.fwd63==null)?'—':`<b style="color:${g.fwd63>0?'#2ecc71':'#ff5a5a'}">${g.fwd63>0?'+':''}${g.fwd63}%</b>`;
+    return `<tr style="border-bottom:1px solid rgba(255,255,255,0.05)"><td style="padding:4px 8px;color:var(--muted);white-space:nowrap">${b.time}</td>`
+      +`<td style="padding:4px 8px;white-space:nowrap"><span style="color:${col}">●${g.code}</span> ${g.name}</td>`
+      +`<td style="padding:4px 8px;color:var(--muted)">${g.original}</td>`
+      +`<td style="padding:4px 8px">${g.better}</td>`
+      +`<td style="padding:4px 8px;text-align:right">${fwd}</td></tr>`;
+  }).join('');
+  document.getElementById('dgTable').innerHTML =
+    `<thead><tr style="color:#64748b;text-align:left;border-bottom:1px solid var(--line)"><th style="padding:4px 8px">日期</th><th style="padding:4px 8px">缺陷</th><th style="padding:4px 8px">原本標籤</th><th style="padding:4px 8px">建議改成</th><th style="padding:4px 8px;text-align:right">事後63日</th></tr></thead><tbody>${rows}</tbody>`;
+  try{ _dg.chart.timeScale().fitContent(); }catch(e){}
+}
+
 async function loadAll(){
   try{
     const [sig, ev, rb, cs, mn, tw, ld, ag, al, kb] = await Promise.all([
@@ -1202,6 +1313,7 @@ async function loadAll(){
     renderWatch(sig);
     renderEvidence(ev);
     renderKbar(kb);
+    renderDiag(kb);
     $('#foot').textContent = `${sig.config.universe||''}　|　進場：${sig.config.entry}　|　出場：${sig.config.exit}`;
   }catch(e){
     $('#regime').innerHTML = '<div class="lbl" style="color:var(--red)">⚠️ 資料載入失敗</div>'+
