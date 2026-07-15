@@ -195,6 +195,7 @@
     <button class="tabbtn" data-tab="taiwan">🌏 台股</button>
     <button class="tabbtn" data-tab="kbar">🕯️ 每日K棒</button>
     <button class="tabbtn" data-tab="diag">🔧 信號診斷</button>
+    <button class="tabbtn" data-tab="adaptive">🐂 牛熊自適應</button>
     <button class="tabbtn" data-tab="satellite">🏆 個股衛星</button>
   </nav>
 
@@ -234,6 +235,10 @@
   <div class="tabpane" id="tab-diag">
   <div id="diagPanel"></div>
   </div><!-- /tab-diag -->
+
+  <div class="tabpane" id="tab-adaptive">
+  <div id="adaptPanel"></div>
+  </div><!-- /tab-adaptive -->
 
   <div class="tabpane" id="tab-satellite">
   <!-- ↓↓ 個股衛星(獨立系統) ↓↓ -->
@@ -1055,6 +1060,13 @@ document.querySelectorAll('#tabbar .tabbtn').forEach(btn=>{
         _dg.chart.timeScale().fitContent();
       }catch(e){}
     }
+    if(tab==='adaptive' && _ad.chart){
+      try{ const d=document.getElementById('adChart'), e2=document.getElementById('adEqChart');
+        _ad.chart.applyOptions({width:d.clientWidth,height:d.clientHeight||400});
+        _ad.eqc.applyOptions({width:e2.clientWidth,height:e2.clientHeight||240});
+        _ad.chart.timeScale().fitContent(); _ad.eqc.timeScale().fitContent();
+      }catch(e){}
+    }
     window.scrollTo({top:0,behavior:'smooth'});
   });
 });
@@ -1279,6 +1291,109 @@ function _dgSelect(sym){
   try{ _dg.chart.timeScale().fitContent(); }catch(e){}
 }
 
+// ── 牛熊自適應(牛市積極 cap2.0 / 熊市保守;與原版公正比較) ──
+const AD_REG = {bull:'#2ecc71', bear:'#8a96ad'};
+let _ad = {chart:null, candle:null, vol:null, eqc:null, eqb:null, eqa:null, byTime:{}, cur:null, built:false, data:null};
+
+function _adInit(){
+  if(_ad.chart || typeof LightweightCharts==='undefined') return;
+  const dom=document.getElementById('adChart'); if(!dom) return;
+  const opt={layout:{background:{type:'solid',color:'transparent'},textColor:'#8a96ad'},
+    grid:{vertLines:{color:'rgba(255,255,255,0.03)'},horzLines:{color:'rgba(255,255,255,0.03)'}},
+    crosshair:{mode:LightweightCharts.CrosshairMode.Normal},
+    rightPriceScale:{borderColor:'rgba(255,255,255,0.08)'},timeScale:{borderColor:'rgba(255,255,255,0.08)',timeVisible:false}};
+  _ad.chart=LightweightCharts.createChart(dom,opt);
+  _ad.candle=_ad.chart.addCandlestickSeries({upColor:'#ff5a5a',downColor:'#2ecc71',borderUpColor:'#ff5a5a',borderDownColor:'#2ecc71',wickUpColor:'#ff5a5a',wickDownColor:'#2ecc71'});
+  _ad.candle.priceScale().applyOptions({scaleMargins:{top:0.05,bottom:0.3}});
+  _ad.vol=_ad.chart.addHistogramSeries({priceFormat:{type:'volume'},priceScaleId:''});
+  _ad.vol.priceScale().applyOptions({scaleMargins:{top:0.82,bottom:0}});
+  new ResizeObserver(es=>{if(es.length)_ad.chart.applyOptions({width:es[0].contentRect.width,height:es[0].contentRect.height});}).observe(dom);
+  const eqd=document.getElementById('adEqChart');
+  _ad.eqc=LightweightCharts.createChart(eqd,Object.assign({},opt,{rightPriceScale:{borderColor:'rgba(255,255,255,0.08)',mode:LightweightCharts.PriceScaleMode.Logarithmic}}));
+  _ad.eqb=_ad.eqc.addLineSeries({color:'#8a96ad',lineWidth:2,priceLineVisible:false,title:'原版'});
+  _ad.eqa=_ad.eqc.addLineSeries({color:'#ffcb45',lineWidth:2,priceLineVisible:false,title:'自適應'});
+  new ResizeObserver(es=>{if(es.length)_ad.eqc.applyOptions({width:es[0].contentRect.width,height:es[0].contentRect.height});}).observe(eqd);
+  const tip=document.getElementById('adTip');
+  _ad.chart.subscribeCrosshairMove(p=>{
+    if(!p||!p.time||!p.point){tip.style.display='none';return;}
+    const b=_ad.byTime[_kbTimeStr(p.time)]; if(!b||!b.adaptive){tip.style.display='none';return;}
+    const a=b.adaptive, col=(a.tone==='green'?'#2ecc71':a.tone==='lime'?'#a3e635':a.tone==='amber'?'#ffcb45':'#ff5a5a');
+    const rc=AD_REG[a.regime], ex=(a.expo==null)?'維持':(a.expo*100).toFixed(0)+'%';
+    const oex=(b.expo==null)?'維持':(b.expo*100).toFixed(0)+'%';
+    tip.innerHTML=`<div style="color:#cbd5e1;margin-bottom:3px">${b.time} <span style="color:${rc}">${a.regime==='bull'?'🐂牛市':'🐻熊市'}</span></div>`
+      +`<div style="color:${col};font-weight:700">${a.label}</div>`
+      +`<div style="color:#8a96ad;margin-top:3px">自適應曝險 <b style="color:#ffcb45">${ex}</b> ｜ 原版 <b style="color:#8a96ad">${oex}</b></div>`
+      +`<div style="color:#8a96ad">收 ${b.close} · 200MA ${b.ma200} · 停損線 ${b.exit}</div>`;
+    tip.style.display='block';
+    const w=tip.offsetWidth, cw=dom.clientWidth; let x=p.point.x+16; if(x+w>cw)x=p.point.x-w-16;
+    tip.style.left=Math.max(0,x)+'px'; tip.style.top=Math.max(0,p.point.y-10)+'px';
+  });
+}
+
+function renderAdaptive(kb){
+  const host=document.getElementById('adaptPanel'); if(!host) return;
+  if(!kb||!kb.tickers||!kb.tickers.length){host.innerHTML='<div style="color:var(--muted);padding:10px">尚無資料</div>';return;}
+  _ad.data=kb;
+  if(!_ad.built){
+    const verdict=`<div style="background:#1a2233;border:1px solid var(--line);border-radius:8px;padding:11px 14px;font-size:12.5px;color:var(--muted);margin-bottom:12px;line-height:1.75">
+      <div style="color:#e6ecf5;font-weight:700;margin-bottom:4px">🐂 牛熊自適應版 — 我的設計與建議</div>
+      進出邏輯<b style="color:#e6ecf5">與原版完全相同</b>(回測證實「牛市抱過洗損」有害、已剔除);<b style="color:#e6ecf5">唯一差異</b>=偵測到牛市(MA200上彎+信用HYG/LQD健康)時,倉位上限 cap 1.5→<b style="color:#ffcb45">2.0 積極</b>;一轉熊(信用壞/MA200下彎)<b style="color:#2ecc71">自動收回保守</b>。2022 全年 0% 判牛市→積極自動關掉,不會被套。<b style="color:#e6ecf5">下面每根K標的是「這套自適應會怎麼建議/下注」,PIT 公正,再跟原版比。</b></div>`;
+    host.innerHTML = verdict
+      +`<div id="adTickers" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px"></div>`
+      +`<div id="adLatest" style="font-family:var(--font-mono);font-size:13px;margin-bottom:8px;padding:7px 10px;background:var(--panel2);border-radius:6px"></div>`
+      +`<div style="font-size:12px;color:var(--muted);margin-bottom:4px">① 自適應逐日標註(底部量條:🟢牛市積極檔 / ⚪熊市保守檔;hover看自適應vs原版曝險)</div>`
+      +`<div style="position:relative"><div id="adChart" style="width:100%;height:400px"></div>`
+      +`<div id="adTip" style="position:absolute;display:none;pointer-events:none;z-index:20;background:#0d1424f2;border:1px solid var(--line);border-radius:6px;padding:8px 10px;font-size:12px;color:var(--txt);max-width:300px"></div></div>`
+      +`<div style="font-size:12px;color:var(--muted);margin:12px 0 4px">② 權益曲線對比(<span style="color:#8a96ad">■原版</span> vs <span style="color:#ffcb45">■自適應</span>,對數軸)</div>`
+      +`<div id="adEqChart" style="width:100%;height:240px"></div>`
+      +`<div style="font-size:12px;color:var(--muted);margin:12px 0 4px">③ 全期統計對比(2006起,含2008 GFC=公正;不高估自適應)</div>`
+      +`<div style="overflow:auto"><table id="adStats" style="width:100%;border-collapse:collapse;font-size:12px;font-family:var(--font-mono)"></table></div>`
+      +`<div style="background:#141a28;border:1px solid var(--line);border-radius:8px;padding:12px 14px;font-size:12.5px;color:#cbd5e1;margin-top:14px;line-height:1.85">
+        <div style="color:#e6ecf5;font-weight:700;margin-bottom:6px">📌 結論:哪個好 / 能否互相借箭 / 缺陷</div>
+        <b style="color:#ffcb45">哪個好?</b> 風險調整後(Sharpe)<b>兩版幾乎一樣</b>(美股 −0.01~+0.02=雜訊)。自適應多的 CAGR(+3~5%)<b>幾乎全是牛市多冒的險</b>換來,回撤同步變深 → 這正是你的<b>資本配置線鐵律:槓桿是風險旋鈕,不是更聰明的擇時</b>。<br>
+        <b style="color:#2ecc71">互相借箭?</b> 可以,而且本就是同一套:自適應<b>借原版的信用哨/熊市保守當「保險絲」</b>(2022自動收手、回撤不惡化);原版<b>借自適應的「牛市自動調高RISK_MULT」當財富引擎</b>。合體=同一策略 + 一個 regime 旋鈕。<br>
+        <b style="color:#ff5a5a">缺陷?</b> 自適應:牛市<b>中途</b>啟動的急崩(如COVID 2020)因帶槓桿→回撤加深;regime 判斷有延遲。原版:牛市過度保守→<b>把利潤留在桌上</b>。<br>
+        <b style="color:#e6ecf5">給你的選擇:</b>要最大財富、能扛更深回撤 → 自適應(=regime-gated RISK_MULT,牛市積極熊市收手);要最穩、睡得著 → 原版。<b>這是風險胃納的取捨,不是誰「更對」——回測無法幫你證明自適應「更好」,只能證明它「牛市更肥、崩盤更痛」。</b></div>`;
+    const box=document.getElementById('adTickers');
+    kb.tickers.forEach(t=>{const b=document.createElement('button');b.textContent=t.symbol.replace('.TW','');b.dataset.sym=t.symbol;
+      b.style.cssText='padding:5px 10px;font-size:12px;cursor:pointer;border:1px solid var(--line);background:var(--panel2);color:var(--txt);border-radius:5px';
+      b.onclick=()=>_adSelect(t.symbol);box.appendChild(b);});
+    // 統計表(全標的)
+    const hd=`<thead><tr style="color:#64748b;text-align:right;border-bottom:1px solid var(--line)"><th style="padding:5px 8px;text-align:left">標的</th><th style="padding:5px 8px">原Sharpe</th><th style="padding:5px 8px">自適應</th><th style="padding:5px 8px">原CAGR</th><th style="padding:5px 8px">自適應</th><th style="padding:5px 8px">原MDD</th><th style="padding:5px 8px">自適應</th><th style="padding:5px 8px">平均曝險</th></tr></thead>`;
+    const rws=kb.tickers.map(t=>{const s=t.stats,b=s.base,a=s.adapt;
+      const dS=(a.sharpe-b.sharpe), dc=dS>=0?'#2ecc71':'#ff5a5a';
+      return `<tr data-sym="${t.symbol}" style="border-bottom:1px solid rgba(255,255,255,0.05);text-align:right"><td style="padding:5px 8px;text-align:left">${t.symbol.replace('.TW','')}</td>`
+        +`<td style="padding:5px 8px">${b.sharpe}</td><td style="padding:5px 8px;color:${dc}">${a.sharpe} (${dS>=0?'+':''}${dS.toFixed(3)})</td>`
+        +`<td style="padding:5px 8px">${b.cagr}%</td><td style="padding:5px 8px;color:#ffcb45">${a.cagr}%</td>`
+        +`<td style="padding:5px 8px">${b.mdd}%</td><td style="padding:5px 8px;color:#ff5a5a">${a.mdd}%</td>`
+        +`<td style="padding:5px 8px;color:var(--muted)">${s.avg_expo_base}→${s.avg_expo_adapt}% · 牛${s.bull_share}%</td></tr>`;}).join('');
+    document.getElementById('adStats').innerHTML=hd+'<tbody>'+rws+'</tbody>';
+    _adInit(); _ad.built=true;
+  }
+  _adSelect(_ad.cur||'QQQ');
+}
+
+function _adSelect(sym){
+  const t=_ad.data.tickers.find(x=>x.symbol===sym)||_ad.data.tickers[0];
+  if(!t||!_ad.candle) return;
+  _ad.cur=t.symbol;
+  document.querySelectorAll('#adTickers button').forEach(b=>{const on=b.dataset.sym===t.symbol;b.style.background=on?'rgba(255,203,69,0.25)':'var(--panel2)';b.style.borderColor=on?'#ffcb45':'var(--line)';});
+  document.querySelectorAll('#adStats tr[data-sym]').forEach(r=>{r.style.background=r.dataset.sym===t.symbol?'rgba(255,203,69,0.08)':'transparent';});
+  const bars=t.bars; _ad.byTime={}; bars.forEach(b=>{_ad.byTime[b.time]=b;});
+  _ad.candle.setData(bars.map(b=>({time:b.time,open:b.open,high:b.high,low:b.low,close:b.close})));
+  _ad.vol.setData(bars.map(b=>({time:b.time,value:b.volume,color:(b.adaptive&&b.adaptive.regime==='bull'?'#2ecc7188':'#8a96ad55')})));
+  // regime 轉折 markers
+  const mk=[]; let pr=null;
+  bars.forEach(b=>{const rg=b.adaptive?b.adaptive.regime:null; if(rg&&rg!==pr){mk.push({time:b.time,position:rg==='bull'?'belowBar':'aboveBar',color:AD_REG[rg],shape:rg==='bull'?'arrowUp':'arrowDown',text:rg==='bull'?'🐂積極':'🐻保守'});pr=rg;}});
+  _ad.candle.setMarkers(mk);
+  _ad.eqb.setData(bars.map((b,i)=>({time:b.time,value:t.eq_base[i]})));
+  _ad.eqa.setData(bars.map((b,i)=>({time:b.time,value:t.eq_adapt[i]})));
+  const last=bars[bars.length-1], a=last.adaptive, rc=AD_REG[a.regime];
+  const ex=(a.expo==null)?'維持':(a.expo*100).toFixed(0)+'%', oex=(last.expo==null)?'維持':(last.expo*100).toFixed(0)+'%';
+  document.getElementById('adLatest').innerHTML=`最新 <b>${t.symbol.replace('.TW','')}</b> [${last.time}] <span style="color:${rc};font-weight:700">${a.regime==='bull'?'🐂牛市積極':'🐻熊市保守'}</span>　${a.label}　自適應曝險 <b style="color:#ffcb45">${ex}</b>(原版 ${oex})`;
+  try{_ad.chart.timeScale().fitContent(); _ad.eqc.timeScale().fitContent();}catch(e){}
+}
+
 async function loadAll(){
   try{
     const [sig, ev, rb, cs, mn, tw, ld, ag, al, kb] = await Promise.all([
@@ -1314,6 +1429,7 @@ async function loadAll(){
     renderEvidence(ev);
     renderKbar(kb);
     renderDiag(kb);
+    renderAdaptive(kb);
     $('#foot').textContent = `${sig.config.universe||''}　|　進場：${sig.config.entry}　|　出場：${sig.config.exit}`;
   }catch(e){
     $('#regime').innerHTML = '<div class="lbl" style="color:var(--red)">⚠️ 資料載入失敗</div>'+

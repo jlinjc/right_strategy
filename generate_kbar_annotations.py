@@ -27,7 +27,7 @@ from scanner_base import DASHBOARD_DIR
 import core_status as C
 import taiwan_status as T
 
-START_DL = '2014-06-01'      # 下載起點(讓 2016 起 MA200 已暖身)
+START_DL = '2006-01-01'      # 下載起點(含2008 GFC → 比較統計才公正,不高估自適應;顯示K棒仍從 START_OUT)
 START_OUT = '2016-01-01'     # 輸出起點(早於此的暖身段不顯示)
 
 US = [('SPY', 'S&P500'), ('QQQ', '那斯達克100'), ('SMH', '半導體SMH'),
@@ -35,6 +35,7 @@ US = [('SPY', 'S&P500'), ('QQQ', '那斯達克100'), ('SMH', '半導體SMH'),
 TW = [('006208.TW', '富邦台50'), ('0050.TW', '元大台灣50')]
 US_CANARY = ['HYG', 'LQD']
 TW_CANARY = ['HYG', 'LQD', 'SOXX']
+BULL_CAP = 2.0          # 自適應版:牛市(MA200上彎+信用健康)cap 1.5→2.0;轉熊自動收回(research_regime_adaptive.py)
 
 
 def _clean_ohlc(df: pd.DataFrame, is_tw: bool) -> pd.DataFrame:
@@ -101,7 +102,57 @@ def _kcat(label: str) -> str:
     return 'other'
 
 
-def annotate(ohlc: pd.DataFrame, params: dict, vix: pd.Series, canary_closes: dict) -> list:
+def _buy_word(expo, quiet):
+    if expo >= 1.0:   w = f'可買(足量~{expo*100:.0f}%)'
+    elif expo >= 0.5: w = f'可小買(~{expo*100:.0f}%)'
+    else:             w = f'偏貴·買少量(~{(expo or 0)*100:.0f}%)'
+    return w + ('·無量緩破健康' if quiet else '')
+
+
+def _state_expo(c, ma, el, h, vx, bull, budget, cap, floor, adaptive):
+    """狀態機曝險(進出邏輯 base/adaptive 完全相同,只差牛市 cap;=公正比較的核心)。"""
+    n = len(c)
+    below = c < el
+    db = np.zeros(n, int); run = 0
+    for t in range(n):
+        run = run + 1 if below[t] else 0
+        db[t] = run
+    expo = np.zeros(n); in_pos = False; last_base = 0.0
+    for t in range(n):
+        credit_off = h[t] <= 0
+        reclaim = (not np.isnan(ma[t])) and c[t] >= ma[t]
+        panic = (not np.isnan(vx[t])) and vx[t] > C.PANIC_VIX
+        cap_eff = BULL_CAP if (adaptive and bull[t]) else cap
+        if not in_pos:
+            if reclaim and not credit_off:
+                in_pos = True
+        else:
+            if credit_off:
+                in_pos = False
+            elif below[t] and not (panic and db[t] < C.PANIC_DELAY):
+                in_pos = False
+        if in_pos and reclaim:
+            sd = (c[t] - el[t]) / c[t]
+            last_base = min(budget / max(sd, floor), cap_eff)
+            expo[t] = last_base * h[t]
+        elif in_pos:
+            expo[t] = last_base * h[t]
+    return expo
+
+
+def _stats(r):
+    r = r[~np.isnan(r)]
+    if len(r) < 20:
+        return {}
+    mu, sd = r.mean(), r.std()
+    eq = np.cumprod(1 + r)
+    dd = (eq / np.maximum.accumulate(eq) - 1).min()
+    return {'sharpe': round(float(mu / sd * np.sqrt(252)), 3) if sd > 0 else None,
+            'cagr': round(float(eq[-1] ** (252 / len(r)) - 1) * 100, 1),
+            'mdd': round(float(dd) * 100, 1)}
+
+
+def annotate(ohlc: pd.DataFrame, params: dict, vix: pd.Series, canary_closes: dict):
     """對單一標的逐日產生 PIT 標註。回傳 bars list。"""
     df = ohlc
     dates = df.index
@@ -137,6 +188,7 @@ def annotate(ohlc: pd.DataFrame, params: dict, vix: pd.Series, canary_closes: di
         days_below[t] = run
 
     bars = []
+    out_idx = []
     for t in range(len(close)):
         d = dates[t]
         if d < pd.Timestamp(START_OUT) or np.isnan(ma200[t]):
@@ -227,6 +279,19 @@ def annotate(ohlc: pd.DataFrame, params: dict, vix: pd.Series, canary_closes: di
             diag = {'code': dg[0], 'name': dg[1], 'better': dg[2], 'sev': dg[3],
                     'original': label, 'fwd63': fwd}
 
+        # ── 自適應版標籤(牛市積極/熊市保守):進出同原版,只差牛市 cap 拉高 → 曝險上限更高 ──
+        bull = slope_up and h >= 1.0
+        cap_eff = BULL_CAP if bull else cap
+        a_expo, a_label, a_tone = expo, label, tone
+        if tone in ('green', 'lime') and sr > 0:
+            a_expo = round(min((budget * h) / max(sr, C.STOP_DIST_FLOOR), cap_eff), 2)
+            if bull:                                     # 牛市買區→用更高上限重算下注量
+                a_label = _buy_word(a_expo, '無量緩破' in label)
+                a_tone = 'green' if a_expo >= 0.5 else 'lime'
+        adaptive = {'regime': 'bull' if bull else 'bear',
+                    'label': ('🐂積極 ' if bull else '🐻保守 ') + a_label,
+                    'tone': a_tone, 'expo': a_expo}
+
         bars.append({
             'time': d.strftime('%Y-%m-%d'),
             'open': round(float(openp[t]), 2), 'high': round(float(high[t]), 2),
@@ -234,8 +299,9 @@ def annotate(ohlc: pd.DataFrame, params: dict, vix: pd.Series, canary_closes: di
             'volume': float(vol[t]),
             'ma200': round(float(ma), 2), 'exit': round(float(ep), 2),
             'label': label, 'tone': tone,
-            'expo': expo, 'note': ' · '.join(note_bits), 'diag': diag,
+            'expo': expo, 'note': ' · '.join(note_bits), 'diag': diag, 'adaptive': adaptive,
         })
+        out_idx.append(t)
 
     # 同類診斷連續多日→只留每段第一天(避免markers爆量)
     prev = None
@@ -244,7 +310,29 @@ def annotate(ohlc: pd.DataFrame, params: dict, vix: pd.Series, canary_closes: di
         if code is not None and code == prev:
             b['diag'] = None
         prev = code
-    return bars
+
+    # ── 兩版狀態機權益曲線 + 全期統計(公正比較:同進出,只差牛市 cap) ──
+    bull_arr = (~np.isnan(slope20)) & (slope20 > 0) & (health >= 1.0)
+    floor = C.STOP_DIST_FLOOR
+    eb = _state_expo(close, ma200, exit_line, health, vix_al, bull_arr, budget, cap, floor, False)
+    ea = _state_expo(close, ma200, exit_line, health, vix_al, bull_arr, budget, cap, floor, True)
+    ret = np.zeros(_n); ret[1:] = close[1:] / close[:-1] - 1
+    rb = np.zeros(_n); rb[1:] = eb[:-1] * ret[1:]
+    ra = np.zeros(_n); ra[1:] = ea[:-1] * ret[1:]
+    valid = ~np.isnan(ma200)
+    stats = {'base': _stats(rb[valid]), 'adapt': _stats(ra[valid]),
+             'bull_share': round(float(np.mean(bull_arr[valid])) * 100, 0),
+             'avg_expo_base': round(float(np.mean(eb[valid])) * 100, 0),
+             'avg_expo_adapt': round(float(np.mean(ea[valid])) * 100, 0)}
+    eqb = np.cumprod(1 + rb); eqa = np.cumprod(1 + ra)
+    if out_idx:
+        b0, a0 = eqb[out_idx[0]] or 1.0, eqa[out_idx[0]] or 1.0
+        eq_base = [round(float(eqb[t] / b0 * 100), 2) for t in out_idx]
+        eq_adapt = [round(float(eqa[t] / a0 * 100), 2) for t in out_idx]
+    else:
+        eq_base = eq_adapt = []
+    extra = {'stats': stats, 'eq_base': eq_base, 'eq_adapt': eq_adapt}
+    return bars, extra
 
 
 def main():
@@ -281,7 +369,7 @@ def main():
             continue
         params = (T.TW_PARAMS.get(sym) if is_tw else C.PARAMS.get(sym)) or C.DEFAULT_PARAM
         canary_closes = {k: canary_raw[k] for k in (TW_CANARY if is_tw else US_CANARY) if k in canary_raw}
-        bars = annotate(d, params, vix, canary_closes)
+        bars, extra = annotate(d, params, vix, canary_closes)
         if not bars:
             continue
         last = bars[-1]
@@ -289,8 +377,12 @@ def main():
                             'market': 'tw' if is_tw else 'us',
                             'params': {'entry_thr': params['entry_thr'], 'exit_buf': params['exit_buf'],
                                        'budget': params['budget'], 'cap': params['cap']},
-                            'bars': bars})
-        print(f"  ✓ {sym:11} {name:8} {len(bars)} 根K  最新[{last['time']}] {last['label']}")
+                            'bars': bars, 'stats': extra['stats'],
+                            'eq_base': extra['eq_base'], 'eq_adapt': extra['eq_adapt']})
+        st = extra['stats']
+        print(f"  ✓ {sym:11} {name:8} {len(bars)} 根K  最新[{last['time']}] {last['label']}"
+              f"  | 原Sharpe {st['base'].get('sharpe')}/自適應 {st['adapt'].get('sharpe')}"
+              f" CAGR {st['base'].get('cagr')}→{st['adapt'].get('cagr')}%")
 
     out = {
         'generated': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
