@@ -1348,6 +1348,8 @@ function renderAdaptive(kb){
       +`<div id="adEqChart" style="width:100%;height:240px"></div>`
       +`<div style="font-size:12px;color:var(--muted);margin:12px 0 4px">③ 全期統計對比(2006起,含2008 GFC=公正;不高估自適應)</div>`
       +`<div style="overflow:auto"><table id="adStats" style="width:100%;border-collapse:collapse;font-size:12px;font-family:var(--font-mono)"></table></div>`
+      +`<div style="font-size:12px;color:var(--muted);margin:14px 0 4px">④ 積極度取捨掃描(牛市 cap 1.5→3.0;<b style="color:#e6ecf5">挑你「睡得著的回撤」那檔</b>。Sharpe 幾乎不變=純風險旋鈕,不是更好的擇時)</div>`
+      +`<div style="overflow:auto"><table id="adSweep" style="width:100%;border-collapse:collapse;font-size:12px;font-family:var(--font-mono)"></table></div>`
       +`<div style="background:#141a28;border:1px solid var(--line);border-radius:8px;padding:12px 14px;font-size:12.5px;color:#cbd5e1;margin-top:14px;line-height:1.85">
         <div style="color:#e6ecf5;font-weight:700;margin-bottom:6px">📌 結論:哪個好 / 能否互相借箭 / 缺陷</div>
         <b style="color:#ffcb45">哪個好?</b> 風險調整後(Sharpe)<b>兩版幾乎一樣</b>(美股 −0.01~+0.02=雜訊)。自適應多的 CAGR(+3~5%)<b>幾乎全是牛市多冒的險</b>換來,回撤同步變深 → 這正是你的<b>資本配置線鐵律:槓桿是風險旋鈕,不是更聰明的擇時</b>。<br>
@@ -1391,6 +1393,24 @@ function _adSelect(sym){
   const last=bars[bars.length-1], a=last.adaptive, rc=AD_REG[a.regime];
   const ex=(a.expo==null)?'維持':(a.expo*100).toFixed(0)+'%', oex=(last.expo==null)?'維持':(last.expo*100).toFixed(0)+'%';
   document.getElementById('adLatest').innerHTML=`最新 <b>${t.symbol.replace('.TW','')}</b> [${last.time}] <span style="color:${rc};font-weight:700">${a.regime==='bull'?'🐂牛市積極':'🐻熊市保守'}</span>　${a.label}　自適應曝險 <b style="color:#ffcb45">${ex}</b>(原版 ${oex})`;
+  // ④ 取捨掃描表
+  const sw=t.sweep||[];
+  if(sw.length){
+    const capNote=c=>c<=1.5?'原版·最穩·睡得著':c<1.9?'小積極':c<2.2?'平衡(推薦起點)':c<2.7?'積極':'博命·效率遞減';
+    const capLbl=c=>Number.isInteger(c)?c+'.0':(''+c);
+    const maxC=Math.max(...sw.map(x=>x.cagr)), maxM=Math.max(...sw.map(x=>Math.abs(x.mdd)));
+    const rws=sw.map(x=>{const rec=Math.abs(x.cap-2)<0.01;
+      const cbar=`<div style="display:inline-block;height:9px;width:${(x.cagr/maxC*80).toFixed(0)}px;background:#2ecc71;border-radius:2px;vertical-align:middle;margin-right:5px"></div>${x.cagr}%`;
+      const mbar=`<div style="display:inline-block;height:9px;width:${(Math.abs(x.mdd)/maxM*80).toFixed(0)}px;background:#ff5a5a;border-radius:2px;vertical-align:middle;margin-right:5px"></div>${x.mdd}%`;
+      return `<tr style="border-bottom:1px solid rgba(255,255,255,0.05);${rec?'background:rgba(255,203,69,0.08)':''}">`
+        +`<td style="padding:5px 8px;font-weight:${rec?700:400};color:${rec?'#ffcb45':'#e6ecf5'};white-space:nowrap">cap ${capLbl(x.cap)}${rec?' ★':''}</td>`
+        +`<td style="padding:5px 8px;color:var(--muted)">${capNote(x.cap)}</td>`
+        +`<td style="padding:5px 8px;text-align:right">${x.sharpe}</td>`
+        +`<td style="padding:5px 8px">${cbar}</td><td style="padding:5px 8px">${mbar}</td>`
+        +`<td style="padding:5px 8px;text-align:right;color:var(--muted)">${x.avg_expo}%</td></tr>`;}).join('');
+    document.getElementById('adSweep').innerHTML=
+      `<thead><tr style="color:#64748b;border-bottom:1px solid var(--line)"><th style="padding:5px 8px;text-align:left">牛市cap</th><th style="padding:5px 8px;text-align:left">定位</th><th style="padding:5px 8px;text-align:right">Sharpe</th><th style="padding:5px 8px;text-align:left">CAGR</th><th style="padding:5px 8px;text-align:left">最大回撤</th><th style="padding:5px 8px;text-align:right">平均曝險</th></tr></thead><tbody>${rws}</tbody>`;
+  }
   try{_ad.chart.timeScale().fitContent(); _ad.eqc.timeScale().fitContent();}catch(e){}
 }
 

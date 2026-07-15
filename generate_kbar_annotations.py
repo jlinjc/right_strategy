@@ -36,6 +36,7 @@ TW = [('006208.TW', '富邦台50'), ('0050.TW', '元大台灣50')]
 US_CANARY = ['HYG', 'LQD']
 TW_CANARY = ['HYG', 'LQD', 'SOXX']
 BULL_CAP = 2.0          # 自適應版:牛市(MA200上彎+信用健康)cap 1.5→2.0;轉熊自動收回(research_regime_adaptive.py)
+SWEEP_CAPS = [1.5, 1.75, 2.0, 2.5, 3.0]   # 積極度取捨掃描(1.5=原版;讓 Jason 挑「睡得著的回撤」那檔)
 
 
 def _clean_ohlc(df: pd.DataFrame, is_tw: bool) -> pd.DataFrame:
@@ -109,8 +110,8 @@ def _buy_word(expo, quiet):
     return w + ('·無量緩破健康' if quiet else '')
 
 
-def _state_expo(c, ma, el, h, vx, bull, budget, cap, floor, adaptive):
-    """狀態機曝險(進出邏輯 base/adaptive 完全相同,只差牛市 cap;=公正比較的核心)。"""
+def _state_expo(c, ma, el, h, vx, bull, budget, cap, floor, bull_cap):
+    """狀態機曝險(進出邏輯完全相同,只差牛市 cap=bull_cap;bull_cap=cap 即原版=公正比較核心)。"""
     n = len(c)
     below = c < el
     db = np.zeros(n, int); run = 0
@@ -122,7 +123,7 @@ def _state_expo(c, ma, el, h, vx, bull, budget, cap, floor, adaptive):
         credit_off = h[t] <= 0
         reclaim = (not np.isnan(ma[t])) and c[t] >= ma[t]
         panic = (not np.isnan(vx[t])) and vx[t] > C.PANIC_VIX
-        cap_eff = BULL_CAP if (adaptive and bull[t]) else cap
+        cap_eff = bull_cap if bull[t] else cap
         if not in_pos:
             if reclaim and not credit_off:
                 in_pos = True
@@ -314,12 +315,12 @@ def annotate(ohlc: pd.DataFrame, params: dict, vix: pd.Series, canary_closes: di
     # ── 兩版狀態機權益曲線 + 全期統計(公正比較:同進出,只差牛市 cap) ──
     bull_arr = (~np.isnan(slope20)) & (slope20 > 0) & (health >= 1.0)
     floor = C.STOP_DIST_FLOOR
-    eb = _state_expo(close, ma200, exit_line, health, vix_al, bull_arr, budget, cap, floor, False)
-    ea = _state_expo(close, ma200, exit_line, health, vix_al, bull_arr, budget, cap, floor, True)
     ret = np.zeros(_n); ret[1:] = close[1:] / close[:-1] - 1
+    valid = ~np.isnan(ma200)
+    eb = _state_expo(close, ma200, exit_line, health, vix_al, bull_arr, budget, cap, floor, cap)
+    ea = _state_expo(close, ma200, exit_line, health, vix_al, bull_arr, budget, cap, floor, BULL_CAP)
     rb = np.zeros(_n); rb[1:] = eb[:-1] * ret[1:]
     ra = np.zeros(_n); ra[1:] = ea[:-1] * ret[1:]
-    valid = ~np.isnan(ma200)
     stats = {'base': _stats(rb[valid]), 'adapt': _stats(ra[valid]),
              'bull_share': round(float(np.mean(bull_arr[valid])) * 100, 0),
              'avg_expo_base': round(float(np.mean(eb[valid])) * 100, 0),
@@ -331,7 +332,15 @@ def annotate(ohlc: pd.DataFrame, params: dict, vix: pd.Series, canary_closes: di
         eq_adapt = [round(float(eqa[t] / a0 * 100), 2) for t in out_idx]
     else:
         eq_base = eq_adapt = []
-    extra = {'stats': stats, 'eq_base': eq_base, 'eq_adapt': eq_adapt}
+    # ★積極度取捨掃描:牛市 cap 1.5→3.0 各自的 報酬↔回撤(讓 Jason 挑睡得著那檔)
+    sweep = []
+    for bc in SWEEP_CAPS:
+        ex = _state_expo(close, ma200, exit_line, health, vix_al, bull_arr, budget, cap, floor, bc)
+        rr = np.zeros(_n); rr[1:] = ex[:-1] * ret[1:]
+        st = _stats(rr[valid])
+        sweep.append({'cap': bc, 'sharpe': st.get('sharpe'), 'cagr': st.get('cagr'),
+                      'mdd': st.get('mdd'), 'avg_expo': round(float(np.mean(ex[valid])) * 100, 0)})
+    extra = {'stats': stats, 'eq_base': eq_base, 'eq_adapt': eq_adapt, 'sweep': sweep}
     return bars, extra
 
 
@@ -377,7 +386,7 @@ def main():
                             'market': 'tw' if is_tw else 'us',
                             'params': {'entry_thr': params['entry_thr'], 'exit_buf': params['exit_buf'],
                                        'budget': params['budget'], 'cap': params['cap']},
-                            'bars': bars, 'stats': extra['stats'],
+                            'bars': bars, 'stats': extra['stats'], 'sweep': extra['sweep'],
                             'eq_base': extra['eq_base'], 'eq_adapt': extra['eq_adapt']})
         st = extra['stats']
         print(f"  ✓ {sym:11} {name:8} {len(bars)} 根K  最新[{last['time']}] {last['label']}"
