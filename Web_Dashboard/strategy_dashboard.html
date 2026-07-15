@@ -159,6 +159,16 @@
   .grp .gbody section:first-child{margin-top:4px}
   .grp .gbody section{margin:18px 0}
   @media(max-width:720px){.play{grid-template-columns:1fr}}
+  /* Tabs(頁籤分類,降雜訊) */
+  .tabbar{display:flex;gap:6px;flex-wrap:wrap;margin:14px 0 6px;position:sticky;top:0;z-index:30;
+    background:var(--bg);padding:8px 0;border-bottom:1px solid var(--line)}
+  .tabbtn{padding:9px 15px;font-size:14px;font-weight:600;cursor:pointer;border:1px solid var(--line);
+    background:var(--panel);color:var(--muted);border-radius:10px;transition:.15s}
+  .tabbtn:hover{color:var(--txt);border-color:var(--mid)}
+  .tabbtn.active{color:var(--txt);background:var(--panel2);border-color:var(--accent)}
+  .tabpane{display:none}
+  .tabpane.active{display:block;animation:fadein .2s ease}
+  @keyframes fadein{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
 </style>
 </head>
 <body>
@@ -179,6 +189,15 @@
 </header>
 
 <div class="wrap">
+  <nav class="tabbar" id="tabbar">
+    <button class="tabbtn active" data-tab="today">🎯 今日作戰</button>
+    <button class="tabbtn" data-tab="config">💼 配置 / 策略</button>
+    <button class="tabbtn" data-tab="taiwan">🌏 台股</button>
+    <button class="tabbtn" data-tab="kbar">🕯️ 每日K棒</button>
+    <button class="tabbtn" data-tab="satellite">🏆 個股衛星</button>
+  </nav>
+
+  <div class="tabpane active" id="tab-today">
   <!-- 大盤 REGIME -->
   <div class="regime" id="regime">
     <div class="light"></div>
@@ -191,22 +210,28 @@
   <!-- ★今日掛單建議(台美股:該買什麼/別追什麼/掛單價) -->
   <div id="buyList"></div>
 
+  </div><!-- /tab-today -->
+
+  <div class="tabpane" id="tab-config">
   <!-- ★資產配置建議(核心/衛星/VRP 三塊,data talk) -->
   <div id="allocationPanel"></div>
 
   <!-- 核心-衛星 王者配置 -->
   <div id="coreBanner"></div>
+  </div><!-- /tab-config -->
 
+  <div class="tabpane" id="tab-taiwan">
   <!-- 台股版面板(同一套引擎搬到台股) -->
   <div id="taiwanPanel"></div>
+  </div><!-- /tab-taiwan -->
 
+  <div class="tabpane" id="tab-kbar">
   <!-- ★每日K棒 PIT 逐日標註(視覺化:每根K在「當天」會被標成什麼) -->
-  <details class="grp" id="kbarGroup" open>
-    <summary>🕯️ 每日K棒標註 — 每根K在「當天」會被標成什麼(PIT·無未來函數) <span class="ar">▸</span></summary>
-    <div class="gbody"><div id="kbarPanel"></div></div>
-  </details>
+  <div id="kbarPanel"></div>
+  </div><!-- /tab-kbar -->
 
-  <!-- ↓↓ 以下為「詳細資料」,預設收合,保持上方一目了然 ↓↓ -->
+  <div class="tabpane" id="tab-satellite">
+  <!-- ↓↓ 個股衛星(獨立系統) ↓↓ -->
 
   <!-- 個股衛星(龍頭 + 今日信號 + 醞釀) -->
   <details class="grp">
@@ -257,6 +282,8 @@
       </section>
     </div>
   </details>
+
+  </div><!-- /tab-satellite -->
 
   <div class="foot" id="foot"></div>
 </div>
@@ -1003,6 +1030,23 @@ function renderAggressive(ag){
     </div>
   </div>`;
 }
+
+// ── 頁籤切換(分類降雜訊) ──
+document.querySelectorAll('#tabbar .tabbtn').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    const tab=btn.dataset.tab;
+    document.querySelectorAll('#tabbar .tabbtn').forEach(b=>b.classList.toggle('active',b===btn));
+    document.querySelectorAll('.tabpane').forEach(p=>p.classList.toggle('active',p.id==='tab-'+tab));
+    // K棒圖在隱藏頁籤建立時寬度為0,切到時修正寬度並重新 fit
+    if(tab==='kbar' && _kb.chart){
+      try{ const d=document.getElementById('kbChart');
+        _kb.chart.applyOptions({width:d.clientWidth,height:d.clientHeight||440});
+        _kb.chart.timeScale().fitContent();
+      }catch(e){}
+    }
+    window.scrollTo({top:0,behavior:'smooth'});
+  });
+});
 
 // ── 每日K棒 PIT 標註(視覺化) ──
 const KB_TONE = {green:'#2ecc71', lime:'#a3e635', amber:'#ffcb45', red:'#ff5a5a'};
