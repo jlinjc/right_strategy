@@ -319,8 +319,8 @@ def annotate(ohlc: pd.DataFrame, params: dict, vix: pd.Series, canary_closes: di
     valid = ~np.isnan(ma200)
     eb = _state_expo(close, ma200, exit_line, health, vix_al, bull_arr, budget, cap, floor, cap)
     ea = _state_expo(close, ma200, exit_line, health, vix_al, bull_arr, budget, cap, floor, BULL_CAP)
-    # vol-timing:牛市 cap 隨波動縮放(平靜加碼/動盪縮);research_voltiming_robust.py 僅 QQQ 穩健
-    rv_ser = s_close.pct_change().rolling(C.VOL_WIN).std() * np.sqrt(252)
+    # vol-timing:牛市 cap 隨波動縮放(平靜加碼/動盪縮);EWMA 波動預測,QQQ+SMH 穩健(research_sizing_deepen.py)
+    rv_ser = s_close.pct_change().ewm(span=C.VOL_WIN).std() * np.sqrt(252)
     rvs = rv_ser.values
     medvs = rv_ser.rolling(C.VOL_MED).median().values
     vcap = np.clip(cap * medvs / rvs, cap * C.VOL_CAP_LO_MULT, cap * C.VOL_CAP_HI_MULT)

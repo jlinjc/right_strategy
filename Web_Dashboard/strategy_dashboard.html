@@ -1366,7 +1366,7 @@ function renderAdaptive(kb){
     const hd=`<thead><tr style="color:#64748b;text-align:right;border-bottom:1px solid var(--line)"><th style="padding:5px 8px;text-align:left">標的</th><th style="padding:5px 8px">原Sharpe</th><th style="padding:5px 8px">自適應</th><th style="padding:5px 8px">vol-timing</th><th style="padding:5px 8px">原CAGR</th><th style="padding:5px 8px">自適應</th><th style="padding:5px 8px">原MDD</th><th style="padding:5px 8px">自適應</th><th style="padding:5px 8px">平均曝險</th></tr></thead>`;
     const rws=kb.tickers.map(t=>{const s=t.stats,b=s.base,a=s.adapt,v=s.vol;
       const dS=(a.sharpe-b.sharpe), dc=dS>=0?'#2ecc71':'#ff5a5a';
-      const dV=(v.sharpe-b.sharpe), robust=(t.symbol==='QQQ');
+      const dV=(v.sharpe-b.sharpe), robust=(t.symbol==='QQQ'||t.symbol==='SMH');
       const vcol=robust?(dV>=0?'#2ecc71':'#ff5a5a'):'#8a96ad';
       return `<tr data-sym="${t.symbol}" style="border-bottom:1px solid rgba(255,255,255,0.05);text-align:right"><td style="padding:5px 8px;text-align:left">${t.symbol.replace('.TW','')}</td>`
         +`<td style="padding:5px 8px">${b.sharpe}</td><td style="padding:5px 8px;color:${dc}">${a.sharpe} (${dS>=0?'+':''}${dS.toFixed(3)})</td>`
@@ -1375,7 +1375,7 @@ function renderAdaptive(kb){
         +`<td style="padding:5px 8px">${b.mdd}%</td><td style="padding:5px 8px;color:#ff5a5a">${a.mdd}%</td>`
         +`<td style="padding:5px 8px;color:var(--muted)">${s.avg_expo_base}→${s.avg_expo_adapt}% · 牛${s.bull_share}%</td></tr>`;}).join('');
     document.getElementById('adStats').innerHTML=hd+'<tbody>'+rws+'</tbody>';
-    document.getElementById('adVolNote').innerHTML='vol-timing:牛市 cap 隨波動縮放(平靜加碼/動盪縮)。<b style="color:#2ecc71">✅QQQ 穩健</b>(32格參數掃描 26 格勝過原版與裸槓桿)→<b style="color:#e6ecf5">已接進 live core_status,只對 QQQ 啟用</b>。<b style="color:#8a96ad">*SMH/SPY 此格數字是參數運氣</b>(換波動窗就垮,SMH 12/32、SPY 8/32)→live 不啟用,別當真。';
+    document.getElementById('adVolNote').innerHTML='vol-timing:牛市 cap 隨<b>EWMA 波動預測</b>縮放(平靜加碼/動盪縮)。48格掃描:<b style="color:#2ecc71">✅QQQ 48/48、SMH 40/48</b>(EWMA 把 SMH 從 realized 的 32/48 救活)→<b style="color:#e6ecf5">已接進 live core_status,QQQ+SMH 啟用</b>。<b style="color:#8a96ad">*SPY 仍無效不啟用</b>(低波動指數沒東西可縮)。';
     _adInit(); _ad.built=true;
   }
   _adSelect(_ad.cur||'QQQ');

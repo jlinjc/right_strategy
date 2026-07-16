@@ -92,12 +92,13 @@ RISK_MULT = 1.0
 RISK_MULT = min(RISK_MULT, 1.5)   # 硬上限:防止誤設成 Kelly 級槓桿
 STOP_DIST_FLOOR = 0.02   # 停損距下限(剛站上MA200時防爆槓桿,對應回測 clip(lower=0.02))
 
-# ★ vol-timing 下注縮放(research_voltiming_robust.py:僅 QQQ 穩健 26/32 格、+0.03 Sharpe;SMH參數運氣/SPY無效→只套QQQ):
-#   牛市(站上200MA 且 MA200上彎)時,cap 隨波動縮放=clip(cap×中位波動/實現波動, cap×0.67, cap×1.67)。
-#   平靜(實現<中位)→加碼、動盪(崩前兆)→自動縮。信用哨仍在 main 把關(信用壞→曝險照砍)。
-#   誠實:邊際升級非普適、非最大財富(換的是效率/淺回撤)。機制=Moreira-Muir 波動擇時。
-VOL_TIMING = {'QQQ'}     # 只對這些標的啟用(實測只有 QQQ 穩健)
-VOL_WIN = 20             # 實現波動窗
+# ★ vol-timing 下注縮放(research_voltiming_robust.py / research_sizing_deepen.py):
+#   牛市(站上200MA 且 MA200上彎)時,cap 隨波動縮放=clip(cap×中位波動/EWMA波動, cap×0.67, cap×1.67)。
+#   平靜(波動<中位)→加碼、動盪(崩前兆)→自動縮。信用哨仍在 main 把關(信用壞→曝險照砍)。
+#   ★用 EWMA 波動『預測』(非事後 realized):48格掃描 QQQ 48/48、SMH 40/48(EWMA 把 SMH 從 32/48 救活)。
+#   誠實:邊際升級(+0.03~0.05 Sharpe)非普適、非最大財富(換效率/淺回撤);SPY 無效不啟用。機制=Moreira-Muir。
+VOL_TIMING = {'QQQ', 'SMH'}   # EWMA 後 QQQ+SMH 皆穩健啟用;SPY 無效不啟用
+VOL_WIN = 20             # EWMA 波動 span
 VOL_MED = 252            # 中位波動窗(基準)
 VOL_CAP_LO_MULT = 0.667  # cap 下限 = cap×此(base cap 1.5 → 1.0)
 VOL_CAP_HI_MULT = 1.667  # cap 上限 = cap×此(base cap 1.5 → 2.5)
@@ -231,11 +232,11 @@ def core_signal(close: pd.Series, vix_last: float | None, ticker: str,
     cap_use = cap
     vol_note = None
     if ticker in VOL_TIMING and last >= ma and len(ma_series) > 21 and ma > float(ma_series.iloc[-21]):
-        rvs = close.pct_change().rolling(VOL_WIN).std() * (252 ** 0.5)
+        rvs = close.pct_change().ewm(span=VOL_WIN).std() * (252 ** 0.5)   # EWMA 波動預測(勝 realized)
         rv = float(rvs.iloc[-1]); medv = float(rvs.iloc[-VOL_MED:].median())
         if rv > 0 and medv == medv:
             cap_use = round(min(max(cap * medv / rv, cap * VOL_CAP_LO_MULT), cap * VOL_CAP_HI_MULT), 2)
-            vol_note = (f'vol-timing:cap {cap:.2f}→{cap_use:.2f}(實現波動 {rv*100:.0f}% vs 中位 {medv*100:.0f}%,'
+            vol_note = (f'vol-timing:cap {cap:.2f}→{cap_use:.2f}(EWMA波動 {rv*100:.0f}% vs 中位 {medv*100:.0f}%,'
                         f'{"平靜加碼" if cap_use > cap else "動盪縮" if cap_use < cap else "持平"})')
     stop_dist_frac = max(stop_risk / 100.0, STOP_DIST_FLOOR)
     expo_raw = round(min(budget / stop_dist_frac, cap_use), 2)
