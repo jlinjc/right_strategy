@@ -92,6 +92,16 @@ RISK_MULT = 1.0
 RISK_MULT = min(RISK_MULT, 1.5)   # 硬上限:防止誤設成 Kelly 級槓桿
 STOP_DIST_FLOOR = 0.02   # 停損距下限(剛站上MA200時防爆槓桿,對應回測 clip(lower=0.02))
 
+# ★ vol-timing 下注縮放(research_voltiming_robust.py:僅 QQQ 穩健 26/32 格、+0.03 Sharpe;SMH參數運氣/SPY無效→只套QQQ):
+#   牛市(站上200MA 且 MA200上彎)時,cap 隨波動縮放=clip(cap×中位波動/實現波動, cap×0.67, cap×1.67)。
+#   平靜(實現<中位)→加碼、動盪(崩前兆)→自動縮。信用哨仍在 main 把關(信用壞→曝險照砍)。
+#   誠實:邊際升級非普適、非最大財富(換的是效率/淺回撤)。機制=Moreira-Muir 波動擇時。
+VOL_TIMING = {'QQQ'}     # 只對這些標的啟用(實測只有 QQQ 穩健)
+VOL_WIN = 20             # 實現波動窗
+VOL_MED = 252            # 中位波動窗(基準)
+VOL_CAP_LO_MULT = 0.667  # cap 下限 = cap×此(base cap 1.5 → 1.0)
+VOL_CAP_HI_MULT = 1.667  # cap 上限 = cap×此(base cap 1.5 → 2.5)
+
 # 路線B(輪動)用哪個分數挑最強核心:
 #   'voladj' = 126日波動調整動能(最高Sharpe1.37,穩健,預設)
 #   'csm'    = 60/120/252多週期平均(最大財富:報酬+43%、OOS同穩,代價-0.08Sharpe)
@@ -217,8 +227,18 @@ def core_signal(close: pd.Series, vix_last: float | None, ticker: str,
         rs_csm = round((r60 + r120 + r252) / 3, 3)
 
     # ★ RiskTarget 倉位:曝險 = clip(budget / 停損距, 0, cap)。停損短(便宜)→加倉、停損寬(貴)→減倉。
+    #   ★vol-timing(僅 QQQ):牛市時 cap 隨波動縮放(平靜加碼/動盪縮);信用哨仍在 main 把關。
+    cap_use = cap
+    vol_note = None
+    if ticker in VOL_TIMING and last >= ma and len(ma_series) > 21 and ma > float(ma_series.iloc[-21]):
+        rvs = close.pct_change().rolling(VOL_WIN).std() * (252 ** 0.5)
+        rv = float(rvs.iloc[-1]); medv = float(rvs.iloc[-VOL_MED:].median())
+        if rv > 0 and medv == medv:
+            cap_use = round(min(max(cap * medv / rv, cap * VOL_CAP_LO_MULT), cap * VOL_CAP_HI_MULT), 2)
+            vol_note = (f'vol-timing:cap {cap:.2f}→{cap_use:.2f}(實現波動 {rv*100:.0f}% vs 中位 {medv*100:.0f}%,'
+                        f'{"平靜加碼" if cap_use > cap else "動盪縮" if cap_use < cap else "持平"})')
     stop_dist_frac = max(stop_risk / 100.0, STOP_DIST_FLOOR)
-    expo_raw = round(min(budget / stop_dist_frac, cap), 2)
+    expo_raw = round(min(budget / stop_dist_frac, cap_use), 2)
 
     # ── 持有者：續抱 / 出場 / 恐慌觀察 ──
     if last >= ma:
@@ -266,6 +286,7 @@ def core_signal(close: pd.Series, vix_last: float | None, ticker: str,
             'suggested_expo': suggested_expo, 'rs_score': rs_score, 'rs_csm': rs_csm, 'is_strongest': False,
             'days_below': days_below, 'panic': panic,
             'state': state, 'action': hold_action, 'hold_action': hold_action,
+            'cap_used': cap_use, 'vol_note': vol_note,
             'entry_state': entry_state, 'entry_action': entry_action, **struct}
 
 
@@ -564,7 +585,9 @@ def main():
         print(f"          💵 空手→ {entry_emoji[d['entry_state']]} {d['entry_action']}")
         if d.get('structure_note'):
             print(f"          📐 結構→ {d['structure_note']}")
-        print(f"          📊 RiskTarget 建議曝險 {ex} = clip(budget {d['budget']} / 停損距 {d['stop_risk_pct']:.0f}%, 0, cap {d['cap']:.1f})")
+        print(f"          📊 RiskTarget 建議曝險 {ex} = clip(budget {d['budget']} / 停損距 {d['stop_risk_pct']:.0f}%, 0, cap {d.get('cap_used', d['cap']):.2f})")
+        if d.get('vol_note'):
+            print(f"          🌊 {d['vol_note']}")
         print(f"          🛑 停損線 ${d['exit_price']:.2f}(現價進場停損距 -{d['stop_risk_pct']:.0f}%) · 進場上限 ${d['entry_cap']:.2f} · 不停利")
     if canary:
         ce = '🟢' if canary['health'] >= 1 else ('🟠' if canary['health'] > 0 else '🔴')

@@ -1312,6 +1312,7 @@ function _adInit(){
   _ad.eqc=LightweightCharts.createChart(eqd,Object.assign({},opt,{rightPriceScale:{borderColor:'rgba(255,255,255,0.08)',mode:LightweightCharts.PriceScaleMode.Logarithmic}}));
   _ad.eqb=_ad.eqc.addLineSeries({color:'#8a96ad',lineWidth:2,priceLineVisible:false,title:'原版'});
   _ad.eqa=_ad.eqc.addLineSeries({color:'#ffcb45',lineWidth:2,priceLineVisible:false,title:'自適應'});
+  _ad.eqv=_ad.eqc.addLineSeries({color:'#4da3ff',lineWidth:2,priceLineVisible:false,title:'vol-timing'});
   new ResizeObserver(es=>{if(es.length)_ad.eqc.applyOptions({width:es[0].contentRect.width,height:es[0].contentRect.height});}).observe(eqd);
   const tip=document.getElementById('adTip');
   _ad.chart.subscribeCrosshairMove(p=>{
@@ -1344,10 +1345,11 @@ function renderAdaptive(kb){
       +`<div style="font-size:12px;color:var(--muted);margin-bottom:4px">① 自適應逐日標註(底部量條:🟢牛市積極檔 / ⚪熊市保守檔;hover看自適應vs原版曝險)</div>`
       +`<div style="position:relative"><div id="adChart" style="width:100%;height:400px"></div>`
       +`<div id="adTip" style="position:absolute;display:none;pointer-events:none;z-index:20;background:#0d1424f2;border:1px solid var(--line);border-radius:6px;padding:8px 10px;font-size:12px;color:var(--txt);max-width:300px"></div></div>`
-      +`<div style="font-size:12px;color:var(--muted);margin:12px 0 4px">② 權益曲線對比(<span style="color:#8a96ad">■原版</span> vs <span style="color:#ffcb45">■自適應</span>,對數軸)</div>`
+      +`<div style="font-size:12px;color:var(--muted);margin:12px 0 4px">② 權益曲線對比(<span style="color:#8a96ad">■原版</span> vs <span style="color:#ffcb45">■自適應(牛市cap2.0)</span> vs <span style="color:#4da3ff">■vol-timing(波動縮放·僅QQQ穩健)</span>,對數軸)</div>`
       +`<div id="adEqChart" style="width:100%;height:240px"></div>`
       +`<div style="font-size:12px;color:var(--muted);margin:12px 0 4px">③ 全期統計對比(2006起,含2008 GFC=公正;不高估自適應)</div>`
       +`<div style="overflow:auto"><table id="adStats" style="width:100%;border-collapse:collapse;font-size:12px;font-family:var(--font-mono)"></table></div>`
+      +`<div id="adVolNote" style="font-size:11.5px;color:var(--muted);margin-top:6px;line-height:1.6"></div>`
       +`<div style="font-size:12px;color:var(--muted);margin:14px 0 4px">④ 積極度取捨掃描(牛市 cap 1.5→3.0;<b style="color:#e6ecf5">挑你「睡得著的回撤」那檔</b>。Sharpe 幾乎不變=純風險旋鈕,不是更好的擇時)</div>`
       +`<div style="overflow:auto"><table id="adSweep" style="width:100%;border-collapse:collapse;font-size:12px;font-family:var(--font-mono)"></table></div>`
       +`<div style="background:#141a28;border:1px solid var(--line);border-radius:8px;padding:12px 14px;font-size:12.5px;color:#cbd5e1;margin-top:14px;line-height:1.85">
@@ -1361,15 +1363,19 @@ function renderAdaptive(kb){
       b.style.cssText='padding:5px 10px;font-size:12px;cursor:pointer;border:1px solid var(--line);background:var(--panel2);color:var(--txt);border-radius:5px';
       b.onclick=()=>_adSelect(t.symbol);box.appendChild(b);});
     // 統計表(全標的)
-    const hd=`<thead><tr style="color:#64748b;text-align:right;border-bottom:1px solid var(--line)"><th style="padding:5px 8px;text-align:left">標的</th><th style="padding:5px 8px">原Sharpe</th><th style="padding:5px 8px">自適應</th><th style="padding:5px 8px">原CAGR</th><th style="padding:5px 8px">自適應</th><th style="padding:5px 8px">原MDD</th><th style="padding:5px 8px">自適應</th><th style="padding:5px 8px">平均曝險</th></tr></thead>`;
-    const rws=kb.tickers.map(t=>{const s=t.stats,b=s.base,a=s.adapt;
+    const hd=`<thead><tr style="color:#64748b;text-align:right;border-bottom:1px solid var(--line)"><th style="padding:5px 8px;text-align:left">標的</th><th style="padding:5px 8px">原Sharpe</th><th style="padding:5px 8px">自適應</th><th style="padding:5px 8px">vol-timing</th><th style="padding:5px 8px">原CAGR</th><th style="padding:5px 8px">自適應</th><th style="padding:5px 8px">原MDD</th><th style="padding:5px 8px">自適應</th><th style="padding:5px 8px">平均曝險</th></tr></thead>`;
+    const rws=kb.tickers.map(t=>{const s=t.stats,b=s.base,a=s.adapt,v=s.vol;
       const dS=(a.sharpe-b.sharpe), dc=dS>=0?'#2ecc71':'#ff5a5a';
+      const dV=(v.sharpe-b.sharpe), robust=(t.symbol==='QQQ');
+      const vcol=robust?(dV>=0?'#2ecc71':'#ff5a5a'):'#8a96ad';
       return `<tr data-sym="${t.symbol}" style="border-bottom:1px solid rgba(255,255,255,0.05);text-align:right"><td style="padding:5px 8px;text-align:left">${t.symbol.replace('.TW','')}</td>`
         +`<td style="padding:5px 8px">${b.sharpe}</td><td style="padding:5px 8px;color:${dc}">${a.sharpe} (${dS>=0?'+':''}${dS.toFixed(3)})</td>`
+        +`<td style="padding:5px 8px;color:${vcol}">${v.sharpe} (${dV>=0?'+':''}${dV.toFixed(3)})${robust?' ✅':'*'}</td>`
         +`<td style="padding:5px 8px">${b.cagr}%</td><td style="padding:5px 8px;color:#ffcb45">${a.cagr}%</td>`
         +`<td style="padding:5px 8px">${b.mdd}%</td><td style="padding:5px 8px;color:#ff5a5a">${a.mdd}%</td>`
         +`<td style="padding:5px 8px;color:var(--muted)">${s.avg_expo_base}→${s.avg_expo_adapt}% · 牛${s.bull_share}%</td></tr>`;}).join('');
     document.getElementById('adStats').innerHTML=hd+'<tbody>'+rws+'</tbody>';
+    document.getElementById('adVolNote').innerHTML='vol-timing:牛市 cap 隨波動縮放(平靜加碼/動盪縮)。<b style="color:#2ecc71">✅QQQ 穩健</b>(32格參數掃描 26 格勝過原版與裸槓桿)→<b style="color:#e6ecf5">已接進 live core_status,只對 QQQ 啟用</b>。<b style="color:#8a96ad">*SMH/SPY 此格數字是參數運氣</b>(換波動窗就垮,SMH 12/32、SPY 8/32)→live 不啟用,別當真。';
     _adInit(); _ad.built=true;
   }
   _adSelect(_ad.cur||'QQQ');
@@ -1390,6 +1396,7 @@ function _adSelect(sym){
   _ad.candle.setMarkers(mk);
   _ad.eqb.setData(bars.map((b,i)=>({time:b.time,value:t.eq_base[i]})));
   _ad.eqa.setData(bars.map((b,i)=>({time:b.time,value:t.eq_adapt[i]})));
+  if(t.eq_vol)_ad.eqv.setData(bars.map((b,i)=>({time:b.time,value:t.eq_vol[i]})));
   const last=bars[bars.length-1], a=last.adaptive, rc=AD_REG[a.regime];
   const ex=(a.expo==null)?'維持':(a.expo*100).toFixed(0)+'%', oex=(last.expo==null)?'維持':(last.expo*100).toFixed(0)+'%';
   document.getElementById('adLatest').innerHTML=`最新 <b>${t.symbol.replace('.TW','')}</b> [${last.time}] <span style="color:${rc};font-weight:700">${a.regime==='bull'?'🐂牛市積極':'🐻熊市保守'}</span>　${a.label}　自適應曝險 <b style="color:#ffcb45">${ex}</b>(原版 ${oex})`;

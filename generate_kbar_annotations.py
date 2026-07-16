@@ -123,7 +123,7 @@ def _state_expo(c, ma, el, h, vx, bull, budget, cap, floor, bull_cap):
         credit_off = h[t] <= 0
         reclaim = (not np.isnan(ma[t])) and c[t] >= ma[t]
         panic = (not np.isnan(vx[t])) and vx[t] > C.PANIC_VIX
-        cap_eff = bull_cap if bull[t] else cap
+        cap_eff = ((bull_cap[t] if hasattr(bull_cap, '__len__') else bull_cap) if bull[t] else cap)
         if not in_pos:
             if reclaim and not credit_off:
                 in_pos = True
@@ -319,19 +319,29 @@ def annotate(ohlc: pd.DataFrame, params: dict, vix: pd.Series, canary_closes: di
     valid = ~np.isnan(ma200)
     eb = _state_expo(close, ma200, exit_line, health, vix_al, bull_arr, budget, cap, floor, cap)
     ea = _state_expo(close, ma200, exit_line, health, vix_al, bull_arr, budget, cap, floor, BULL_CAP)
+    # vol-timing:牛市 cap 隨波動縮放(平靜加碼/動盪縮);research_voltiming_robust.py 僅 QQQ 穩健
+    rv_ser = s_close.pct_change().rolling(C.VOL_WIN).std() * np.sqrt(252)
+    rvs = rv_ser.values
+    medvs = rv_ser.rolling(C.VOL_MED).median().values
+    vcap = np.clip(cap * medvs / rvs, cap * C.VOL_CAP_LO_MULT, cap * C.VOL_CAP_HI_MULT)
+    vcap = np.where(np.isnan(vcap), cap, vcap)
+    ev = _state_expo(close, ma200, exit_line, health, vix_al, bull_arr, budget, cap, floor, vcap)
     rb = np.zeros(_n); rb[1:] = eb[:-1] * ret[1:]
     ra = np.zeros(_n); ra[1:] = ea[:-1] * ret[1:]
-    stats = {'base': _stats(rb[valid]), 'adapt': _stats(ra[valid]),
+    rvret = np.zeros(_n); rvret[1:] = ev[:-1] * ret[1:]
+    stats = {'base': _stats(rb[valid]), 'adapt': _stats(ra[valid]), 'vol': _stats(rvret[valid]),
              'bull_share': round(float(np.mean(bull_arr[valid])) * 100, 0),
              'avg_expo_base': round(float(np.mean(eb[valid])) * 100, 0),
-             'avg_expo_adapt': round(float(np.mean(ea[valid])) * 100, 0)}
-    eqb = np.cumprod(1 + rb); eqa = np.cumprod(1 + ra)
+             'avg_expo_adapt': round(float(np.mean(ea[valid])) * 100, 0),
+             'avg_expo_vol': round(float(np.mean(ev[valid])) * 100, 0)}
+    eqb = np.cumprod(1 + rb); eqa = np.cumprod(1 + ra); eqv = np.cumprod(1 + rvret)
     if out_idx:
-        b0, a0 = eqb[out_idx[0]] or 1.0, eqa[out_idx[0]] or 1.0
+        b0, a0, v0 = eqb[out_idx[0]] or 1.0, eqa[out_idx[0]] or 1.0, eqv[out_idx[0]] or 1.0
         eq_base = [round(float(eqb[t] / b0 * 100), 2) for t in out_idx]
         eq_adapt = [round(float(eqa[t] / a0 * 100), 2) for t in out_idx]
+        eq_vol = [round(float(eqv[t] / v0 * 100), 2) for t in out_idx]
     else:
-        eq_base = eq_adapt = []
+        eq_base = eq_adapt = eq_vol = []
     # ★積極度取捨掃描:牛市 cap 1.5→3.0 各自的 報酬↔回撤(讓 Jason 挑睡得著那檔)
     sweep = []
     for bc in SWEEP_CAPS:
@@ -340,7 +350,7 @@ def annotate(ohlc: pd.DataFrame, params: dict, vix: pd.Series, canary_closes: di
         st = _stats(rr[valid])
         sweep.append({'cap': bc, 'sharpe': st.get('sharpe'), 'cagr': st.get('cagr'),
                       'mdd': st.get('mdd'), 'avg_expo': round(float(np.mean(ex[valid])) * 100, 0)})
-    extra = {'stats': stats, 'eq_base': eq_base, 'eq_adapt': eq_adapt, 'sweep': sweep}
+    extra = {'stats': stats, 'eq_base': eq_base, 'eq_adapt': eq_adapt, 'eq_vol': eq_vol, 'sweep': sweep}
     return bars, extra
 
 
@@ -387,7 +397,8 @@ def main():
                             'params': {'entry_thr': params['entry_thr'], 'exit_buf': params['exit_buf'],
                                        'budget': params['budget'], 'cap': params['cap']},
                             'bars': bars, 'stats': extra['stats'], 'sweep': extra['sweep'],
-                            'eq_base': extra['eq_base'], 'eq_adapt': extra['eq_adapt']})
+                            'eq_base': extra['eq_base'], 'eq_adapt': extra['eq_adapt'],
+                            'eq_vol': extra['eq_vol']})
         st = extra['stats']
         print(f"  ✓ {sym:11} {name:8} {len(bars)} 根K  最新[{last['time']}] {last['label']}"
               f"  | 原Sharpe {st['base'].get('sharpe')}/自適應 {st['adapt'].get('sharpe')}"
