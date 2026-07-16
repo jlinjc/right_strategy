@@ -229,14 +229,15 @@ def annotate(ohlc: pd.DataFrame, params: dict, vix: pd.Series, canary_closes: di
             blowoff = newhigh and (not np.isnan(rv)) and rv >= C.BLOWOFF_VOL
             quiet_bo = newhigh and (not np.isnan(rv)) and rv <= C.QUIET_VOL
             chop = abs(c / ma - 1) <= C.CHOP_ZONE_PCT / 100.0
+            ma_up = (not np.isnan(slope20[t])) and slope20[t] > 0   # D4:MA200上彎的鋸齒=發射台非陷阱
             r = resist[t]
             room = (r / c - 1) if r else None
             if ec is not None and c >= ec:
                 tone, label = 'amber', '追高·別追(等拉回50MA)'
                 note_bits.append(f'距50MA +{(c/ma50[t]-1)*100:.0f}% > 門檻 +{(thr-1)*100:.0f}%')
-            elif chop:
+            elif chop and not ma_up:
                 tone, label = 'amber', '鋸齒區·觀望(信心低)'
-                note_bits.append(f'離200MA 僅 {(c/ma-1)*100:+.0f}%(剛站上假訊號多)')
+                note_bits.append(f'離200MA 僅 {(c/ma-1)*100:+.0f}% 且 MA200未上彎(假訊號多)')
             elif blowoff:
                 tone, label = 'amber', '爆量突破·別追那根'
                 note_bits.append(f'創{C.BREAKOUT_WIN}日新高 × 量 {rv:.1f}倍=短線耗竭')
@@ -249,9 +250,12 @@ def annotate(ohlc: pd.DataFrame, params: dict, vix: pd.Series, canary_closes: di
                 elif expo is not None and expo >= 0.5:
                     tone, label = 'green', f'可小買(~{expo*100:.0f}%)'
                 else:
-                    tone, label = 'lime', f'偏貴·買少量(~{(expo or 0)*100:.0f}%)'
+                    # D3:曝險<50%=停損太遠,負期望;空手別新進,持有者續抱(非「買少量」)
+                    tone, label = 'amber', f'偏貴·空手別追(持有續抱,曝險僅{(expo or 0)*100:.0f}%)'
                 if quiet_bo:
                     label += '·無量緩破健康'
+                if chop and ma_up:
+                    note_bits.append('鋸齒區但MA200上彎=發射台(D4:歷史此格報酬高於基準)')
                 note_bits.append(f'停損距 -{sr*100:.0f}%'
                                  + (f' · 上方壓力 {r:.2f}(+{room*100:.0f}%)' if r else ' · 藍天無壓'))
         if 0 < h < 1:
@@ -268,10 +272,7 @@ def annotate(ohlc: pd.DataFrame, params: dict, vix: pd.Series, canary_closes: di
             dg = ('D1', 'V底回補漏接', '🟢 勇敢買:指數已收復200MA、VIX從尖峰回落→別等信用慢哨,直接回補', 'high')
         elif cg == 'exit' and days_below[t] <= 2:
             dg = ('D2', '出場洗損風險', '🟠 第1天別砍:改「跌破觀察」,連續3日+信用同壞才出(常反彈)', 'high')
-        elif cg == 'expensive':
-            dg = ('D3', '偏貴誤標', '空手改「別追高(等拉回)」;曝險已極低=其實別新進,持有者續抱', 'med')
-        elif cg == 'chop' and slope_up:
-            dg = ('D4', '鋸齒誤判', 'MA200上彎=發射台,改「可買」別觀望', 'med')
+        # D3(偏貴誤標)/D4(鋸齒誤判)已直接修進標籤邏輯(2026-07-17),診斷不再重複標記
         elif cg == 'buy_full' and expo is not None and expo >= cap * 0.95 and (not slope_up or h < 1):
             dg = ('D5', '做頭型滿槓桿', '拉回若為較低高點/信用轉弱→別上滿150%,減半', 'low')
         diag = None
