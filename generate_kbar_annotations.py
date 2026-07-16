@@ -289,9 +289,10 @@ def annotate(ohlc: pd.DataFrame, params: dict, vix: pd.Series, canary_closes: di
             if bull:                                     # 牛市買區→用更高上限重算下注量
                 a_label = _buy_word(a_expo, '無量緩破' in label)
                 a_tone = 'green' if a_expo >= 0.5 else 'lime'
+        why = ('MA200↑' if slope_up else 'MA200未上彎') + (' & 信用滿血' if h >= 1.0 else f' & 信用{h:.0%}')
         adaptive = {'regime': 'bull' if bull else 'bear',
                     'label': ('🐂積極 ' if bull else '🐻保守 ') + a_label,
-                    'tone': a_tone, 'expo': a_expo}
+                    'tone': a_tone, 'expo': a_expo, 'why': why}
 
         bars.append({
             'time': d.strftime('%Y-%m-%d'),
