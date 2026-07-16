@@ -76,17 +76,18 @@ PANIC_BASE_RATE = {'fwd21_median': 3.3, 'fwd21_up_pct': 67, 'fwd63_median': 8.3,
 # credit_k = 該指數的信用門檻(HYG<200MA×credit_k 才砍曝險)。research_xlk_credit.py:
 #   半導體/成長(SMH/SOXX/QQQ/SPY)對信用真敏感→k=1.00(跌破就砍,2022保護最佳);
 #   XLK含蘋果微軟巨頭=利率/品質驅動,淺信用波動是假警報→k=0.98(只認深破),救回報酬+保住風險。
-#   resist_warn = 「頭上壓力」黃燈門檻(剩餘空間≤此才警示;2026-07-17 逐根全史審計):
-#     QQQ=-1(永不警示,改純資訊):全史1072天「壓」各距離事後皆≥「買」(壓+0% 63日+6.5%/勝86% vs 買+4.2%)
-#       =貼近前高在QQQ是「將突破」的多頭訊號非壓力,40%日子被誤標黃燈。
-#     SMH=0.005(只在正頂著前高+0%才警示):該格21日+1.7%/勝60%=全場最弱;+1~3%≈買,不再警示。
-#     其他指數未逐根解剖→維持預設0.03。⚠️僅改建議文字,不動進出場/倉位機制。
+#   resist_warn = 「頭上壓力」黃燈門檻(剩餘空間≤此才警示;2026-07-17 逐根全史審計,五指數+台股全解剖):
+#     QQQ/XLK/SPY=-1(永不警示,改純資訊):全史「壓」各距離事後皆≥「買」(QQQ壓+0% 63日+6.5%/86% vs 買+4.2%;
+#       SPY壓全格+4.0~5.2% vs 買+2.3%)=廣基/巨頭指數動能直接碾過前高,「等突破」系統性錯誤。
+#     SMH=0.005(只正頂前高+0%才警示):該格21日+1.7%/勝60%=全場最弱;+1~3%≈買。
+#     SOXX=0.015(≤1%警示):唯一真的會被壓的——壓≤1% 63日+7.1~7.4% vs 買+12.2%,差距大。
+#     台股006208/0050=0.005(只+0%弱,見taiwan_status)。⚠️僅改建議文字,不動進出場/倉位機制。
 PARAMS = {
     'SMH':  {'entry_thr': 1.10, 'exit_buf': 0.98, 'budget': 0.213, 'cap': 1.5, 'credit_k': 1.00, 'resist_warn': 0.005},
-    'SOXX': {'entry_thr': 1.07, 'exit_buf': 0.99, 'budget': 0.201, 'cap': 1.5, 'credit_k': 1.00},
+    'SOXX': {'entry_thr': 1.07, 'exit_buf': 0.99, 'budget': 0.201, 'cap': 1.5, 'credit_k': 1.00, 'resist_warn': 0.015},
     'QQQ':  {'entry_thr': 1.07, 'exit_buf': 1.00, 'budget': 0.199, 'cap': 1.5, 'credit_k': 1.00, 'resist_warn': -1},
-    'XLK':  {'entry_thr': 1.10, 'exit_buf': 0.98, 'budget': 0.213, 'cap': 1.5, 'credit_k': 0.98},
-    'SPY':  {'entry_thr': 1.05, 'exit_buf': 1.00, 'budget': 0.190, 'cap': 1.5, 'credit_k': 1.00},
+    'XLK':  {'entry_thr': 1.10, 'exit_buf': 0.98, 'budget': 0.213, 'cap': 1.5, 'credit_k': 0.98, 'resist_warn': -1},
+    'SPY':  {'entry_thr': 1.05, 'exit_buf': 1.00, 'budget': 0.190, 'cap': 1.5, 'credit_k': 1.00, 'resist_warn': -1},
 }
 DEFAULT_PARAM = {'entry_thr': 1.08, 'exit_buf': 0.98, 'budget': 0.20, 'cap': 1.5, 'credit_k': 1.00}
 

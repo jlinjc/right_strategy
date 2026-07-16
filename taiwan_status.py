@@ -32,9 +32,9 @@ from scanner_base import DASHBOARD_DIR
 # 可回測核心(趨勢載具) + per-index 參數(research_taiwan_core.py + research_taiwan_optimize.py 校準)
 #   per-ticker thr/buf:00757(美科技,波動大)放寬1.12/1.00、0050貼1.06/0.98(grid實益最大),其餘統一1.08/0.99。
 TW_PARAMS = {
-    '0050.TW':   {'name': '元大台灣50',  'entry_thr': 1.06, 'exit_buf': 0.98, 'budget': 0.0863, 'cap': 1.5},
+    '0050.TW':   {'name': '元大台灣50',  'entry_thr': 1.06, 'exit_buf': 0.98, 'budget': 0.0863, 'cap': 1.5, 'resist_warn': 0.005},
     '0052.TW':   {'name': '富邦科技',    'entry_thr': 1.08, 'exit_buf': 0.99, 'budget': 0.0936, 'cap': 1.5},
-    '006208.TW': {'name': '富邦台50',    'entry_thr': 1.08, 'exit_buf': 0.99, 'budget': 0.0807, 'cap': 1.5},
+    '006208.TW': {'name': '富邦台50',    'entry_thr': 1.08, 'exit_buf': 0.99, 'budget': 0.0807, 'cap': 1.5, 'resist_warn': 0.005},
     '0051.TW':   {'name': '元大中型100', 'entry_thr': 1.08, 'exit_buf': 0.99, 'budget': 0.0787, 'cap': 1.5},
     '00757.TW':  {'name': '統一FANG+',   'entry_thr': 1.12, 'exit_buf': 1.00, 'budget': 0.1276, 'cap': 1.5},
 }
