@@ -1375,7 +1375,7 @@ function renderAdaptive(kb){
         +`<td style="padding:5px 8px">${b.mdd}%</td><td style="padding:5px 8px;color:#ff5a5a">${a.mdd}%</td>`
         +`<td style="padding:5px 8px;color:var(--muted)">${s.avg_expo_base}→${s.avg_expo_adapt}% · 牛${s.bull_share}%</td></tr>`;}).join('');
     document.getElementById('adStats').innerHTML=hd+'<tbody>'+rws+'</tbody>';
-    document.getElementById('adVolNote').innerHTML='vol-timing:牛市 cap 隨<b>EWMA 波動預測</b>縮放(平靜加碼/動盪縮)。48格掃描:<b style="color:#2ecc71">✅QQQ 48/48、SMH 40/48</b>(EWMA 把 SMH 從 realized 的 32/48 救活)→<b style="color:#e6ecf5">已接進 live core_status,QQQ+SMH 啟用</b>。<b style="color:#8a96ad">*SPY 仍無效不啟用</b>(低波動指數沒東西可縮)。';
+    document.getElementById('adVolNote').innerHTML='vol-timing:牛市 cap 隨<b>EWMA 波動預測</b>縮放(平靜加碼/動盪縮)<b> × 信用cushion</b>(信用薄→再縮=降回撤)。48格掃描:<b style="color:#2ecc71">✅QQQ 48/48、SMH 40/48</b>(EWMA 救活 SMH);加 cushion 後<b style="color:#e6ecf5">回撤再降</b>(QQQ MDD -33→-27、SMH -38→-36),Sharpe 仍 +0.04。→<b style="color:#e6ecf5">已 live,QQQ+SMH 啟用</b>。<b style="color:#8a96ad">*SPY 無效不啟用</b>。';
     _adInit(); _ad.built=true;
   }
   _adSelect(_ad.cur||'QQQ');

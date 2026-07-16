@@ -320,10 +320,19 @@ def annotate(ohlc: pd.DataFrame, params: dict, vix: pd.Series, canary_closes: di
     eb = _state_expo(close, ma200, exit_line, health, vix_al, bull_arr, budget, cap, floor, cap)
     ea = _state_expo(close, ma200, exit_line, health, vix_al, bull_arr, budget, cap, floor, BULL_CAP)
     # vol-timing:牛市 cap 隨波動縮放(平靜加碼/動盪縮);EWMA 波動預測,QQQ+SMH 穩健(research_sizing_deepen.py)
+    #   × 信用cushion(信用薄→再縮,降回撤器)
     rv_ser = s_close.pct_change().ewm(span=C.VOL_WIN).std() * np.sqrt(252)
     rvs = rv_ser.values
     medvs = rv_ser.rolling(C.VOL_MED).median().values
-    vcap = np.clip(cap * medvs / rvs, cap * C.VOL_CAP_LO_MULT, cap * C.VOL_CAP_HI_MULT)
+    cf_arr = np.ones(_n)
+    if C.CREDIT_CUSHION and canary_closes:
+        cc = [v for k, v in canary_closes.items() if k in ('HYG', 'LQD')]
+        if cc:
+            cdl = [(v / v.rolling(C.MA).mean() - 1).reindex(dates).ffill() for v in cc]
+            cs = sum(cdl) / len(cdl)
+            cf = (0.8 + (cs - cs.rolling(C.CUSHION_MED).median()) * C.CUSHION_K).clip(C.CUSHION_LO, C.CUSHION_HI)
+            cf_arr = cf.reindex(dates).fillna(1.0).values
+    vcap = np.clip(cap * medvs / rvs * cf_arr, cap * C.VOL_CAP_LO_MULT, cap * C.VOL_CAP_HI_MULT)
     vcap = np.where(np.isnan(vcap), cap, vcap)
     ev = _state_expo(close, ma200, exit_line, health, vix_al, bull_arr, budget, cap, floor, vcap)
     rb = np.zeros(_n); rb[1:] = eb[:-1] * ret[1:]

@@ -103,6 +103,14 @@ VOL_MED = 252            # 中位波動窗(基準)
 VOL_CAP_LO_MULT = 0.667  # cap 下限 = cap×此(base cap 1.5 → 1.0)
 VOL_CAP_HI_MULT = 1.667  # cap 上限 = cap×此(base cap 1.5 → 2.5)
 
+# ★ 信用cushion(research_sizing_deepen.py):vol-timing 再乘一個信用緩衝因子——信用(HYG/LQD)高於自己
+#   200MA 的距離越薄→cap 縮越多(崩前信用先轉弱=先降槓桿)。實測=降回撤器(SMH MDD -41.7→-36.2、
+#   QQQ -29.5→-26.8),Sharpe 中性、微傷 CAGR。是「讓積極更安全」的旋鈕,可關(CREDIT_CUSHION=False)。
+CREDIT_CUSHION = True
+CUSHION_MED = 252        # 信用距離中位窗
+CUSHION_K = 6.0          # 距離偏離中位 → 因子斜率
+CUSHION_LO, CUSHION_HI = 0.8, 1.25   # 因子上下限
+
 # 路線B(輪動)用哪個分數挑最強核心:
 #   'voladj' = 126日波動調整動能(最高Sharpe1.37,穩健,預設)
 #   'csm'    = 60/120/252多週期平均(最大財富:報酬+43%、OOS同穩,代價-0.08Sharpe)
@@ -130,6 +138,23 @@ def _trailing_below(close: pd.Series, ma_series: pd.Series, buf_mult: float) -> 
         else:
             break
     return cnt
+
+
+def _credit_cushion(credit_closes: dict) -> float:
+    """信用cushion因子(HYG/LQD 高於自己200MA的距離 vs 其中位;越薄→<1縮cap、異常強→>1)。PIT trailing。"""
+    try:
+        dists = []
+        for s in credit_closes.values():
+            ma = s.rolling(MA).mean()
+            dists.append(s / ma - 1)
+        cs = sum(dists) / len(dists)
+        cmed = cs.rolling(CUSHION_MED).median()
+        f = 0.8 + (float(cs.iloc[-1]) - float(cmed.iloc[-1])) * CUSHION_K
+        if f != f:
+            return 1.0
+        return round(min(max(f, CUSHION_LO), CUSHION_HI), 3)
+    except Exception:
+        return 1.0
 
 
 def _structure_read(ohlc: pd.DataFrame, last: float, exit_price: float, dist_pct: float) -> dict:
@@ -189,7 +214,7 @@ def _structure_read(ohlc: pd.DataFrame, last: float, exit_price: float, dist_pct
 
 
 def core_signal(close: pd.Series, vix_last: float | None, ticker: str,
-                ohlc: pd.DataFrame | None = None) -> dict:
+                ohlc: pd.DataFrame | None = None, cred_factor: float = 1.0) -> dict:
     """核心擇時 + 恐慌容忍 + 進場判定 + RiskTarget 倉位,用該指數自己的參數。
     ohlc(可選,OHLCV)→ 加裸價格結構讀數(上方壓力/突破量能/R:R/鋸齒區)輔助下手決策。"""
     p = PARAMS.get(ticker, DEFAULT_PARAM)
@@ -235,9 +260,11 @@ def core_signal(close: pd.Series, vix_last: float | None, ticker: str,
         rvs = close.pct_change().ewm(span=VOL_WIN).std() * (252 ** 0.5)   # EWMA 波動預測(勝 realized)
         rv = float(rvs.iloc[-1]); medv = float(rvs.iloc[-VOL_MED:].median())
         if rv > 0 and medv == medv:
-            cap_use = round(min(max(cap * medv / rv, cap * VOL_CAP_LO_MULT), cap * VOL_CAP_HI_MULT), 2)
-            vol_note = (f'vol-timing:cap {cap:.2f}→{cap_use:.2f}(EWMA波動 {rv*100:.0f}% vs 中位 {medv*100:.0f}%,'
-                        f'{"平靜加碼" if cap_use > cap else "動盪縮" if cap_use < cap else "持平"})')
+            cf = cred_factor if CREDIT_CUSHION else 1.0
+            cap_use = round(min(max(cap * medv / rv * cf, cap * VOL_CAP_LO_MULT), cap * VOL_CAP_HI_MULT), 2)
+            cush = f' × 信用cushion {cf:.2f}' if (CREDIT_CUSHION and abs(cf - 1.0) > 0.001) else ''
+            vol_note = (f'vol-timing:cap {cap:.2f}→{cap_use:.2f}(EWMA波動 {rv*100:.0f}% vs 中位 {medv*100:.0f}%{cush},'
+                        f'{"平靜加碼" if cap_use > cap else "動盪/信用薄縮" if cap_use < cap else "持平"})')
     stop_dist_frac = max(stop_risk / 100.0, STOP_DIST_FLOOR)
     expo_raw = round(min(budget / stop_dist_frac, cap_use), 2)
 
@@ -445,12 +472,22 @@ def main():
     except Exception:
         pass
 
+    # 信用cushion因子(給 vol-timing;用 HYG/LQD 的 200MA 距離)
+    cred_factor = 1.0
+    try:
+        cc = {tk: raw[tk]['Close'].dropna() for tk in ('HYG', 'LQD') if tk in CREDIT_TICKERS}
+        if cc:
+            cred_factor = _credit_cushion(cc)
+    except Exception:
+        pass
+
     out = {}
     for tk in CORE_TICKERS:
         try:
             s = raw[tk]['Close'].dropna()
             if len(s) >= MA:
-                out[tk] = core_signal(s, vix_last, tk, ohlc=raw[tk].dropna(subset=['Close']))
+                out[tk] = core_signal(s, vix_last, tk, ohlc=raw[tk].dropna(subset=['Close']),
+                                      cred_factor=cred_factor)
         except Exception:
             pass
 
