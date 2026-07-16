@@ -241,7 +241,7 @@ def annotate(ohlc: pd.DataFrame, params: dict, vix: pd.Series, canary_closes: di
             elif blowoff:
                 tone, label = 'amber', '爆量突破·別追那根'
                 note_bits.append(f'創{C.BREAKOUT_WIN}日新高 × 量 {rv:.1f}倍=短線耗竭')
-            elif room is not None and room <= 0.03:
+            elif room is not None and room <= params.get('resist_warn', 0.03):
                 tone, label = 'amber', f'頭上壓力+{room*100:.0f}%·等突破'
                 note_bits.append(f'前波高點 {r:.2f} 就在上方')
             else:
@@ -256,6 +256,8 @@ def annotate(ohlc: pd.DataFrame, params: dict, vix: pd.Series, canary_closes: di
                     label += '·無量緩破健康'
                 if chop and ma_up:
                     note_bits.append('鋸齒區但MA200上彎=發射台(D4:歷史此格報酬高於基準)')
+                if r and room is not None and room <= 0.03 and params.get('resist_warn', 0.03) < room:
+                    note_bits.append(f'前高 {r:.2f}(+{room*100:.0f}%)在上方,但此指數該格歷史無壓制力(審計:事後≥買日)→不擋')
                 note_bits.append(f'停損距 -{sr*100:.0f}%'
                                  + (f' · 上方壓力 {r:.2f}(+{room*100:.0f}%)' if r else ' · 藍天無壓'))
         if 0 < h < 1:

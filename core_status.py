@@ -76,10 +76,15 @@ PANIC_BASE_RATE = {'fwd21_median': 3.3, 'fwd21_up_pct': 67, 'fwd63_median': 8.3,
 # credit_k = 該指數的信用門檻(HYG<200MA×credit_k 才砍曝險)。research_xlk_credit.py:
 #   半導體/成長(SMH/SOXX/QQQ/SPY)對信用真敏感→k=1.00(跌破就砍,2022保護最佳);
 #   XLK含蘋果微軟巨頭=利率/品質驅動,淺信用波動是假警報→k=0.98(只認深破),救回報酬+保住風險。
+#   resist_warn = 「頭上壓力」黃燈門檻(剩餘空間≤此才警示;2026-07-17 逐根全史審計):
+#     QQQ=-1(永不警示,改純資訊):全史1072天「壓」各距離事後皆≥「買」(壓+0% 63日+6.5%/勝86% vs 買+4.2%)
+#       =貼近前高在QQQ是「將突破」的多頭訊號非壓力,40%日子被誤標黃燈。
+#     SMH=0.005(只在正頂著前高+0%才警示):該格21日+1.7%/勝60%=全場最弱;+1~3%≈買,不再警示。
+#     其他指數未逐根解剖→維持預設0.03。⚠️僅改建議文字,不動進出場/倉位機制。
 PARAMS = {
-    'SMH':  {'entry_thr': 1.10, 'exit_buf': 0.98, 'budget': 0.213, 'cap': 1.5, 'credit_k': 1.00},
+    'SMH':  {'entry_thr': 1.10, 'exit_buf': 0.98, 'budget': 0.213, 'cap': 1.5, 'credit_k': 1.00, 'resist_warn': 0.005},
     'SOXX': {'entry_thr': 1.07, 'exit_buf': 0.99, 'budget': 0.201, 'cap': 1.5, 'credit_k': 1.00},
-    'QQQ':  {'entry_thr': 1.07, 'exit_buf': 1.00, 'budget': 0.199, 'cap': 1.5, 'credit_k': 1.00},
+    'QQQ':  {'entry_thr': 1.07, 'exit_buf': 1.00, 'budget': 0.199, 'cap': 1.5, 'credit_k': 1.00, 'resist_warn': -1},
     'XLK':  {'entry_thr': 1.10, 'exit_buf': 0.98, 'budget': 0.213, 'cap': 1.5, 'credit_k': 0.98},
     'SPY':  {'entry_thr': 1.05, 'exit_buf': 1.00, 'budget': 0.190, 'cap': 1.5, 'credit_k': 1.00},
 }
@@ -157,7 +162,8 @@ def _credit_cushion(credit_closes: dict) -> float:
         return 1.0
 
 
-def _structure_read(ohlc: pd.DataFrame, last: float, exit_price: float, dist_pct: float) -> dict:
+def _structure_read(ohlc: pd.DataFrame, last: float, exit_price: float, dist_pct: float,
+                    resist_warn: float = 0.03) -> dict:
     """裸價格結構讀數(F4 上方壓力 + F5 突破量能 + R:R + 鋸齒區信心)。
     ohlc 需含 High/Low/Close/Volume。壓力用『已確認』fractal swing high(pivot 到 i+k 才確認 → 無 look-ahead)。"""
     try:
@@ -195,8 +201,11 @@ def _structure_read(ohlc: pd.DataFrame, last: float, exit_price: float, dist_pct
     if chop:
         notes.append(f'⚠️鋸齒區(離200MA {dist_pct:+.0f}%,剛站上假訊號多、信心低)')
     if resist:
-        if resi_room is not None and resi_room <= 3:
+        if resi_room is not None and resi_room <= resist_warn * 100:
             notes.append(f'⚠️頭上前高壓力 ${resist:.2f}(僅 +{resi_room:.0f}%,期望值較差,宜等突破)')
+        elif resi_room is not None and resi_room <= 3:
+            notes.append(f'前高 ${resist:.2f}(+{resi_room:.0f}%)在上方,此指數該格歷史無壓制力→不擋'
+                         + (f',R:R {rr}' if rr else ''))
         else:
             notes.append(f'上方壓力 ${resist:.2f}(+{resi_room:.0f}%'
                          + (f',R:R {rr}' if rr else '') + ')')
@@ -233,7 +242,8 @@ def core_signal(close: pd.Series, vix_last: float | None, ticker: str,
     exit_price = round(ma * buf, 2)          # 停損/出場線(該指數緩衝)
     entry_cap = round(ma50 * thr, 2)         # 進場上限價(超過=追高)
     stop_risk = round((last - exit_price) / last * 100, 1)   # 現在進場的話,停損在下方幾%
-    struct = _structure_read(ohlc, last, exit_price, dist) if ohlc is not None else {}
+    struct = _structure_read(ohlc, last, exit_price, dist,
+                             resist_warn=p.get('resist_warn', 0.03)) if ohlc is not None else {}
 
     # ★ 橫斷面相對強度:多核心皆 risk_on 時,決定該持有哪一個(#4:持有最強)
     #   rs_score = voladj 126日(最高Sharpe1.37,穩健,預設選股)
