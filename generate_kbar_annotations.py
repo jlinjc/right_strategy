@@ -175,6 +175,11 @@ def annotate(ohlc: pd.DataFrame, params: dict, vix: pd.Series, canary_closes: di
     slope20 = s_close.rolling(C.MA).mean().diff(20).values     # MA200 斜率(20日)
     _n = len(close)
     f63 = np.array([close[i + 63] / close[i] - 1 if i + 63 < _n else np.nan for i in range(_n)])  # 事後63日(診斷證據)
+    f21 = np.array([close[i + 21] / close[i] - 1 if i + 21 < _n else np.nan for i in range(_n)])  # 事後21日(review打分)
+    # EWMA 波動 vs 中位(與 live vol-timing 同源,PIT trailing)——review R3/R7 用
+    _ew = s_close.pct_change().ewm(span=C.VOL_WIN).std() * np.sqrt(252)
+    ewma_v = _ew.values
+    ewma_med = _ew.rolling(C.VOL_MED).median().values
 
     thr, buf = params['entry_thr'], params['exit_buf']
     budget, cap = params['budget'], params['cap']
@@ -233,8 +238,17 @@ def annotate(ohlc: pd.DataFrame, params: dict, vix: pd.Series, canary_closes: di
             r = resist[t]
             room = (r / c - 1) if r else None
             if ec is not None and c >= ec:
-                tone, label = 'amber', '追高·別追(等拉回50MA)'
-                note_bits.append(f'距50MA +{(c/ma50[t]-1)*100:.0f}% > 門檻 +{(thr-1)*100:.0f}%')
+                # ★R3升級(2026-07-18 review 記分 29✅:3❌):平靜牛市(EWMA波動<中位)+信用滿血+MA200上彎
+                #   的追高日歷史≈買日→給小額試單,別全擋;其餘追高維持別追。
+                _ew_ok = (not np.isnan(ewma_v[t])) and (not np.isnan(ewma_med[t])) and ewma_v[t] > 0
+                _calm_bull = _ew_ok and ewma_v[t] < ewma_med[t] and slope20[t] > 0 and h >= 1.0
+                if _calm_bull and expo is not None:
+                    tone, label = 'lime', f'追高·可小額試單(~{expo*100:.0f}%,平靜牛市)'
+                    note_bits.append(f'距50MA +{(c/ma50[t]-1)*100:.0f}%>門檻,但EWMA波動<中位+信用滿血+MA200上彎'
+                                     f'(此格歷史≈買日,review 29✅:3❌)')
+                else:
+                    tone, label = 'amber', '追高·別追(等拉回50MA)'
+                    note_bits.append(f'距50MA +{(c/ma50[t]-1)*100:.0f}% > 門檻 +{(thr-1)*100:.0f}%')
             elif chop and not ma_up:
                 tone, label = 'amber', '鋸齒區·觀望(信心低)'
                 note_bits.append(f'離200MA 僅 {(c/ma-1)*100:+.0f}% 且 MA200未上彎(假訊號多)')
@@ -283,6 +297,26 @@ def annotate(ohlc: pd.DataFrame, params: dict, vix: pd.Series, canary_closes: di
             diag = {'code': dg[0], 'name': dg[1], 'better': dg[2], 'sev': dg[3],
                     'original': label, 'fwd63': fwd}
 
+        # ── 💡第二意見 review(放下成見逐根重審;理由全 PIT,事後打分另存 verdict)──
+        review = None
+        ew_ok = (not np.isnan(ewma_v[t])) and (not np.isnan(ewma_med[t])) and ewma_v[t] > 0
+        vol_calm = ew_ok and ewma_v[t] < ewma_med[t]
+        vol_hot = ew_ok and ewma_v[t] > ewma_med[t] * 1.25
+        if cg == 'credit_clear' and c >= ma and slope_up and (not np.isnan(vspk)) and vspk > C.PANIC_VIX and vfall:
+            review = {'rule': 'R1', 'better': '🟢小買回補試單',
+                      'why': '已收復200MA且MA200仍上彎+VIX自尖峰回落=V底結構(2022式陷阱MA200是下彎的,PIT可分);信用慢哨落後'}
+        # R3(平靜牛市追高→小額)已於 2026-07-18 升級進標籤(29✅:3❌),review 不再重複標
+        elif cg == 'blowoff' and params.get('_sym') == 'QQQ':
+            review = {'rule': 'R5', 'better': '可買(別因爆量卻步)',
+                      'why': 'QQQ爆量新高歷史10/10事後21日上漲(n小,證據弱但一致)'}
+        elif cg == 'buy_full' and expo is not None and expo >= 1.0 and vol_hot:
+            v_expo = round(expo * ewma_med[t] / ewma_v[t], 2)
+            review = {'rule': 'R7', 'better': f'減碼至~{v_expo*100:.0f}%(波動高)',
+                      'why': f'EWMA波動{ewma_v[t]*100:.0f}%>>中位{ewma_med[t]*100:.0f}%;live vol-timing會縮cap,標籤未同步喊滿倉=標籤與live不一致'}
+        if review:
+            review['original'] = label
+            review['f21'] = round(float(f21[t]) * 100, 1) if not np.isnan(f21[t]) else None
+
         # ── 自適應版標籤(牛市積極/熊市保守):進出同原版,只差牛市 cap 拉高 → 曝險上限更高 ──
         bull = slope_up and h >= 1.0
         cap_eff = BULL_CAP if bull else cap
@@ -305,6 +339,7 @@ def annotate(ohlc: pd.DataFrame, params: dict, vix: pd.Series, canary_closes: di
             'ma200': round(float(ma), 2), 'exit': round(float(ep), 2),
             'label': label, 'tone': tone,
             'expo': expo, 'note': ' · '.join(note_bits), 'diag': diag, 'adaptive': adaptive,
+            'review': review,
         })
         out_idx.append(t)
 
@@ -315,6 +350,24 @@ def annotate(ohlc: pd.DataFrame, params: dict, vix: pd.Series, canary_closes: di
         if code is not None and code == prev:
             b['diag'] = None
         prev = code
+    # review 同規則連續→留段首;再用事後21日打分(誠實:建議錯的也照登)
+    prev = None
+    for b in bars:
+        rl = b['review']['rule'] if b.get('review') else None
+        if rl is not None and rl == prev:
+            b['review'] = None
+        prev = rl
+    for b in bars:
+        rv = b.get('review')
+        if not rv:
+            continue
+        f = rv.get('f21')
+        if f is None:
+            rv['verdict'] = '⏳未知'
+        elif rv['rule'] == 'R7':          # 建議減碼→跌才算建議對
+            rv['verdict'] = '✅建議較好' if f < -2 else ('❌原標較好' if f > 2 else '≈差不多')
+        else:                              # 建議多買→漲才算建議對
+            rv['verdict'] = '✅建議較好' if f > 2 else ('❌原標較好' if f < -2 else '≈差不多')
 
     # ── 兩版狀態機權益曲線 + 全期統計(公正比較:同進出,只差牛市 cap) ──
     bull_arr = (~np.isnan(slope20)) & (slope20 > 0) & (health >= 1.0)
@@ -399,7 +452,7 @@ def main():
         d = get(sym, is_tw)
         if d is None or len(d) < C.MA + 30:
             continue
-        params = (T.TW_PARAMS.get(sym) if is_tw else C.PARAMS.get(sym)) or C.DEFAULT_PARAM
+        params = dict((T.TW_PARAMS.get(sym) if is_tw else C.PARAMS.get(sym)) or C.DEFAULT_PARAM, _sym=sym)
         canary_closes = {k: canary_raw[k] for k in (TW_CANARY if is_tw else US_CANARY) if k in canary_raw}
         bars, extra = annotate(d, params, vix, canary_closes)
         if not bars:

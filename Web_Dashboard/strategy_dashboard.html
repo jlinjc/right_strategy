@@ -1107,7 +1107,8 @@ function _kbInitChart(){
       +`<div style="color:${c};font-weight:600;margin-bottom:3px">● ${b.label}</div>`
       +`<div style="color:#8a96ad">收 ${b.close} · 200MA ${b.ma200} · 停損線 ${b.exit}</div>`
       +`<div style="color:#8a96ad">建議曝險 ${ex}</div>`
-      +(b.note?`<div style="color:#64748b;margin-top:3px;font-size:11px">${b.note}</div>`:'');
+      +(b.note?`<div style="color:#64748b;margin-top:3px;font-size:11px">${b.note}</div>`:'')
+      +(b.review?`<div style="color:#e879f9;margin-top:4px;font-size:11.5px">💡更好:${b.review.better} <span style="color:#8a96ad">(事後:${b.review.verdict||''})</span><br><span style="color:#a78bcb">${b.review.why}</span></div>`:'');
     tip.style.display='block';
     const w=tip.offsetWidth, cw=document.getElementById('kbChart').clientWidth;
     let x=p.point.x+16; if(x+w>cw) x=p.point.x-w-16;
@@ -1133,6 +1134,8 @@ function renderKbar(kb){
       +`<div id="kbLatest" style="font-size:13px;margin-bottom:8px;padding:7px 10px;background:var(--panel2);border-radius:6px"></div>`
       +`<div style="position:relative"><div id="kbChart" style="width:100%;height:440px"></div>`
       +`<div id="kbTip" style="position:absolute;display:none;pointer-events:none;z-index:20;background:#0d1424f2;border:1px solid var(--line);border-radius:6px;padding:8px 10px;font-size:12px;color:var(--txt);max-width:280px"></div></div>`
+      +`<div style="font-size:12px;color:var(--muted);margin:14px 0 4px">💡 第二意見 review(放下成見逐根重審:<b style="color:#e879f9">紫色「改」標記</b>=該根有更好標籤;理由全部只用當天資料(PIT),「事後」欄是驗證打分——<b>建議錯的也照登</b>)</div>`
+      +`<div style="overflow:auto;max-height:300px"><table id="kbReview" style="width:100%;border-collapse:collapse;font-size:12px"></table></div>`
       +`<div style="font-size:12px;color:var(--muted);margin:12px 0 4px">📋 近 365 日逐日 PIT 紀律(每根K棒在<b>當天收盤後</b>會給的建議,只用當天及以前資料、無未來函數;最新在上)。<span style="color:#64748b">牛熊欄:🐂=MA200上彎且信用滿血(積極檔)/🐻=其一不成立(保守檔)</span></div>`
       +`<div style="overflow:auto;max-height:520px"><table id="kbTable" style="width:100%;border-collapse:collapse;font-size:12px"></table></div>`;
     const box = document.getElementById('kbTickers');
@@ -1183,6 +1186,9 @@ function _kbSelect(sym){
       const shape=b.tone==='red'?'arrowDown':((b.tone==='green'||b.tone==='lime')?'arrowUp':'circle');
       markers.push({time:b.time,position:b.tone==='red'?'aboveBar':'belowBar',color:col,shape,text:b.label});
     }
+    if(b.review){                              // 💡第二意見:紫色「改」
+      markers.push({time:b.time,position:'aboveBar',color:'#e879f9',shape:'square',text:'改'});
+    }
     prev=b.tone;
   });
   _kb.candle.setMarkers(markers);
@@ -1207,6 +1213,28 @@ function _kbSelect(sym){
     +`<th style="padding:4px 8px;text-align:center">牛熊</th>`
     +`<th style="padding:4px 8px;text-align:right">收盤</th><th style="padding:4px 8px">當日標註(PIT)</th>`
     +`<th style="padding:4px 8px;text-align:right">曝險</th><th style="padding:4px 8px;text-align:right">停損線</th></tr></thead><tbody>${rows}</tbody>`;
+  // 💡第二意見表(近365日;建議錯的也照登=誠實記分)
+  const revs = bars.slice(-365).filter(b=>b.review).reverse();
+  const vcnt = {'✅建議較好':0,'❌原標較好':0,'≈差不多':0,'⏳未知':0};
+  revs.forEach(b=>{ if(b.review.verdict in vcnt) vcnt[b.review.verdict]++; });
+  const rrows = revs.map(b=>{
+    const r=b.review, vc = r.verdict&&r.verdict.startsWith('✅')?'#2ecc71':(r.verdict&&r.verdict.startsWith('❌')?'#ff5a5a':'#8a96ad');
+    const f=(r.f21==null)?'—':((r.f21>0?'+':'')+r.f21+'%');
+    return `<tr style="border-bottom:1px solid rgba(255,255,255,0.05)"><td style="padding:4px 8px;color:var(--muted);white-space:nowrap">${b.time}</td>`
+      +`<td style="padding:4px 8px;color:#8a96ad">${r.rule}</td>`
+      +`<td style="padding:4px 8px;color:var(--muted)">${r.original}</td>`
+      +`<td style="padding:4px 8px;color:#e879f9">${r.better}</td>`
+      +`<td style="padding:4px 8px;font-size:11px;color:#a78bcb">${r.why}</td>`
+      +`<td style="padding:4px 8px;text-align:right;white-space:nowrap">${f}</td>`
+      +`<td style="padding:4px 8px;color:${vc};white-space:nowrap">${r.verdict||''}</td></tr>`;
+  }).join('');
+  document.getElementById('kbReview').innerHTML = revs.length
+    ? `<thead><tr style="color:#64748b;text-align:left;border-bottom:1px solid var(--line)">`
+      +`<th style="padding:4px 8px">日期</th><th style="padding:4px 8px">規則</th><th style="padding:4px 8px">原標籤</th>`
+      +`<th style="padding:4px 8px">💡更好的標籤</th><th style="padding:4px 8px">PIT理由</th>`
+      +`<th style="padding:4px 8px;text-align:right">事後21日</th><th style="padding:4px 8px">打分</th></tr></thead>`
+      +`<tbody><tr><td colspan="7" style="padding:5px 8px;color:#8a96ad">記分:✅${vcnt['✅建議較好']} · ❌${vcnt['❌原標較好']} · ≈${vcnt['≈差不多']} · ⏳${vcnt['⏳未知']}</td></tr>${rrows}</tbody>`
+    : '<tbody><tr><td style="padding:6px 8px;color:var(--muted)">此標的近365日無「更好標籤」建議(現行標註已是當天可辯護的最佳)</td></tr></tbody>';
   // 預設視窗=近一年(每根都有單字標記的區段);看全史往左拖即可
   _kb.nBars = bars.length;
   try{ _kb.chart.timeScale().setVisibleLogicalRange({from: Math.max(0,bars.length-262), to: bars.length+3}); }catch(e){}

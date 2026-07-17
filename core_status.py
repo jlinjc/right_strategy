@@ -306,8 +306,18 @@ def core_signal(close: pd.Series, vix_last: float | None, ticker: str,
         entry_action = f'不進(在200MA ${ma:.2f} 之下,等站回)'
     elif last >= entry_cap:
         entry_state = 'extended'
-        entry_action = (f'追高,等拉回到 ${entry_cap:.2f} 以下'
-                        f'(距50MA +{dist50:.0f}% > 門檻 +{(thr-1)*100:.0f}%)')
+        # ★R3(2026-07-18 review 29✅:3❌):平靜牛市(EWMA波動<中位+MA200上彎)的追高日歷史≈買日→給小額
+        _r3 = False
+        if len(close) > VOL_MED + 30 and ma > float(ma_series.iloc[-21]):
+            _rv = close.pct_change().ewm(span=VOL_WIN).std() * (252 ** 0.5)
+            if float(_rv.iloc[-1]) < float(_rv.iloc[-VOL_MED:].median()):
+                _r3 = True
+        if _r3:
+            entry_action = (f'追高但平靜牛市→可小額試單(~{expo_raw*100:.0f}%);'
+                            f'距50MA +{dist50:.0f}%>門檻,正常拉回到 ${entry_cap:.2f} 以下再足量')
+        else:
+            entry_action = (f'追高,等拉回到 ${entry_cap:.2f} 以下'
+                            f'(距50MA +{dist50:.0f}% > 門檻 +{(thr-1)*100:.0f}%)')
     else:
         entry_state = 'can_enter'
         extra = '；VIX高=恐慌綠燈,果斷進' if panic else ''
