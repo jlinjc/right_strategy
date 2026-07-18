@@ -306,13 +306,8 @@ def annotate(ohlc: pd.DataFrame, params: dict, vix: pd.Series, canary_closes: di
             review = {'rule': 'R1', 'better': '🟢小買回補試單',
                       'why': '已收復200MA且MA200仍上彎+VIX自尖峰回落=V底結構(2022式陷阱MA200是下彎的,PIT可分);信用慢哨落後'}
         # R3(平靜牛市追高→小額)已於 2026-07-18 升級進標籤(29✅:3❌),review 不再重複標
-        elif cg == 'blowoff' and params.get('_sym') == 'QQQ':
-            review = {'rule': 'R5', 'better': '可買(別因爆量卻步)',
-                      'why': 'QQQ爆量新高歷史10/10事後21日上漲(n小,證據弱但一致)'}
-        elif cg == 'buy_full' and expo is not None and expo >= 1.0 and vol_hot:
-            v_expo = round(expo * ewma_med[t] / ewma_v[t], 2)
-            review = {'rule': 'R7', 'better': f'減碼至~{v_expo*100:.0f}%(波動高)',
-                      'why': f'EWMA波動{ewma_v[t]*100:.0f}%>>中位{ewma_med[t]*100:.0f}%;live vol-timing會縮cap,標籤未同步喊滿倉=標籤與live不一致'}
+        # R5(QQQ爆量別怕)2026-07-18 撤銷:63日五指數爆量全輸基準(QQQ+1.0 vs +4.3),21日10/10是小樣本假象
+        # R7(波動高減碼)2026-07-18 撤銷:記分6✅:19❌;組合層vol-timing已在live處理,bar層標記添亂
         if review:
             review['original'] = label
             review['f21'] = round(float(f21[t]) * 100, 1) if not np.isnan(f21[t]) else None

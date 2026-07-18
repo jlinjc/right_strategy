@@ -209,6 +209,9 @@
   <!-- ★進取模式(TQQQ/SOXL 槓桿) — 成長階段每日執行 -->
   <div id="aggressivePanel"></div>
 
+  <!-- ★執行追蹤:系統說 vs 你做(對人肉執行系統,遵守率比標籤優化值錢) -->
+  <div id="adherencePanel"></div>
+
   <!-- ★今日掛單建議(台美股:該買什麼/別追什麼/掛單價) -->
   <div id="buyList"></div>
 
@@ -1470,6 +1473,29 @@ function _adSelect(sym){
   try{_ad.chart.timeScale().fitContent(); _ad.eqc.timeScale().fitContent();}catch(e){}
 }
 
+// ── 執行追蹤(localStorage;系統說什麼 vs 你做什麼→遵守率) ──
+function renderAdherence(cs){
+  const host=document.getElementById('adherencePanel'); if(!host) return;
+  const KEY='adherence_log';
+  const log=JSON.parse(localStorage.getItem(KEY)||'{}');
+  const today=new Date().toISOString().slice(0,10);
+  const verdict=(cs&&cs.daily_verdict)||'—';
+  window._adhMark=(v)=>{ log[today]={v, verdict, ts:Date.now()}; localStorage.setItem(KEY,JSON.stringify(log)); renderAdherence(cs); };
+  const days=Object.keys(log).sort().reverse();
+  const n=days.length, follow=days.filter(d=>log[d].v==='✅').length;
+  const rate=n?Math.round(follow/n*100):null;
+  const todayMark=log[today]?log[today].v:null;
+  const btn=(v,txt,col)=>`<button onclick="_adhMark('${v}')" style="padding:6px 14px;margin-right:8px;font-size:13px;cursor:pointer;border-radius:6px;border:1px solid ${todayMark===v?col:'var(--line)'};background:${todayMark===v?col+'33':'var(--panel2)'};color:var(--txt)">${txt}</button>`;
+  const rows=days.slice(0,10).map(d=>`<tr style="border-bottom:1px solid rgba(255,255,255,0.05)"><td style="padding:3px 8px;color:var(--muted);white-space:nowrap">${d}</td><td style="padding:3px 8px">${log[d].v}</td><td style="padding:3px 8px;color:#64748b;font-size:11px">${(log[d].verdict||'').slice(0,60)}</td></tr>`).join('');
+  host.innerHTML=`<div style="background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:13px 16px;margin:14px 0">
+    <div style="font-weight:700;margin-bottom:6px">📓 執行追蹤 — 今天你照系統做了嗎?<span style="color:var(--muted);font-weight:400;font-size:11.5px">(存在本機瀏覽器;對人肉執行的系統,遵守率比任何標籤優化都值錢)</span></div>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:8px">今日系統結論:${verdict}</div>
+    <div>${btn('✅','✅ 照做','#2ecc71')}${btn('⚠️','⚠️ 部分照做','#ffcb45')}${btn('❌','❌ 沒照做','#ff5a5a')}
+    ${rate!=null?`<span style="margin-left:14px;font-size:13px">遵守率 <b style="color:${rate>=80?'#2ecc71':rate>=50?'#ffcb45':'#ff5a5a'}">${rate}%</b>(${follow}/${n}天)</span>`:''}</div>
+    ${rows?`<table style="width:100%;border-collapse:collapse;font-size:12px;margin-top:8px">${rows}</table>`:''}
+  </div>`;
+}
+
 async function loadAll(){
   try{
     const [sig, ev, rb, cs, mn, tw, ld, ag, al, kb] = await Promise.all([
@@ -1484,6 +1510,18 @@ async function loadAll(){
       getJSON('allocation_status.json').catch(()=>null),
       getJSON('kbar_annotations.json').catch(()=>null),
     ]);
+    // ★資料斷供防線:JSON 太舊(>36小時)就大字紅色警告,別依過期標籤下單
+    try{
+      const ts = cs && cs.last_updated ? new Date(cs.last_updated.replace(' ','T')) : null;
+      const ageH = ts ? (Date.now()-ts.getTime())/3.6e6 : 999;
+      let sb = document.getElementById('staleBanner');
+      if(ageH > 36){
+        if(!sb){ sb=document.createElement('div'); sb.id='staleBanner';
+          sb.style.cssText='background:#5e1f1f;border:2px solid #ff5a5a;color:#ffb4b4;border-radius:10px;padding:12px 16px;margin:14px 0;font-size:15px;font-weight:700';
+          const w=document.querySelector('.wrap'); w.insertBefore(sb, w.firstChild.nextSibling); }
+        sb.textContent = `🔴 資料過期警告:核心訊號最後更新 ${cs.last_updated}(約 ${Math.round(ageH)} 小時前)。抓價可能斷供,以下標籤是舊的——別依此下單,先查 GitHub Actions 是否失敗。`;
+      } else if(sb){ sb.remove(); }
+    }catch(e){}
     $('#updated').innerHTML =
       `🟢 指數即時資料 <b>${cs?cs.last_updated:'—'}</b>(台北時間·每天 09:00/21:00/22:30 自動)<br>`+
       `🟢 個股信號 <b>${sig.last_updated}</b>(台北時間·每天 09:00/21:00/22:30 自動;22:30為美股盤中暫定,決策看隔天早上收盤班)<br>`+
@@ -1491,6 +1529,7 @@ async function loadAll(){
       `<span style="color:var(--muted);font-size:11px">↻ 本次載入 ${new Date().toLocaleTimeString('zh-TW')}`+
       `(按↻只是重抓伺服器現有資料,不會重跑行情;資料時間由伺服器每天 09:00/21:00/22:30 自動更新)</span>`;
     renderRegime(cs, ag);
+    renderAdherence(cs);
     renderAggressive(ag);
     renderAllocation(al);
     renderBuyList(cs, tw);
