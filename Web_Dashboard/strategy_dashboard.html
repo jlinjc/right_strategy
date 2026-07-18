@@ -209,6 +209,9 @@
   <!-- ★進取模式(TQQQ/SOXL 槓桿) — 成長階段每日執行 -->
   <div id="aggressivePanel"></div>
 
+  <!-- ★每月定投卡:RS最強輪動決定買什麼 × 標籤決定買多少 × 閒錢階梯 × 摩擦細節 -->
+  <div id="dcaCard"></div>
+
   <!-- ★執行追蹤:系統說 vs 你做(對人肉執行系統,遵守率比標籤優化值錢) -->
   <div id="adherencePanel"></div>
 
@@ -1473,6 +1476,53 @@ function _adSelect(sym){
   try{_ad.chart.timeScale().fitContent(); _ad.eqc.timeScale().fitContent();}catch(e){}
 }
 
+// ── 📅每月定投卡(RS最強輪動×標籤額度×閒錢階梯×摩擦細節;根據 research_dca_labels:載具>>微操作) ──
+function _dcaPlan(status, mktKey){
+  if(!status || !status.cores) return null;
+  const rh = status.rotation_hold || {};
+  const strongest = status.strongest;
+  const veh = (rh.ticker && status.cores[rh.ticker]) ? rh.ticker : strongest;
+  if(!veh || !status.cores[veh]) return null;
+  const v = status.cores[veh];
+  const health = status.canary ? status.canary.health : 1;
+  const lockTxt = rh.ticker ? (rh.locked ? `🔒鎖定中(還${rh.lock_days_left}日)` : `🔓已滿鎖,今日最強=${rh.today_strongest||strongest}`) : '';
+  let amt, tone, ladder;
+  if(health<=0){ amt='本月存現金(銀行+1),等信用站回'; tone='#ff5a5a'; ladder='閒錢:等。信用全示警不部署'; }
+  else if(v.state==='panic_watch'){ amt='暫停一次(恐慌觀察,等3日確認)'; tone='#ffcb45'; ladder='閒錢:等確認'; }
+  else if(v.state!=='risk_on'){ amt='本月存現金(跌破線)'; tone='#ff5a5a'; ladder='閒錢:等站回200MA'; }
+  else if(v.entry_state==='can_enter'){ amt='🟢 全額投入 + 把之前存的現金一併佈署'; tone='#2ecc71'; ladder='閒錢:綠燈→10個交易日內分3批佈完,別等更低'; }
+  else if((v.entry_action||'').includes('可小額')){ amt='🟡 半額(平靜牛市追高→小額;掛限價等拉回再補足)'; tone='#a3e635'; ladder='閒錢:先佈1/3,拉回到門檻內再加'; }
+  else { amt='🟡 半額,掛限價 ≤ $'+v.entry_cap+' 等拉回'; tone='#ffcb45'; ladder='閒錢:先佈1/3,拉回到門檻內再加'; }
+  return {veh, v, amt, tone, ladder, lockTxt, health};
+}
+function renderDcaCard(cs, tw){
+  const host=document.getElementById('dcaCard'); if(!host) return;
+  const plans=[['US 美股',_dcaPlan(cs,'us')],['TW 台股',_dcaPlan(tw,'tw')]].filter(x=>x[1]);
+  if(!plans.length){ host.innerHTML=''; return; }
+  const KEY='dca_log';
+  const log=JSON.parse(localStorage.getItem(KEY)||'{}');
+  const month=new Date().toISOString().slice(0,7);
+  window._dcaMark=()=>{ log[month]={ts:Date.now()}; localStorage.setItem(KEY,JSON.stringify(log)); renderDcaCard(cs,tw); };
+  const done=!!log[month];
+  const blocks=plans.map(([name,p])=>{
+    const cr = p.health>=1?'信用🟢':(p.health>0?`信用🟠×${Math.round(p.health*100)}%`:'信用🔴');
+    return `<div style="flex:1;min-width:300px;background:var(--panel2);border-radius:8px;padding:10px 12px">
+      <div style="font-size:12px;color:var(--muted)">${name} · RS輪動選出</div>
+      <div style="font-size:17px;font-weight:800;margin:2px 0">${p.veh.replace('.TW','')} <span style="font-size:12px;color:var(--muted);font-weight:400">RS ${p.v.rs_score??'—'} ${p.lockTxt} ${cr}</span></div>
+      <div style="color:${p.tone};font-weight:700;margin:4px 0">${p.amt}</div>
+      <div style="font-size:12px;color:var(--muted)">現價 $${p.v.close} · 進場上限 $${p.v.entry_cap} · 停損線 $${p.v.exit_price}</div>
+      <div style="font-size:12px;color:#8a96ad;margin-top:4px">💰 ${p.ladder}</div>
+    </div>`;}).join('');
+  host.innerHTML=`<div style="background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:13px 16px;margin:14px 0">
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px">
+      <div style="font-weight:800">📅 每月定投卡 — 買什麼(RS最強)× 買多少(標籤)× 閒錢階梯</div>
+      <button onclick="_dcaMark()" style="margin-left:auto;padding:6px 14px;font-size:13px;cursor:pointer;border-radius:6px;border:1px solid ${done?'#2ecc71':'var(--line)'};background:${done?'#2ecc7133':'var(--panel2)'};color:var(--txt)">${done?'✅ 本月已執行':'本月執行完點我'}</button>
+    </div>
+    <div style="display:flex;gap:12px;flex-wrap:wrap">${blocks}</div>
+    <div style="font-size:11.5px;color:#64748b;margin-top:8px">📌 依據(research_dca_labels 2016-26):賺贏大盤+235%來自載具(SMH 7.9x vs SPY 2.4x),定投微操作十年僅差±4%——<b style="color:#8a96ad">所以:選最強、絕不缺席,比挑買點重要</b>。摩擦細節:收盤訊號→隔日掛限價、不追盤中;長抱>1年稅率優勢;紅燈月存的現金=下次綠燈的子彈。</div>
+  </div>`;
+}
+
 // ── 執行追蹤(localStorage;系統說什麼 vs 你做什麼→遵守率) ──
 function renderAdherence(cs){
   const host=document.getElementById('adherencePanel'); if(!host) return;
@@ -1529,6 +1579,7 @@ async function loadAll(){
       `<span style="color:var(--muted);font-size:11px">↻ 本次載入 ${new Date().toLocaleTimeString('zh-TW')}`+
       `(按↻只是重抓伺服器現有資料,不會重跑行情;資料時間由伺服器每天 09:00/21:00/22:30 自動更新)</span>`;
     renderRegime(cs, ag);
+    renderDcaCard(cs, tw);
     renderAdherence(cs);
     renderAggressive(ag);
     renderAllocation(al);
