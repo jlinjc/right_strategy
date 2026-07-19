@@ -270,6 +270,13 @@ def annotate(ohlc: pd.DataFrame, params: dict, vix: pd.Series, canary_closes: di
                     label += '·無量緩破健康'
                 if chop and ma_up:
                     note_bits.append('鋸齒區但MA200上彎=發射台(D4:歷史此格報酬高於基準)')
+                # ★黃金拉回(research_menu_and_distance.py B2):曾噴遠>20%後跌回貼MA(<5%)
+                #   =全表最佳格(63日+11.4%/勝79% vs 正噴遠+6.4%);「回到MA=動能死」理論被證偽
+                d_now = (c / ma - 1) * 100
+                if d_now < 5 and t >= 63:
+                    maxd63 = float(np.nanmax(close[t-63:t+1] / ma200[t-63:t+1] - 1)) * 100
+                    if maxd63 > 20:
+                        note_bits.append('★黃金拉回:曾噴遠>20%回踩MA(歷史63日+11.4%/勝79%=全表最佳格)')
                 if r and room is not None and room <= 0.03 and params.get('resist_warn', 0.03) < room:
                     note_bits.append(f'前高 {r:.2f}(+{room*100:.0f}%)在上方,但此指數該格歷史無壓制力(審計:事後≥買日)→不擋')
                 note_bits.append(f'停損距 -{sr*100:.0f}%'

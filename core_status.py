@@ -324,6 +324,16 @@ def core_signal(close: pd.Series, vix_last: float | None, ticker: str,
         entry_action = (f'可進場(距50MA +{dist50:.0f}% ≤ 門檻 +{(thr-1)*100:.0f}%)'
                         f'；停損距 -{stop_risk:.0f}% → 建議曝險 {expo_raw*100:.0f}%{extra}')
 
+    # ★黃金拉回(research_menu_and_distance.py B2):曾噴遠>20%後跌回貼MA(<5%)=全表最佳格
+    #   (63日+11.4%/勝79% vs 正噴遠+6.4%);「回到MA=動能死」被證偽——回踩是買點不是死訊。
+    golden_pullback = False
+    if last >= ma and dist < 5 and len(close) > 263:
+        d_series = (close.iloc[-64:] / ma_series.iloc[-64:] - 1) * 100
+        if float(d_series.max()) > 20:
+            golden_pullback = True
+            if entry_state == 'can_enter':
+                entry_action = '★黃金拉回(曾噴遠>20%回踩MA,歷史63日+11.4%/勝79%)!' + entry_action
+
     snote = struct.get('structure_note')
     if snote and entry_state in ('can_enter', 'extended'):
         entry_action = entry_action + '  │ 結構:' + snote
@@ -335,7 +345,7 @@ def core_signal(close: pd.Series, vix_last: float | None, ticker: str,
             'suggested_expo': suggested_expo, 'rs_score': rs_score, 'rs_csm': rs_csm, 'is_strongest': False,
             'days_below': days_below, 'panic': panic,
             'state': state, 'action': hold_action, 'hold_action': hold_action,
-            'cap_used': cap_use, 'vol_note': vol_note,
+            'cap_used': cap_use, 'vol_note': vol_note, 'golden_pullback': golden_pullback,
             'entry_state': entry_state, 'entry_action': entry_action, **struct}
 
 
