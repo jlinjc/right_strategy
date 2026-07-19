@@ -198,12 +198,6 @@
   </nav>
 
   <div class="tabpane active" id="tab-today">
-  <!-- 大盤 REGIME -->
-  <div class="regime" id="regime">
-    <div class="light"></div>
-    <div><div class="lbl">載入中…</div><div class="act"></div></div>
-  </div>
-
   <!-- ★今日唯一指令:統合 regime+RS輪動+信用+定投額度+閒錢階梯,全站以此為準 -->
   <div id="commandCard"></div>
 
@@ -1471,9 +1465,9 @@ function _adSelect(sym){
   try{_ad.chart.timeScale().fitContent(); _ad.eqc.timeScale().fitContent();}catch(e){}
 }
 
-// ── 🎯今日唯一指令卡:統合 regime+RS輪動+信用+定投額度+閒錢階梯(單一數字來源=suggested_expo,
-//    已含 RiskTarget×vol-timing×信用減碼→與掛單建議永不打架) ──
-function _cmdBlock(name, status){
+// ── 🎯今日唯一指令卡:狀態+RS輪動+信用+額度+換算(單一數字來源=suggested_expo,
+//    已含 RiskTarget×vol-timing×信用減碼;金額/股數=純乘法換算,不新增任何未回測規則) ──
+function _cmdBlock(name, status, mkt, cur){
   if(!status || !status.cores) return '';
   const rh = status.rotation_hold || {};
   const veh = (rh.ticker && status.cores[rh.ticker]) ? rh.ticker : status.strongest;
@@ -1484,22 +1478,46 @@ function _cmdBlock(name, status){
   const ep = (expo==null)?null:Math.round(expo*100);
   const cr = health>=1?'信用🟢':(health>0?`信用🟠(額度已×${Math.round(health*100)}%)`:'信用🔴全示警');
   const lock = rh.ticker?(rh.locked?`🔒還${rh.lock_days_left}日才可換`:`🔓可換(今日最強=${rh.today_strongest||status.strongest})`):'';
+  const K = parseFloat(localStorage.getItem('cap_'+mkt)) || null;
+  const pos = localStorage.getItem('pos_'+mkt) || '';
+  // 換算=純乘法:目標部位 = 核心資金K × suggested_expo;股數 = 目標÷現價(捨去)
+  let calc='';
+  if(K && ep!=null && ep>0){
+    const tgt=K*expo, sh=Math.floor(tgt/d.close);
+    calc=`目標部位 ${cur}${Math.round(tgt).toLocaleString()} ≈ <b>${sh.toLocaleString()} 股</b>`
+      +(expo>1?'(>100%需融資;現金帳戶=全倉即可)':'')
+      +(mkt==='tw'?'(以券商現價為準,可零股)':'');
+  } else if(ep!=null && ep>0){ calc='(輸入核心資金→自動算股數)'; }
   let buy, tone, ladder;
   if(health<=0 || d.state==='risk_off'){ buy='存現金(=下次綠燈的子彈)'; tone='#ff5a5a'; ladder='等信用/趨勢回來,不部署'; }
   else if(d.state==='panic_watch'){ buy='暫停,等3日恐慌確認'; tone='#ffcb45'; ladder='等確認'; }
-  else if(ep>=75){ buy=`全額投入(建議曝險 ${ep}%)+把先前存的現金一併佈署`; tone='#2ecc71'; ladder='一次佈署最優(回測:分批平均少賺);心理過不去→最多10日分3批(行為緩衝,非最優)'; }
-  else if(ep>=40){ buy=`半額(建議曝險 ${ep}%),限價 ≤ $${d.entry_cap}`; tone='#a3e635'; ladder='先佈 1/3,拉回到限價內再加'; }
-  else if(ep>0){ buy=`小額就好(曝險僅 ${ep}%=位階偏貴/信用減碼),限價 ≤ $${d.entry_cap}`; tone='#ffcb45'; ladder='先佈 1/3,拉回再加'; }
+  else if(ep>=75){ buy=`全額投入(目標曝險 ${ep}%)+把先前存的現金一併佈署`; tone='#2ecc71'; ladder='一次佈署最優(回測:分批平均少賺);心理過不去→最多10日分3批(行為緩衝,非最優)'; }
+  else if(ep>=40){ buy=`半額(目標曝險 ${ep}%),限價 ≤ ${cur}${d.entry_cap}`; tone='#a3e635'; ladder='先佈一部分,拉回到限價內再加'; }
+  else if(ep>0){ buy=`小額就好(曝險僅 ${ep}%=位階偏貴/信用減碼),限價 ≤ ${cur}${d.entry_cap}`; tone='#ffcb45'; ladder='先小佈,拉回再加'; }
   else { buy='存現金'; tone='#ff5a5a'; ladder='等綠燈'; }
-  const hold = d.state==='risk_on'
-    ? `續抱,目標曝險 ${ep??'—'}%,停損 $${d.exit_price},<b>沒破線今天不動</b>`
-    : (d.state==='panic_watch' ? '恐慌觀察:維持現倉別加減' : `出場線已破→照紀律離場(停損 $${d.exit_price})`);
-  return `<div style="flex:1;min-width:320px;background:var(--panel2);border-radius:8px;padding:11px 13px">
-    <div style="font-size:12px;color:var(--muted)">${name} · RS輪動持有 ${lock} · ${cr}</div>
-    <div style="font-size:18px;font-weight:800;margin:2px 0">${veh.replace('.TW','')} <span style="font-size:12px;font-weight:400;color:var(--muted)">RS ${d.rs_score??'—'} · 現價 $${d.close}</span></div>
-    <div style="font-size:13px;margin-top:6px">🏠 已持有:${hold}</div>
-    <div style="font-size:13px;margin-top:4px">💵 本月新資金:<b style="color:${tone}">${buy}</b></div>
-    <div style="font-size:12px;color:#8a96ad;margin-top:4px">💰 大額閒錢:${ladder}</div>
+  const holdLine = d.state==='risk_on'
+    ? `續抱;目標曝險 ${ep??'—'}%${calc?`,${calc}`:''};停損 ${cur}${d.exit_price}(收盤跌破→全出);<b>沒破線今天不動</b>,加減碼以目標為準`
+    : (d.state==='panic_watch' ? '恐慌觀察:維持現倉別加減,等3日確認' : `出場線已破→照紀律離場(停損 ${cur}${d.exit_price})`);
+  const cashLine = `${buy}${calc?`;${calc}`:''};停損 ${cur}${d.exit_price}`;
+  const pbtn=(v,txt)=>`<button onclick="_setPos('${mkt}','${v}')" style="padding:3px 10px;font-size:11.5px;cursor:pointer;border-radius:5px;margin-left:6px;border:1px solid ${pos===v?'var(--accent)':'var(--line)'};background:${pos===v?'rgba(77,163,255,0.2)':'var(--panel2)'};color:var(--txt)">${txt}</button>`;
+  let body='';
+  if(pos==='hold'){
+    body=`<div style="font-size:13.5px;margin-top:6px">🏠 ${holdLine}</div>
+      <div style="font-size:11.5px;color:#8a96ad;margin-top:4px">💵 本月新資金:${buy}</div>`;
+  } else if(pos==='cash'){
+    body=`<div style="font-size:13.5px;margin-top:6px">💵 <b style="color:${tone}">${cashLine}</b></div>
+      <div style="font-size:11.5px;color:#8a96ad;margin-top:4px">💰 大額閒錢:${ladder}</div>`;
+  } else {
+    body=`<div style="font-size:13px;margin-top:6px">🏠 已持有:${holdLine}</div>
+      <div style="font-size:13px;margin-top:4px">💵 空手/新資金:<b style="color:${tone}">${cashLine}</b></div>
+      <div style="font-size:11.5px;color:#ffcb45;margin-top:4px">👆 點右上「持有中/空手」→ 之後只顯示你需要的那行</div>`;
+  }
+  return `<div style="flex:1;min-width:330px;background:var(--panel2);border-radius:8px;padding:11px 13px">
+    <div style="font-size:12px;color:var(--muted);display:flex;align-items:center;flex-wrap:wrap">${name} · RS輪動 ${lock} · ${cr}
+      <span style="margin-left:auto">我目前:${pbtn('hold','持有中')}${pbtn('cash','空手')}</span></div>
+    <div style="font-size:18px;font-weight:800;margin:2px 0">${veh.replace('.TW','')} <span style="font-size:12px;font-weight:400;color:var(--muted)">RS ${d.rs_score??'—'} · 現價 ${cur}${d.close}</span></div>
+    <div style="font-size:11.5px;color:var(--muted);margin-top:2px">核心資金 ${cur}<input type="number" value="${K||''}" placeholder="投入此策略的錢" onchange="_setCap('${mkt}',this.value)" style="width:110px;background:var(--panel);border:1px solid var(--line);border-radius:4px;color:var(--txt);padding:2px 6px;font-size:11.5px"> <span style="color:#64748b">=你分配給「核心指數策略」的錢(照70/20/10=總資產×70%)</span></div>
+    ${body}
   </div>`;
 }
 function renderCommandCard(cs, tw, ag){
@@ -1508,16 +1526,27 @@ function renderCommandCard(cs, tw, ag){
   const log=JSON.parse(localStorage.getItem(KEY)||'{}');
   const month=new Date().toISOString().slice(0,7);
   window._dcaMark=()=>{ log[month]={ts:Date.now()}; localStorage.setItem(KEY,JSON.stringify(log)); renderCommandCard(cs,tw,ag); };
+  window._setCap=(m,v)=>{ if(v) localStorage.setItem('cap_'+m,v); else localStorage.removeItem('cap_'+m); renderCommandCard(cs,tw,ag); };
+  window._setPos=(m,v)=>{ const c=localStorage.getItem('pos_'+m); if(c===v) localStorage.removeItem('pos_'+m); else localStorage.setItem('pos_'+m,v); renderCommandCard(cs,tw,ag); };
   const done=!!log[month];
   const aggOff = ag && ag.canary && !ag.canary.ok;
+  // ★狀態列=原頂部regime橫幅併入(單一聲音;與 core_status.combined 同源)
+  const st = cs && cs.combined ? cs.combined.state : null;
+  const stMap = {risk_on:['#2ecc71','🟢 趨勢+信用健康 → 持有最強核心'],
+                 risk_off:['#ff5a5a','🔴 核心全部轉現金(信用全壞或跌破200MA)'],
+                 panic_watch:['#ffcb45','🟠 恐慌觀察:VIX高+跌破 → 別砍V底,維持現倉'],
+                 credit_warning:['#ffcb45','🟠 信用部分示警 → 新買量減半(持有者續抱不動,不是叫你賣)'],
+                 core_warning:['#ffcb45','🟡 核心跌破200MA → 出場(信用尚健康)']};
+  const [stc, stt] = stMap[st] || ['#8a96ad', (cs&&cs.combined)?cs.combined.action:'載入中…'];
   host.innerHTML=`<div style="background:var(--panel);border:2px solid var(--accent);border-radius:12px;padding:13px 16px;margin:14px 0">
-    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px">
-      <div style="font-weight:800;font-size:15px">🎯 今日唯一指令 — 全站以這張卡為準(其餘面板=進階參考)</div>
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px">
+      <div style="font-weight:800;font-size:15px">🎯 今日唯一指令</div>
+      <div style="font-size:13px;color:${stc};font-weight:700">${stt}</div>
       <button onclick="_dcaMark()" style="margin-left:auto;padding:6px 14px;font-size:13px;cursor:pointer;border-radius:6px;border:1px solid ${done?'#2ecc71':'var(--line)'};background:${done?'#2ecc7133':'var(--panel2)'};color:var(--txt)">${done?'✅ 本月定投已執行':'本月定投完成點我'}</button>
     </div>
-    <div style="display:flex;gap:12px;flex-wrap:wrap">${_cmdBlock('🇺🇸 美股', cs)}${_cmdBlock('🇹🇼 台股', tw)}</div>
+    <div style="display:flex;gap:12px;flex-wrap:wrap">${_cmdBlock('🇺🇸 美股', cs, 'us', '$')}${_cmdBlock('🇹🇼 台股', tw, 'tw', 'NT$')}</div>
     ${aggOff?`<div style="font-size:12px;color:#ff9d5a;margin-top:8px">⚠️ 只影響槓桿玩家:TQQQ/SOXL(獨立二元哨,更嚴格)今日=空手。不玩槓桿ETF可無視,詳見下方收合面板。</div>`:''}
-    <div style="font-size:11.5px;color:#64748b;margin-top:8px">依據分級:🥇<b>機制=回測背書</b>(輪動最強Sharpe1.37/OOS最差1.12 · 信用哨2022 -4.5% · RiskTarget · vol-timing 48格掃描 · 載具>>買點:SMH定投7.9x vs SPY2.4x)｜🥈<b>校準</b>(標籤文字/R3小額=逐根審計)｜🥉<b>介面設計</b>(全額/半額的75%/40%分檔線、行為分批)——🥉是為了好執行,不是回測參數。收盤訊號→隔日限價,不追盤中。</div>
+    <div style="font-size:11.5px;color:#64748b;margin-top:8px">依據分級:🥇<b>機制=回測背書</b>(輪動最強Sharpe1.37/OOS最差1.12 · 信用哨2022 -4.5% · RiskTarget · vol-timing 48格掃描 · 載具>>買點:SMH定投7.9x vs SPY2.4x)｜🥈<b>校準</b>(標籤文字/R3小額=逐根審計)｜🥉<b>介面設計</b>(全額/半額的75%/40%分檔線、行為分批、金額換算的顯示方式)——🥉是為了好執行,不是回測參數。收盤訊號→隔日限價,不追盤中。</div>
   </div>`;
 }
 
@@ -1576,7 +1605,6 @@ async function loadAll(){
       `<span style="color:var(--muted)">🔒 配置/回測實證(靜態·本機 push 才更新)</span><br>`+
       `<span style="color:var(--muted);font-size:11px">↻ 本次載入 ${new Date().toLocaleTimeString('zh-TW')}`+
       `(按↻只是重抓伺服器現有資料,不會重跑行情;資料時間由伺服器每天 09:00/21:00/22:30 自動更新)</span>`;
-    renderRegime(cs, ag);
     renderCommandCard(cs, tw, ag);
     renderAdherence(cs);
     renderAggressive(ag);
