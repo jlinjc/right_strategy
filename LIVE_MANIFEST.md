@@ -11,6 +11,7 @@
 | leaders_status.py | leaders_status.json | 台美龍頭個股(衛星) |
 | generate_kbar_annotations.py | kbar_annotations.json | 每根K棒 PIT 標籤 + 診斷 + 自適應 + review |
 | generate_signals.py | strategy_signals.json | 個股衛星進場信號(S&P500 掃描) |
+| aggressive_status.py | aggressive_status.json | 進取模式 TQQQ/SOXL(獨立二元哨;2026-07-19 補進排程) |
 
 ## 上述檔案的 import 依賴(間接承重)
 scanner_base.py · filter_experiments.py · exit_experiments.py · rs_selection.py · validate_universe.py

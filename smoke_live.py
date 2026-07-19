@@ -10,7 +10,7 @@ from datetime import datetime
 if sys.stdout.encoding and sys.stdout.encoding.lower() != 'utf-8':
     sys.stdout.reconfigure(encoding='utf-8')
 
-LIVE_PY = ['core_status.py', 'taiwan_status.py', 'leaders_status.py',
+LIVE_PY = ['core_status.py', 'taiwan_status.py', 'leaders_status.py', 'aggressive_status.py',
            'generate_kbar_annotations.py', 'generate_signals.py',
            'scanner_base.py', 'filter_experiments.py', 'exit_experiments.py',
            'rs_selection.py', 'validate_universe.py', 'update_dashboard.py']

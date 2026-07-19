@@ -50,6 +50,7 @@ jobs:
           python core_status.py || echo "core_status skipped"
           python taiwan_status.py || echo "taiwan_status skipped"
           python leaders_status.py || echo "leaders_status skipped"
+          python aggressive_status.py || echo "aggressive_status skipped"
           python generate_kbar_annotations.py || echo "kbar_annotations skipped"
 
       # 個股信號 = 重掃 S&P500(慢、會被限流)。依 Jason 要求「每班都跑」:所有排程班次 + 手動都跑

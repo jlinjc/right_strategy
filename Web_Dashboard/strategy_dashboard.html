@@ -194,8 +194,6 @@
     <button class="tabbtn" data-tab="config">💼 配置 / 策略</button>
     <button class="tabbtn" data-tab="taiwan">🌏 台股</button>
     <button class="tabbtn" data-tab="kbar">🕯️ 每日K棒</button>
-    <button class="tabbtn" data-tab="diag">🔧 信號診斷</button>
-    <button class="tabbtn" data-tab="adaptive">🐂 牛熊自適應</button>
     <button class="tabbtn" data-tab="satellite">🏆 個股衛星</button>
   </nav>
 
@@ -206,26 +204,44 @@
     <div><div class="lbl">載入中…</div><div class="act"></div></div>
   </div>
 
-  <!-- ★進取模式(TQQQ/SOXL 槓桿) — 成長階段每日執行 -->
-  <div id="aggressivePanel"></div>
-
-  <!-- ★每月定投卡:RS最強輪動決定買什麼 × 標籤決定買多少 × 閒錢階梯 × 摩擦細節 -->
-  <div id="dcaCard"></div>
+  <!-- ★今日唯一指令:統合 regime+RS輪動+信用+定投額度+閒錢階梯,全站以此為準 -->
+  <div id="commandCard"></div>
 
   <!-- ★執行追蹤:系統說 vs 你做(對人肉執行系統,遵守率比標籤優化值錢) -->
   <div id="adherencePanel"></div>
 
-  <!-- ★今日掛單建議(台美股:該買什麼/別追什麼/掛單價) -->
-  <div id="buyList"></div>
+  <!-- 進階參考(收合):全選單掛單價(=回測選單的每檔讀數,非推薦清單) -->
+  <details class="grp">
+    <summary>📋 進階:全選單掛單價(參考;<b style="color:var(--accent)">今日行動以上方🎯指令卡為準</b>,此清單=回測選單逐檔讀數,非叫你全買)<span class="ar">▸</span></summary>
+    <div class="gbody"><div id="buyList"></div></div>
+  </details>
+
+  <!-- 進階(收合):進取模式=獨立槓桿人格,更嚴格二元哨,只有玩TQQQ/SOXL才需要看 -->
+  <details class="grp">
+    <summary>🚀 進取模式(TQQQ/SOXL 槓桿·<b style="color:#ff9d5a">獨立系統·二元哨更嚴格,與核心不同套</b>)— 只有玩槓桿ETF才展開<span class="ar">▸</span></summary>
+    <div class="gbody"><div id="aggressivePanel"></div></div>
+  </details>
 
   </div><!-- /tab-today -->
 
   <div class="tabpane" id="tab-config">
-  <!-- ★資產配置建議(核心/衛星/VRP 三塊,data talk) -->
+  <!-- ★配置精華:你只需要知道這些 -->
+  <div id="configSummary" style="background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 17px;margin:14px 0;line-height:2">
+    <div style="font-weight:800;margin-bottom:4px">💼 配置精華 — 只需要知道這些(其餘收合在下方)</div>
+    <div style="font-size:13.5px">
+    ① 總資產配置:<b>核心(指數擇時)70% / 衛星(個股動能)20% / VRP(PUTW)10%</b>——衛星別超20%(回測有灌水),VRP 10%封頂15%、只買 PUTW 不碰槓桿short-vol。<br>
+    ② 核心路線三選一:🛡️省事=<b>純A抱最強</b> · ⚖️最穩=<b>A+B各半</b>(回撤最淺) · 🚀最大財富(能扛-34%)=<b>A60/B40 整組×1.3~1.4</b>。<br>
+    ③ 槓桿紀律:<b>RISK_MULT 上限 1.5</b>,Kelly 算出的 2-4x 是「樣本沒真熊市」的幻覺,別信。<br>
+    ④ 真 edge 記帳:擇時 vs 買持僅 +0.08 Sharpe——這套的價值=<b>熊市躲現金+紀律</b>,賺贏大盤靠<b>載具選擇</b>(SMH定投7.9x vs SPY 2.4x),不是靠聰明買點。</div>
+  </div>
+  <!-- 資產配置建議(核心/衛星/VRP 三塊,data talk) -->
   <div id="allocationPanel"></div>
 
-  <!-- 核心-衛星 王者配置 -->
-  <div id="coreBanner"></div>
+  <!-- 進階(收合):核心-衛星完整研究 -->
+  <details class="grp">
+    <summary>進階:核心-衛星完整研究與路線比較<span class="ar">▸</span></summary>
+    <div class="gbody"><div id="coreBanner"></div></div>
+  </details>
   </div><!-- /tab-config -->
 
   <div class="tabpane" id="tab-taiwan">
@@ -237,14 +253,6 @@
   <!-- ★每日K棒 PIT 逐日標註(視覺化:每根K在「當天」會被標成什麼) -->
   <div id="kbarPanel"></div>
   </div><!-- /tab-kbar -->
-
-  <div class="tabpane" id="tab-diag">
-  <div id="diagPanel"></div>
-  </div><!-- /tab-diag -->
-
-  <div class="tabpane" id="tab-adaptive">
-  <div id="adaptPanel"></div>
-  </div><!-- /tab-adaptive -->
 
   <div class="tabpane" id="tab-satellite">
   <!-- ↓↓ 個股衛星(獨立系統) ↓↓ -->
@@ -324,7 +332,7 @@ function renderRegime(cs, ag){
   const lbl = st==='risk_on' ? '🟢 綠燈 · 趨勢+信用健康 → 持有最強核心'
     : st==='risk_off' ? '🔴 紅燈 · 核心全部轉現金(信用全壞 或 跌破200MA)'
     : st==='panic_watch' ? '🟠 恐慌觀察 · VIX高+跌破 → 別砍V底,維持現倉'
-    : '🟠 黃燈 · 信用部分示警 → 核心半倉(仍可買,持有者續抱)';
+    : '🟠 黃燈 · 信用部分示警 → 新買量減半(持有者續抱不動,不是叫你賣)';
   el.innerHTML = `
     <div class="light"></div>
     <div>
@@ -1062,19 +1070,6 @@ document.querySelectorAll('#tabbar .tabbtn').forEach(btn=>{
         else _kb.chart.timeScale().fitContent();
       }catch(e){}
     }
-    if(tab==='diag' && _dg.chart){
-      try{ const d=document.getElementById('dgChart');
-        _dg.chart.applyOptions({width:d.clientWidth,height:d.clientHeight||420});
-        _dg.chart.timeScale().fitContent();
-      }catch(e){}
-    }
-    if(tab==='adaptive' && _ad.chart){
-      try{ const d=document.getElementById('adChart'), e2=document.getElementById('adEqChart');
-        _ad.chart.applyOptions({width:d.clientWidth,height:d.clientHeight||400});
-        _ad.eqc.applyOptions({width:e2.clientWidth,height:e2.clientHeight||240});
-        _ad.chart.timeScale().fitContent(); _ad.eqc.timeScale().fitContent();
-      }catch(e){}
-    }
     window.scrollTo({top:0,behavior:'smooth'});
   });
 });
@@ -1476,50 +1471,53 @@ function _adSelect(sym){
   try{_ad.chart.timeScale().fitContent(); _ad.eqc.timeScale().fitContent();}catch(e){}
 }
 
-// ── 📅每月定投卡(RS最強輪動×標籤額度×閒錢階梯×摩擦細節;根據 research_dca_labels:載具>>微操作) ──
-function _dcaPlan(status, mktKey){
-  if(!status || !status.cores) return null;
+// ── 🎯今日唯一指令卡:統合 regime+RS輪動+信用+定投額度+閒錢階梯(單一數字來源=suggested_expo,
+//    已含 RiskTarget×vol-timing×信用減碼→與掛單建議永不打架) ──
+function _cmdBlock(name, status){
+  if(!status || !status.cores) return '';
   const rh = status.rotation_hold || {};
-  const strongest = status.strongest;
-  const veh = (rh.ticker && status.cores[rh.ticker]) ? rh.ticker : strongest;
-  if(!veh || !status.cores[veh]) return null;
-  const v = status.cores[veh];
+  const veh = (rh.ticker && status.cores[rh.ticker]) ? rh.ticker : status.strongest;
+  if(!veh || !status.cores[veh]) return '';
+  const d = status.cores[veh];
   const health = status.canary ? status.canary.health : 1;
-  const lockTxt = rh.ticker ? (rh.locked ? `🔒鎖定中(還${rh.lock_days_left}日)` : `🔓已滿鎖,今日最強=${rh.today_strongest||strongest}`) : '';
-  let amt, tone, ladder;
-  if(health<=0){ amt='本月存現金(銀行+1),等信用站回'; tone='#ff5a5a'; ladder='閒錢:等。信用全示警不部署'; }
-  else if(v.state==='panic_watch'){ amt='暫停一次(恐慌觀察,等3日確認)'; tone='#ffcb45'; ladder='閒錢:等確認'; }
-  else if(v.state!=='risk_on'){ amt='本月存現金(跌破線)'; tone='#ff5a5a'; ladder='閒錢:等站回200MA'; }
-  else if(v.entry_state==='can_enter'){ amt='🟢 全額投入 + 把之前存的現金一併佈署'; tone='#2ecc71'; ladder='閒錢:綠燈→10個交易日內分3批佈完,別等更低'; }
-  else if((v.entry_action||'').includes('可小額')){ amt='🟡 半額(平靜牛市追高→小額;掛限價等拉回再補足)'; tone='#a3e635'; ladder='閒錢:先佈1/3,拉回到門檻內再加'; }
-  else { amt='🟡 半額,掛限價 ≤ $'+v.entry_cap+' 等拉回'; tone='#ffcb45'; ladder='閒錢:先佈1/3,拉回到門檻內再加'; }
-  return {veh, v, amt, tone, ladder, lockTxt, health};
+  const expo = d.suggested_expo;                       // ★唯一數字來源(已含信用×vol-timing)
+  const ep = (expo==null)?null:Math.round(expo*100);
+  const cr = health>=1?'信用🟢':(health>0?`信用🟠(額度已×${Math.round(health*100)}%)`:'信用🔴全示警');
+  const lock = rh.ticker?(rh.locked?`🔒還${rh.lock_days_left}日才可換`:`🔓可換(今日最強=${rh.today_strongest||status.strongest})`):'';
+  let buy, tone, ladder;
+  if(health<=0 || d.state==='risk_off'){ buy='存現金(=下次綠燈的子彈)'; tone='#ff5a5a'; ladder='等信用/趨勢回來,不部署'; }
+  else if(d.state==='panic_watch'){ buy='暫停,等3日恐慌確認'; tone='#ffcb45'; ladder='等確認'; }
+  else if(ep>=75){ buy=`全額投入(建議曝險 ${ep}%)+把先前存的現金一併佈署`; tone='#2ecc71'; ladder='10個交易日分3批佈完,別等更低'; }
+  else if(ep>=40){ buy=`半額(建議曝險 ${ep}%),限價 ≤ $${d.entry_cap}`; tone='#a3e635'; ladder='先佈 1/3,拉回到限價內再加'; }
+  else if(ep>0){ buy=`小額就好(曝險僅 ${ep}%=位階偏貴/信用減碼),限價 ≤ $${d.entry_cap}`; tone='#ffcb45'; ladder='先佈 1/3,拉回再加'; }
+  else { buy='存現金'; tone='#ff5a5a'; ladder='等綠燈'; }
+  const hold = d.state==='risk_on'
+    ? `續抱,目標曝險 ${ep??'—'}%,停損 $${d.exit_price},<b>沒破線今天不動</b>`
+    : (d.state==='panic_watch' ? '恐慌觀察:維持現倉別加減' : `出場線已破→照紀律離場(停損 $${d.exit_price})`);
+  return `<div style="flex:1;min-width:320px;background:var(--panel2);border-radius:8px;padding:11px 13px">
+    <div style="font-size:12px;color:var(--muted)">${name} · RS輪動持有 ${lock} · ${cr}</div>
+    <div style="font-size:18px;font-weight:800;margin:2px 0">${veh.replace('.TW','')} <span style="font-size:12px;font-weight:400;color:var(--muted)">RS ${d.rs_score??'—'} · 現價 $${d.close}</span></div>
+    <div style="font-size:13px;margin-top:6px">🏠 已持有:${hold}</div>
+    <div style="font-size:13px;margin-top:4px">💵 本月新資金:<b style="color:${tone}">${buy}</b></div>
+    <div style="font-size:12px;color:#8a96ad;margin-top:4px">💰 大額閒錢:${ladder}</div>
+  </div>`;
 }
-function renderDcaCard(cs, tw){
-  const host=document.getElementById('dcaCard'); if(!host) return;
-  const plans=[['US 美股',_dcaPlan(cs,'us')],['TW 台股',_dcaPlan(tw,'tw')]].filter(x=>x[1]);
-  if(!plans.length){ host.innerHTML=''; return; }
+function renderCommandCard(cs, tw, ag){
+  const host=document.getElementById('commandCard'); if(!host) return;
   const KEY='dca_log';
   const log=JSON.parse(localStorage.getItem(KEY)||'{}');
   const month=new Date().toISOString().slice(0,7);
-  window._dcaMark=()=>{ log[month]={ts:Date.now()}; localStorage.setItem(KEY,JSON.stringify(log)); renderDcaCard(cs,tw); };
+  window._dcaMark=()=>{ log[month]={ts:Date.now()}; localStorage.setItem(KEY,JSON.stringify(log)); renderCommandCard(cs,tw,ag); };
   const done=!!log[month];
-  const blocks=plans.map(([name,p])=>{
-    const cr = p.health>=1?'信用🟢':(p.health>0?`信用🟠×${Math.round(p.health*100)}%`:'信用🔴');
-    return `<div style="flex:1;min-width:300px;background:var(--panel2);border-radius:8px;padding:10px 12px">
-      <div style="font-size:12px;color:var(--muted)">${name} · RS輪動選出</div>
-      <div style="font-size:17px;font-weight:800;margin:2px 0">${p.veh.replace('.TW','')} <span style="font-size:12px;color:var(--muted);font-weight:400">RS ${p.v.rs_score??'—'} ${p.lockTxt} ${cr}</span></div>
-      <div style="color:${p.tone};font-weight:700;margin:4px 0">${p.amt}</div>
-      <div style="font-size:12px;color:var(--muted)">現價 $${p.v.close} · 進場上限 $${p.v.entry_cap} · 停損線 $${p.v.exit_price}</div>
-      <div style="font-size:12px;color:#8a96ad;margin-top:4px">💰 ${p.ladder}</div>
-    </div>`;}).join('');
-  host.innerHTML=`<div style="background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:13px 16px;margin:14px 0">
+  const aggOff = ag && ag.canary && !ag.canary.ok;
+  host.innerHTML=`<div style="background:var(--panel);border:2px solid var(--accent);border-radius:12px;padding:13px 16px;margin:14px 0">
     <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px">
-      <div style="font-weight:800">📅 每月定投卡 — 買什麼(RS最強)× 買多少(標籤)× 閒錢階梯</div>
-      <button onclick="_dcaMark()" style="margin-left:auto;padding:6px 14px;font-size:13px;cursor:pointer;border-radius:6px;border:1px solid ${done?'#2ecc71':'var(--line)'};background:${done?'#2ecc7133':'var(--panel2)'};color:var(--txt)">${done?'✅ 本月已執行':'本月執行完點我'}</button>
+      <div style="font-weight:800;font-size:15px">🎯 今日唯一指令 — 全站以這張卡為準(其餘面板=進階參考)</div>
+      <button onclick="_dcaMark()" style="margin-left:auto;padding:6px 14px;font-size:13px;cursor:pointer;border-radius:6px;border:1px solid ${done?'#2ecc71':'var(--line)'};background:${done?'#2ecc7133':'var(--panel2)'};color:var(--txt)">${done?'✅ 本月定投已執行':'本月定投完成點我'}</button>
     </div>
-    <div style="display:flex;gap:12px;flex-wrap:wrap">${blocks}</div>
-    <div style="font-size:11.5px;color:#64748b;margin-top:8px">📌 依據(research_dca_labels 2016-26):賺贏大盤+235%來自載具(SMH 7.9x vs SPY 2.4x),定投微操作十年僅差±4%——<b style="color:#8a96ad">所以:選最強、絕不缺席,比挑買點重要</b>。摩擦細節:收盤訊號→隔日掛限價、不追盤中;長抱>1年稅率優勢;紅燈月存的現金=下次綠燈的子彈。</div>
+    <div style="display:flex;gap:12px;flex-wrap:wrap">${_cmdBlock('🇺🇸 美股', cs)}${_cmdBlock('🇹🇼 台股', tw)}</div>
+    ${aggOff?`<div style="font-size:12px;color:#ff9d5a;margin-top:8px">⚠️ 只影響槓桿玩家:TQQQ/SOXL(獨立二元哨,更嚴格)今日=空手。不玩槓桿ETF可無視,詳見下方收合面板。</div>`:''}
+    <div style="font-size:11.5px;color:#64748b;margin-top:8px">依據=歷次回測最可信組合:輪動最強(Sharpe 1.37/OOS最差1.12)+平滑信用哨(2022 -4.5%)+RiskTarget×vol-timing 下注;賺贏大盤靠載具(SMH定投7.9x vs SPY2.4x),微操作十年±4%→<b style="color:#8a96ad">選最強、絕不缺席、破線才動</b>。收盤訊號→隔日限價,不追盤中。</div>
   </div>`;
 }
 
@@ -1579,7 +1577,7 @@ async function loadAll(){
       `<span style="color:var(--muted);font-size:11px">↻ 本次載入 ${new Date().toLocaleTimeString('zh-TW')}`+
       `(按↻只是重抓伺服器現有資料,不會重跑行情;資料時間由伺服器每天 09:00/21:00/22:30 自動更新)</span>`;
     renderRegime(cs, ag);
-    renderDcaCard(cs, tw);
+    renderCommandCard(cs, tw, ag);
     renderAdherence(cs);
     renderAggressive(ag);
     renderAllocation(al);
@@ -1594,8 +1592,6 @@ async function loadAll(){
     renderWatch(sig);
     renderEvidence(ev);
     renderKbar(kb);
-    renderDiag(kb);
-    renderAdaptive(kb);
     $('#foot').textContent = `${sig.config.universe||''}　|　進場：${sig.config.entry}　|　出場：${sig.config.exit}`;
   }catch(e){
     $('#regime').innerHTML = '<div class="lbl" style="color:var(--red)">⚠️ 資料載入失敗</div>'+
