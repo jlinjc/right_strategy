@@ -1483,7 +1483,8 @@ function _adSelect(sym){
 function _cmdBlock(name, status, mkt, cur){
   if(!status || !status.cores) return '';
   const rh = status.rotation_hold || {};
-  const veh = (rh.ticker && status.cores[rh.ticker]) ? rh.ticker : status.strongest;
+  let veh = (rh.ticker && status.cores[rh.ticker]) ? rh.ticker : status.strongest;
+  if(!veh || !status.cores[veh]) veh = (status.primary && status.cores[status.primary]) ? status.primary : Object.keys(status.cores)[0];
   if(!veh || !status.cores[veh]) return '';
   const d = status.cores[veh];
   const health = status.canary ? status.canary.health : 1;

@@ -1,5 +1,5 @@
 {
-  "last_updated": "2026-07-19 16:33:04",
+  "last_updated": "2026-07-19 21:24:39",
   "intraday_tentative": false,
   "intraday_note": "",
   "daily_verdict": "今日核心動作【持有 SOXX(曝險 39%) · 鎖定中(還 7 日才准換) · ⚠️SOXX頭上前高壓力僅 +2%,空手宜等突破 · 信用部分示警 → 全體曝險減半】其餘無動作,沒破停損線就別動手。",
@@ -76,7 +76,13 @@
       "breakout_relvol": 1.81,
       "chop_zone": false,
       "structure_note": "上方壓力 $581.17(+4%,R:R 0.2)",
-      "credit_mult": 0.5
+      "credit_mult": 0.5,
+      "vbottom": {
+        "active": false,
+        "vix_peak15": 18.8,
+        "vix_now": 18.8,
+        "dd252_pct": -16.8
+      }
     },
     "QQQ": {
       "ma200": 639.53,
