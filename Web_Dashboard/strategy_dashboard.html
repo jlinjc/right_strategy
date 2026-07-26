@@ -194,6 +194,7 @@
     <button class="tabbtn" data-tab="config">💼 配置 / 策略</button>
     <button class="tabbtn" data-tab="taiwan">🌏 台股</button>
     <button class="tabbtn" data-tab="kbar">🕯️ 每日K棒</button>
+    <button class="tabbtn" data-tab="lab">🧪 實驗</button>
     <button class="tabbtn" data-tab="satellite">🏆 個股衛星</button>
   </nav>
 
@@ -260,6 +261,10 @@
   <!-- ★每日K棒 PIT 逐日標註(視覺化:每根K在「當天」會被標成什麼) -->
   <div id="kbarPanel"></div>
   </div><!-- /tab-kbar -->
+
+  <div class="tabpane" id="tab-lab">
+  <div id="labPanel"></div>
+  </div><!-- /tab-lab -->
 
   <div class="tabpane" id="tab-satellite">
   <!-- ↓↓ 個股衛星(獨立系統) ↓↓ -->
@@ -1563,6 +1568,105 @@ function renderCommandCard(cs, tw, ag){
   </div>`;
 }
 
+// ── 🧪實驗室:大叔風控框架 × 我們的回測(整合版+互動計算器) ──
+function _labGet(k, dflt){ const v = localStorage.getItem('lab_'+k); return v===null?dflt:v; }
+function _labSet(k, v){ localStorage.setItem('lab_'+k, v); }
+function renderLab(cs, tw){
+  const host = document.getElementById('labPanel'); if(!host) return;
+  // 停損距資料(live):各標的「現價進場的停損距%」
+  const opts = [];
+  const feed = (st, tag) => { if(st && st.cores) Object.entries(st.cores).forEach(([k,v])=>{
+    if(v.stop_risk_pct != null && v.stop_risk_pct > 0) opts.push({k: k, name: tag+k.replace('.TW',''), s: v.stop_risk_pct, close: v.close, exit: v.exit_price}); }); };
+  feed(cs, '🇺🇸'); feed(tw, '🇹🇼');
+  const optHtml = opts.map((o,i)=>`<option value="${i}">${o.name}(停損距 ${o.s}%)</option>`).join('');
+  const T = (t, txt) => `<span style="font-size:10.5px;padding:1px 6px;border-radius:4px;margin-left:6px;background:${t==='g'?'#155f3a':t==='x'?'#5e1f1f':'#5e4d14'};color:${t==='g'?'#7ee2a8':t==='x'?'#ffb4b4':'#ffe39a'}">${txt}</span>`;
+  const sec = (title, body, open) => `<details class="grp" ${open?'open':''} style="margin:10px 0"><summary style="padding:11px 14px;font-size:14px">${title}<span class="ar">▸</span></summary><div class="gbody" style="padding:12px 15px;font-size:12.5px;line-height:1.85">${body}</div></details>`;
+  const vixNow = cs && cs.vix != null ? cs.vix : '—';
+  const credit = cs && cs.canary ? Math.round(cs.canary.health*100)+'%' : '—';
+  const hold = cs && cs.rotation_hold && cs.rotation_hold.ticker ? cs.rotation_hold.ticker : '空手';
+
+  host.innerHTML = `
+  <div style="background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:13px 16px;margin:14px 0">
+    <div style="font-weight:800;font-size:15px">🧪 實驗室 — 風控框架整合版(大叔框架 × 我們的回測)</div>
+    <div style="font-size:11.5px;color:var(--muted);margin-top:4px">標記:${T('g','🥇我們回測印證')}${T('x','⚔️與我們回測衝突,以數字為準')}${T('y','🥉未驗證經驗參數')}——這頁=看完就知道「怎麼算部位、套牢怎麼辦、每週查什麼」。</div>
+  </div>
+
+  ${sec('① 部位公式計算機 — 部位 = 風險預算 ÷ 停損距離'+T('g','🥇=我們的RiskTarget,+0.06 Sharpe實測'), `
+    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+      總資金 $<input id="labK" type="number" value="${_labGet('K','100000')}" style="width:100px;background:var(--panel2);border:1px solid var(--line);border-radius:4px;color:var(--txt);padding:3px 6px">
+      單筆風險預算 <input id="labR" type="number" step="0.05" value="${_labGet('R','0.75')}" style="width:60px;background:var(--panel2);border:1px solid var(--line);border-radius:4px;color:var(--txt);padding:3px 6px">%
+      標的 <select id="labT" style="background:var(--panel2);border:1px solid var(--line);border-radius:4px;color:var(--txt);padding:3px 6px">${optHtml}</select>
+      <button onclick="_labRecalc()" style="padding:4px 12px;cursor:pointer;border-radius:5px;border:1px solid var(--accent);background:rgba(77,163,255,0.15);color:var(--txt)">計算</button>
+    </div>
+    <div id="labOut1" style="margin-top:8px;font-size:13.5px"></div>
+    <div style="font-size:11px;color:#64748b;margin-top:6px">風險預算怎麼定${T('g','🥇')}:可接受總回撤 ÷ 可承受連錯次數(例 12%÷15≈0.8%);未驗證自己有優勢前單筆別超 1%(Kelly當反向提醒——我們實測 Kelly 算出 4x 是幻覺,紀律上限 1.5x)。波動大→預算打七折${T('g','🥇=我們的vol-timing,QQQ 48/48格')}。`, true)}
+
+  ${sec('② 套牢/超標檢查器 — 先修倉位,再判斷邏輯'+T('g','🥇文章對我們系統唯一的直接增量'), `
+    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+      我現在持有 $<input id="labP" type="number" value="${_labGet('P','')}" placeholder="持有市值" style="width:110px;background:var(--panel2);border:1px solid var(--line);border-radius:4px;color:var(--txt);padding:3px 6px">
+      <button onclick="_labRecalc()" style="padding:4px 12px;cursor:pointer;border-radius:5px;border:1px solid var(--accent);background:rgba(77,163,255,0.15);color:var(--txt)">檢查(用①的資金/預算/標的)</button>
+    </div>
+    <div id="labOut2" style="margin-top:8px;font-size:13.5px"></div>
+    <div style="font-size:11px;color:#64748b;margin-top:6px">鐵則:<b>價格下跌→檢查倉位;財報/指引惡化→才承認判斷錯誤。</b>超標的攤平不是降成本,是放大同一個錯誤。先縮回上限內,再談留不留。</div>`, true)}
+
+  ${sec('③ 四層風控 — 我們系統誰在做(對照表)', `
+    <table style="width:100%;border-collapse:collapse;font-size:12px">
+      <tr style="color:#64748b;border-bottom:1px solid var(--line)"><th style="text-align:left;padding:4px 6px">層</th><th style="text-align:left;padding:4px 6px">大叔版</th><th style="text-align:left;padding:4px 6px">我們系統</th></tr>
+      <tr style="border-bottom:1px solid rgba(255,255,255,0.05)"><td style="padding:4px 6px">單股上限</td><td style="padding:4px 6px">大型半導體10-15%/高波動3-5%</td><td style="padding:4px 6px">衛星:名目上限A20/B15/C10%+組合熱度3%${T('g','🥇已落地')}</td></tr>
+      <tr style="border-bottom:1px solid rgba(255,255,255,0.05)"><td style="padding:4px 6px">板塊上限</td><td style="padding:4px 6px">同主題25-30%${T('y','🥉數字未驗')}</td><td style="padding:4px 6px">核心只持1檔最強(5訊號86%同向=假分散,持多檔沒意義)${T('g','🥇')}</td></tr>
+      <tr style="border-bottom:1px solid rgba(255,255,255,0.05)"><td style="padding:4px 6px">事件風控</td><td style="padding:4px 6px">FOMC/CPI前降二三成${T('y','🥉未驗,牛市大概率保費>保額')}</td><td style="padding:4px 6px">衛星:財報前5天禁入${T('g','🥇')};指數層無此規則(我們測過的預防性減碼全是報酬殺手)</td></tr>
+      <tr><td style="padding:4px 6px">回撤管理</td><td style="padding:4px 6px">主題-8%減¼/-12%停加/-15%只留核心${T('y','🥉階梯數字手拍')}</td><td style="padding:4px 6px">信用哨平滑減碼(一壞×50%兩壞×0,2022 -4.5%)+200MA出場${T('g','🥇有實績')}</td></tr>
+    </table>`, false)}
+
+  ${sec('④ 事前劇本 A/B/C + 論點失效清單(衛星個股用)', `
+    <b>A 續漲</b>:照系統,沒破線不動。<b>B 技術性下跌</b>:價格跌但論點沒壞→管倉位(用②檢查),不改方向。<b>C 真轉空</b>:只有這些才改劇本——管理層下修指引、訂單/需求放緩、毛利率結構性惡化、產品時程跳票、成長假設被財報推翻。<br>
+    <b style="color:#ffcb45">跌價先管倉位,壞指引才改方向。</b>${T('g','🥇對衛星個股=比我們現有ATR停損更完整的框架')}<br>
+    <span style="color:#64748b;font-size:11px">注意:此框架用於「個股」。核心指數沒有「指引」——價格就是訊號,200MA出場有回測實績,別把個股劇本套到指數上。</span>`, false)}
+
+  ${sec('⑤ 每週30分鐘風險校準(live 數據已代入)', `
+    <table style="width:100%;border-collapse:collapse;font-size:12.5px">
+      <tr style="border-bottom:1px solid rgba(255,255,255,0.05)"><td style="padding:4px 6px">VIX 收盤位置</td><td style="padding:4px 6px"><b>${vixNow}</b>(>30=恐慌模式;>40+退燒=SMH V底救援區)</td></tr>
+      <tr style="border-bottom:1px solid rgba(255,255,255,0.05)"><td style="padding:4px 6px">信用哨健康</td><td style="padding:4px 6px"><b>${credit}</b>(HYG/LQD vs 各自200MA;<100%=新買量已自動減)</td></tr>
+      <tr style="border-bottom:1px solid rgba(255,255,255,0.05)"><td style="padding:4px 6px">輪動持有</td><td style="padding:4px 6px"><b>${hold}</b>(RS最強+30日鎖)</td></tr>
+      <tr style="border-bottom:1px solid rgba(255,255,255,0.05)"><td style="padding:4px 6px">自查:槓桿/融資</td><td style="padding:4px 6px">明天再跌一次,你先開「買進清單」還是「維持率畫面」?後者=倉位太大</td></tr>
+      <tr style="border-bottom:1px solid rgba(255,255,255,0.05)"><td style="padding:4px 6px">自查:三層配置</td><td style="padding:4px 6px">核心70/衛星20/VRP10 有沒有因行情失衡?遵守率面板本週幾個✅?</td></tr>
+      <tr><td style="padding:4px 6px">殖利率/外部槓桿</td><td style="padding:4px 6px">10年期方向、(本輪)韓國融資餘額增減——去槓桿沒停就不重倉右側</td></tr>
+    </table>`, false)}
+
+  ${sec('⑥ 降險五步 + 十條紀律(對照版)', `
+    <b>降險五步</b>:1.先去槓桿(負複利${T('g','🥇SOXL實測-70%')})→2.持股分三層(核心/衛星/投機)→3.提高現金(現金=最便宜的避險${T('g','🥇VRP研究同結論')})→4.避開最擁擠交易→5.事前寫劇本。<br>
+    <b>十條裡最硬的五條</b>:不融資抄底 · 不接槓桿ETF的刀 · 不替投機部位攤平 · <b>不因為跌很多而買,只因條件到了才買</b>${T('g','🥇=我們V底救援的設計:條件=VIX≥40退燒,不是「跌很多」')} · 劇本C發生就不跟市場辯論。`, false)}
+
+  ${sec('⑦ 左側 vs 右側 — 與我們系統的整合', `
+    <b>右側(主力)</b>=我們整套核心:站上200MA+信用健康才進、RS最強、RiskTarget下注。<br>
+    <b>左側(嚴格小額)</b>=我們的「🚑V底救援」:只做SMH、只在VIX≥40尖峰退燒、半倉、-7%停損、收復後併回${T('g','🥇Sharpe 1.024→1.052,2020/2025全接到,2022零誤觸')}。<br>
+    ⚔️<b>與我們數據衝突處(以我們為準)</b>:①他的三段式建倉(40/30/30等2-4週)——我們指數實測<b>一次全投優於分批</b>(分批=行為緩衝非最優);②能源當戰術對沖——系統化版本我們測過(Sharpe 0.71 慘輸),手動版無法驗證;③板塊敘事排名(封裝>設備>HBM…)=別人的劇本${T('y','🥉')},我們的替代=讓RS排名+200MA決定,不預判。`, false)}
+  `;
+  window._labRecalc = () => {
+    const K = parseFloat(document.getElementById('labK').value) || 0;
+    const R = parseFloat(document.getElementById('labR').value) || 0;
+    const ti = parseInt(document.getElementById('labT').value) || 0;
+    const P = parseFloat(document.getElementById('labP').value) || 0;
+    _labSet('K', K); _labSet('R', R); _labSet('P', P || '');
+    const o = opts[ti]; if(!o || !K || !R){ return; }
+    const maxLoss = K * R / 100;
+    const U = maxLoss / (o.s / 100);
+    const shares = Math.floor(U / o.close);
+    document.getElementById('labOut1').innerHTML =
+      `→ 這筆最多容許虧 <b>$${Math.round(maxLoss).toLocaleString()}</b>;${o.name} 停損距 ${o.s}%(停損價 $${o.exit})→ 部位上限 <b style="color:#2ecc71">$${Math.round(U).toLocaleString()} ≈ ${shares.toLocaleString()} 股</b>(=組合的 ${(U/K*100).toFixed(1)}%)。停損距越大,部位必須越小。`;
+    if(P > 0){
+      if(P > U * 1.05){
+        document.getElementById('labOut2').innerHTML =
+          `<b style="color:#ff5a5a">⚠️ 超標:</b>持有 $${Math.round(P).toLocaleString()} > 上限 $${Math.round(U).toLocaleString()}(超 ${(P/U*100-100).toFixed(0)}%)。<b>第一步:先縮到上限(賣出約 $${Math.round(P-U).toLocaleString()}),把「無法承受的虧損」變回「可理性判斷的部位」——不是全砍,也不是攤平。</b>然後才用④的劇本檢查論點有沒有失效。`;
+      } else {
+        document.getElementById('labOut2').innerHTML =
+          `<b style="color:#2ecc71">✅ 範圍內:</b>持有 $${Math.round(P).toLocaleString()} ≤ 上限 $${Math.round(U).toLocaleString()}。倉位OK→接下來只看④劇本:價格波動不是賣出理由,論點失效(指引/財報壞)才是。`;
+      }
+    } else { document.getElementById('labOut2').innerHTML = '<span style="color:var(--muted)">輸入持有市值後按檢查。</span>'; }
+  };
+  window._labRecalc();
+}
+
 // ── 執行追蹤(localStorage;系統說什麼 vs 你做什麼→遵守率) ──
 function renderAdherence(cs){
   const host=document.getElementById('adherencePanel'); if(!host) return;
@@ -1620,6 +1724,7 @@ async function loadAll(){
       `(按↻只是重抓伺服器現有資料,不會重跑行情;資料時間由伺服器每天 09:00/21:00/22:30 自動更新)</span>`;
     renderCommandCard(cs, tw, ag);
     renderAdherence(cs);
+    renderLab(cs, tw);
     renderAggressive(ag);
     renderAllocation(al);
     renderBuyList(cs, tw);
