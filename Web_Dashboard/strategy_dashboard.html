@@ -1599,7 +1599,7 @@ function renderLab(cs, tw){
       <button onclick="_labRecalc()" style="padding:4px 12px;cursor:pointer;border-radius:5px;border:1px solid var(--accent);background:rgba(77,163,255,0.15);color:var(--txt)">計算</button>
     </div>
     <div id="labOut1" style="margin-top:8px;font-size:13.5px"></div>
-    <div style="font-size:11px;color:#64748b;margin-top:6px">風險預算怎麼定${T('g','🥇')}:可接受總回撤 ÷ 可承受連錯次數(例 12%÷15≈0.8%);未驗證自己有優勢前單筆別超 1%(Kelly當反向提醒——我們實測 Kelly 算出 4x 是幻覺,紀律上限 1.5x)。波動大→預算打七折${T('g','🥇=我們的vol-timing,QQQ 48/48格')}。`, true)}
+    <div style="font-size:11px;color:#64748b;margin-top:6px">風險預算怎麼定${T('g','🥇')}:可接受總回撤 ÷ 可承受連錯次數(例 12%÷15≈0.8%);未驗證自己有優勢前單筆別超 1%(Kelly當反向提醒——我們實測 Kelly 算出 4x 是幻覺,紀律上限 1.5x)。波動大→縮預算:概念${T('g','🥇=我們的vol-timing(連續縮放,QQQ 48/48格)')},他的「打七折」具體倍率${T('y','🥉手拍數字,我們的版本按 中位波動÷當前波動 連續算')}。`, true)}
 
   ${sec('② 套牢/超標檢查器 — 先修倉位,再判斷邏輯'+T('g','🥇文章對我們系統唯一的直接增量'), `
     <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
@@ -1630,7 +1630,7 @@ function renderLab(cs, tw){
       <tr style="border-bottom:1px solid rgba(255,255,255,0.05)"><td style="padding:4px 6px">輪動持有</td><td style="padding:4px 6px"><b>${hold}</b>(RS最強+30日鎖)</td></tr>
       <tr style="border-bottom:1px solid rgba(255,255,255,0.05)"><td style="padding:4px 6px">自查:槓桿/融資</td><td style="padding:4px 6px">明天再跌一次,你先開「買進清單」還是「維持率畫面」?後者=倉位太大</td></tr>
       <tr style="border-bottom:1px solid rgba(255,255,255,0.05)"><td style="padding:4px 6px">自查:三層配置</td><td style="padding:4px 6px">核心70/衛星20/VRP10 有沒有因行情失衡?遵守率面板本週幾個✅?</td></tr>
-      <tr><td style="padding:4px 6px">殖利率/外部槓桿</td><td style="padding:4px 6px">10年期方向、(本輪)韓國融資餘額增減——去槓桿沒停就不重倉右側</td></tr>
+      <tr><td style="padding:4px 6px">殖利率/外部槓桿</td><td style="padding:4px 6px">10年期方向;他另建議盯「韓國融資餘額」${T('y','🥉本輪敘事,無法驗證,參考就好')}——原則「去槓桿沒停就不重倉右側」與我們信用哨同精神${T('g','🥇')}</td></tr>
     </table>`, false)}
 
   ${sec('⑥ 降險五步 + 十條紀律(對照版)', `
@@ -1640,7 +1640,7 @@ function renderLab(cs, tw){
   ${sec('⑦ 左側 vs 右側 — 與我們系統的整合', `
     <b>右側(主力)</b>=我們整套核心:站上200MA+信用健康才進、RS最強、RiskTarget下注。<br>
     <b>左側(嚴格小額)</b>=我們的「🚑V底救援」:只做SMH、只在VIX≥40尖峰退燒、半倉、-7%停損、收復後併回${T('g','🥇Sharpe 1.024→1.052,2020/2025全接到,2022零誤觸')}。<br>
-    ⚔️<b>與我們數據衝突處(以我們為準)</b>:①他的三段式建倉(40/30/30等2-4週)——我們指數實測<b>一次全投優於分批</b>(分批=行為緩衝非最優);②能源當戰術對沖——系統化版本我們測過(Sharpe 0.71 慘輸),手動版無法驗證;③板塊敘事排名(封裝>設備>HBM…)=別人的劇本${T('y','🥉')},我們的替代=讓RS排名+200MA決定,不預判。`, false)}
+    ⚔️<b>與我們數據衝突處(以我們為準)</b>:①他的三段式建倉(40/30/30等2-4週)——我們指數實測<b>一次全投優於分批</b>(分批=行為緩衝非最優);②能源當戰術對沖——系統化版本本週剛測(廣池含XLE輪動 Sharpe 0.50 vs 現制 0.87,research_menu_and_distance.py),手動擇時版無法驗證;③板塊敘事排名(封裝>設備>HBM…)=別人的劇本${T('y','🥉')},我們的替代=讓RS排名+200MA決定,不預判。`, false)}
   `;
   window._labRecalc = () => {
     const K = parseFloat(document.getElementById('labK').value) || 0;
