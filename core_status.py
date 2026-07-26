@@ -583,29 +583,35 @@ def main():
     today_str = datetime.now().strftime('%Y-%m-%d')
     rotation_hold = compute_rotation_hold(out, strongest, prev_hold, today_str)
 
-    # ★V底救援訊號(research_vbottom.py,2026-07-19;SMH限定——QQQ反彈太淺已測不划算):
+    # ★V底救援訊號(research_vbottom.py,2026-07-19;SMH+SOXX——QQQ/XLK/SPY反彈太淺/不穩健已測不划算):
     #   條件:系統空手語境(非risk_on或信用砍)+距252日高回撤>15%+VIX 15日尖峰≥40且現值≤尖峰×75%(退燒)。
-    #   動作:半倉進場、停損-7%、收復200MA+信用回血後併回正常系統。
-    #   背書:Sharpe 1.024→1.052、2020窗+45→+60%、2025窗+65→+76%、MDD更淺;27/27參數格2022零誤觸
-    #   (VIX≥38結構性避開2022的36.5)、15/27格勝BASE(弱格=停損太緊/回落太深)。
+    #   動作:半倉(expo=0.5,與suggested_expo同單位)、停損-7%、收復200MA+信用回血後併回正常系統。
+    #   背書 SMH:Sharpe 1.024→1.052、2020窗+45→+60%、2025窗+65→+76%、MDD更淺;15/27格勝BASE、27/27格2022零誤觸。
+    #   背書 SOXX:Sharpe 0.926→0.972、2020窗+41→+57%;20/27格勝BASE(比SMH更穩健)、27/27格2022零誤觸。
+    #   QQQ/XLK/SPY 已測:QQQ反彈太淺轉負;XLK/SPY ΔSharpe≈0(雜訊)→不啟用。
     #   誠實限制:2026-03型「低VIX V崩」(尖峰僅31<2022的36.5)在恐慌維度不可分→此訊號救不到,已證不可能。
+    VBOTTOM_TICKERS = {'SMH', 'SOXX'}
     try:
         vix_s = raw[PANIC_TICKER]['Close'].dropna()
-        smh_c = raw['SMH']['Close'].dropna()
-        if len(vix_s) > 15 and len(smh_c) > 252 and 'SMH' in out:
+        for vtk in VBOTTOM_TICKERS:
+            if vtk not in out:
+                continue
+            tk_c = raw[vtk]['Close'].dropna()
+            if len(vix_s) <= 15 or len(tk_c) <= 252:
+                continue
             vspike = float(vix_s.iloc[-15:].max()); vnow = float(vix_s.iloc[-1])
-            dd252 = float(smh_c.iloc[-1] / smh_c.iloc[-252:].max() - 1)
-            flatish = out['SMH']['state'] != 'risk_on' or bool(out['SMH'].get('credit_cut'))
+            dd252 = float(tk_c.iloc[-1] / tk_c.iloc[-252:].max() - 1)
+            flatish = out[vtk]['state'] != 'risk_on' or bool(out[vtk].get('credit_cut'))
             active = flatish and dd252 < -0.15 and vspike >= 40 and vnow <= 0.75 * vspike
             vb = {'active': bool(active), 'vix_peak15': round(vspike, 1),
                   'vix_now': round(vnow, 1), 'dd252_pct': round(dd252 * 100, 1)}
             if active:
-                stop_px = round(out['SMH']['close'] * 0.93, 2)
+                stop_px = round(out[vtk]['close'] * 0.93, 2)
                 vb.update({'tranche': 0.5, 'stop': stop_px})
-                out['SMH']['entry_action'] = (f'🚑 V底救援(SMH限定):VIX尖峰{vspike:.0f}→現{vnow:.0f}退燒+距高{dd252*100:.0f}%'
-                                              f'→半倉進場,停損 ${stop_px}(-7%);收復200MA+信用回血後併回正常系統')
-                out['SMH']['entry_state'] = 'can_enter'
-            out['SMH']['vbottom'] = vb
+                out[vtk]['entry_action'] = (f'🚑 V底救援:VIX尖峰{vspike:.0f}→現{vnow:.0f}退燒+距高{dd252*100:.0f}%'
+                                            f'→半倉進場,停損 ${stop_px}(-7%);收復200MA+信用回血後併回正常系統')
+                out[vtk]['entry_state'] = 'can_enter'
+            out[vtk]['vbottom'] = vb
     except Exception:
         pass
     # 標記實際持有(鎖定下可能≠今日最強);取消舊 is_strongest 顯示衝突由前端處理
