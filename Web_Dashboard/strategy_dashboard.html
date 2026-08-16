@@ -199,7 +199,7 @@
   </nav>
 
   <div class="tabpane active" id="tab-today">
-  <!-- ★今日唯一指令:統合 regime+RS輪動+信用+定投額度+閒錢階梯,全站以此為準 -->
+  <!-- ★今日唯一指令:統合 regime+RS輪動+信用+一次全投規則,全站以此為準(2026-08-16:移除未驗證的分批/階梯邏輯) -->
   <div id="commandCard"></div>
 
   <!-- ★執行追蹤:系統說 vs 你做(對人肉執行系統,遵守率比標籤優化值錢) -->
@@ -1527,13 +1527,14 @@ function _cmdBlock(name, status, mkt, cur){
   let shares=null;
   if(K && ep!=null && ep>0){ shares=Math.floor(K*expo/d.close); }
   // ▶ 行動一句話(依持有狀態)
+  //   ★2026-08-16 拿掉「40/75分批掛限價」——那條線沒被單獨回測過,且跟系統自己驗證過的
+  //   「一次全投優於分批」(見進取模式區:1066行、個股衛星對比表:1668行)直接矛盾。
+  //   統一成同一條已驗證規則:曝險>0就一次買到目標,曝險=0就存現金。
   let act, tone;
   if(health<=0 || d.state==='risk_off'){ act='存現金,等信用/趨勢回來'; tone='#ff5a5a'; }
   else if(d.state==='panic_watch'){ act='恐慌觀察:維持現倉,等3日確認'; tone='#ffcb45'; }
   else if(pos==='hold'){ act='續抱:收盤沒破「停損」就不動;加減碼以「目標」為準'; tone='#2ecc71'; }
-  else if(ep>=75){ act='進場:一次買到「目標」(貼近均線=便宜)'; tone='#2ecc71'; }
-  else if(ep>=40){ act='進場:先買一半,掛「限價」等拉回補足'; tone='#a3e635'; }
-  else if(ep>0){ act='只小額:位階偏貴/信用減碼,掛「限價」等拉回'; tone='#ffcb45'; }
+  else if(ep>0){ act='進場:一次買到「目標」(回測證實一次全投優於分批)'; tone='#2ecc71'; }
   else { act='存現金'; tone='#ff5a5a'; }
   // 大數字格
   const tile=(lab,val,col)=>`<div style="flex:1;min-width:84px;background:var(--panel);border-radius:6px;padding:7px 8px;text-align:center"><div style="font-size:10.5px;color:#64748b;white-space:nowrap">${lab}</div><div style="font-size:16.5px;font-weight:800;color:${col||'var(--txt)'}">${val}</div></div>`;
@@ -1589,7 +1590,7 @@ function renderCommandCard(cs, tw, ag){
     </div>
     <div style="display:flex;gap:12px;flex-wrap:wrap">${_cmdBlock('🇺🇸 美股', cs, 'us', '$')}${_cmdBlock('🇹🇼 台股', tw, 'tw', 'NT$')}</div>
     ${aggOff?`<div style="font-size:12px;color:#ff9d5a;margin-top:8px">⚠️ 只影響槓桿玩家:TQQQ/SOXL(獨立二元哨,更嚴格)今日=空手。不玩槓桿ETF可無視,詳見下方收合面板。</div>`:''}
-    <div style="font-size:11.5px;color:#64748b;margin-top:8px">依據分級:🥇<b>機制=回測背書</b>(輪動最強Sharpe1.37/OOS最差1.12 · 信用哨2022 -4.5% · RiskTarget · vol-timing 48格掃描 · 載具>>買點:SMH定投7.9x vs SPY2.4x)｜🥈<b>校準</b>(標籤文字/R3小額=逐根審計)｜🥉<b>介面設計</b>(全額/半額的75%/40%分檔線、行為分批、金額換算的顯示方式)——🥉是為了好執行,不是回測參數。收盤訊號→隔日限價,不追盤中。</div>
+    <div style="font-size:11.5px;color:#64748b;margin-top:8px">依據分級:🥇<b>機制=回測背書</b>(輪動最強Sharpe1.37/OOS最差1.12 · 信用哨2022 -4.5% · RiskTarget · vol-timing 48格掃描 · 一次全投優於分批 · 載具>>買點:SMH定投7.9x vs SPY2.4x)｜🥈<b>校準</b>(標籤文字/R3小額=逐根審計)｜🥉<b>介面設計</b>(金額/股數換算的顯示方式)——2026-08-16已拿掉沒被單獨驗證、且跟「一次全投優於分批」矛盾的75%/40%分批線。收盤訊號→隔日限價,不追盤中。</div>
   </div>`;
 }
 
