@@ -1,7 +1,8 @@
 {
   "market": "TW",
   "currency": "TWD",
-  "last_updated": "2026-08-16 16:10:09",
+  "last_updated": "2026-08-16 16:32:49",
+  "daily_verdict": "今日核心動作【持有 006208.TW(曝險 23%) · 信用部分示警 → 曝險減碼】曝險%會隨位階連續taper,照目標調整;沒破停損線就別因為價格嚇人提前出場。",
   "ma_window": 200,
   "panic_vix": 30.0,
   "vix": 1.9,

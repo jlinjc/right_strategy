@@ -205,6 +205,30 @@ def compute_rotation_hold(out, today_strongest, prev, today_str):
             'forced_out_prev': bool(prev_tk) and not eligible(prev_tk)}
 
 
+def daily_verdict(out: dict, rotation_hold: dict, canary: dict | None) -> str:
+    """把台股核心 + 信用 + 輪動壓成一行『今日該做什麼』(美股 core_status.py:daily_verdict 的台股孿生版,
+    同一份文案邏輯,2026-08-16補上——之前只有美股有這行結論,台股沒有)。"""
+    if not out:
+        return '今日核心動作:無資料'
+    if canary and canary.get('health', 1) <= 0:
+        return '🔴 今日核心動作【清倉/不進場】:信用全示警(HYG+LQD+SMH皆跌破200MA),等信用站回。'
+    held = rotation_hold.get('ticker') if rotation_hold else None
+    seg = []
+    if held and held in out:
+        d = out[held]
+        expo = d.get('suggested_expo')
+        exs = f"{expo*100:.0f}%" if expo is not None else '維持'
+        seg.append(f'持有 {held}(曝險 {exs})')
+        if rotation_hold.get('locked'):
+            seg.append(f'鎖定中(還 {rotation_hold.get("lock_days_left")} 日才准換)')
+    else:
+        seg.append('空手(無核心站上200MA 或 信用砍0)')
+    if canary and canary.get('state') == 'credit_half':
+        seg.append('信用部分示警 → 曝險減碼')
+    return ('今日核心動作【' + ' · '.join(seg) + '】曝險%會隨位階連續taper,照目標調整;'
+            '沒破停損線就別因為價格嚇人提前出場。')
+
+
 def main():
     watch_have = []
     dl_list = CORE_TICKERS + list(TW_WATCH) + CANARY_TICKERS + [PANIC_TICKER]
@@ -280,6 +304,7 @@ def main():
     data = {
         'market': 'TW', 'currency': 'TWD',
         'last_updated': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+        'daily_verdict': daily_verdict(out, rotation_hold, canary),
         'ma_window': MA, 'panic_vix': PANIC_VIX, 'vix': round(vix_last, 2) if vix_last is not None else None,
         'risk_mult': RISK_MULT, 'strongest': strongest, 'rotation_hold': rotation_hold,
         'anchor_a': '0052.TW',   # Route A 建議主力(回測Sharpe最高)
