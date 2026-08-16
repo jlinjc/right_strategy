@@ -224,7 +224,8 @@ def _structure_read(ohlc: pd.DataFrame, last: float, exit_price: float, dist_pct
 
 
 def core_signal(close: pd.Series, vix_last: float | None, ticker: str,
-                ohlc: pd.DataFrame | None = None, cred_factor: float = 1.0) -> dict:
+                ohlc: pd.DataFrame | None = None, cred_factor: float = 1.0,
+                vix_ma20: float | None = None) -> dict:
     """核心擇時 + 恐慌容忍 + 進場判定 + RiskTarget 倉位,用該指數自己的參數。
     ohlc(可選,OHLCV)→ 加裸價格結構讀數(上方壓力/突破量能/R:R/鋸齒區)輔助下手決策。"""
     p = PARAMS.get(ticker, DEFAULT_PARAM)
@@ -306,12 +307,12 @@ def core_signal(close: pd.Series, vix_last: float | None, ticker: str,
         entry_action = f'不進(在200MA ${ma:.2f} 之下,等站回)'
     elif last >= entry_cap:
         entry_state = 'extended'
-        # ★R3(2026-07-18 review 29✅:3❌):平靜牛市(EWMA波動<中位+MA200上彎)的追高日歷史≈買日→給小額
-        _r3 = False
-        if len(close) > VOL_MED + 30 and ma > float(ma_series.iloc[-21]):
-            _rv = close.pct_change().ewm(span=VOL_WIN).std() * (252 ** 0.5)
-            if float(_rv.iloc[-1]) < float(_rv.iloc[-VOL_MED:].median()):
-                _r3 = True
+        # ★R3(2026-08-16 改版):原版用「EWMA波動<中位+MA200上彎」判斷平靜牛市可小額試單,
+        #   但逐年拆解發現 2020/2025-26 這種該進未進的急拉段 vol比值反而偏高(原條件會漏接);
+        #   能把「該進(2020/2025-26)」跟「該躲(2018/2022/2023)」乾淨分開的是VIX是否正從近期
+        #   高點回落(見 generate_kbar_annotations.py 同步改版,兩邊邏輯對齊)。
+        _r3 = (ma > float(ma_series.iloc[-21]) and vix_last is not None
+               and vix_ma20 is not None and vix_last < vix_ma20)
         if _r3:
             entry_action = (f'追高但平靜牛市→可小額試單(~{expo_raw*100:.0f}%);'
                             f'距50MA +{dist50:.0f}%>門檻,正常拉回到 ${entry_cap:.2f} 以下再足量')
@@ -496,10 +497,13 @@ def main():
                       interval='1d', progress=False, group_by='ticker')
 
     vix_last = None
+    vix_ma20 = None
     try:
         vix_s = raw[PANIC_TICKER]['Close'].dropna()
         if len(vix_s) > 0:
             vix_last = float(vix_s.iloc[-1])
+        if len(vix_s) >= 20:
+            vix_ma20 = float(vix_s.rolling(20).mean().iloc[-1])
     except Exception:
         pass
 
@@ -518,7 +522,7 @@ def main():
             s = raw[tk]['Close'].dropna()
             if len(s) >= MA:
                 out[tk] = core_signal(s, vix_last, tk, ohlc=raw[tk].dropna(subset=['Close']),
-                                      cred_factor=cred_factor)
+                                      cred_factor=cred_factor, vix_ma20=vix_ma20)
         except Exception:
             pass
 

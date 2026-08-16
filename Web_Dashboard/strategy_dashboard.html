@@ -1135,7 +1135,7 @@ function renderKbar(kb){
   if(!kb || !kb.tickers || !kb.tickers.length){ host.innerHTML='<div style="color:var(--muted);padding:10px">尚無 kbar_annotations.json(執行 python generate_kbar_annotations.py)</div>'; return; }
   _kb.data = kb;
   if(!_kb.built){
-    const legend = [['green','可買/可小買'],['lime','偏貴少量'],['amber','觀望/追高/壓力/逼近停損/恐慌觀察'],['red','跌破出場/信用清倉']]
+    const legend = [['green','可進場/持有(數字=建議曝險%)'],['amber','持有觀望·別加碼(數字=曝險%,維持=不動)'],['red','空手(0%)']]
       .map(([k,v])=>`<span><i style="display:inline-block;width:11px;height:11px;background:${KB_TONE[k]};border-radius:2px;vertical-align:middle"></i> ${v}</span>`).join('');
     host.innerHTML =
       `<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:8px">`
@@ -1143,7 +1143,10 @@ function renderKbar(kb){
       +`<div style="margin-left:auto;font-size:11px;color:var(--muted);max-width:430px;text-align:right">${kb.pit_note||''}</div></div>`
       +`<div style="display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin-bottom:6px">${legend}`
       +`<span style="color:#64748b">底部量條=當日建議色 · hover任一K棒看完整標註</span></div>`
-      +`<div style="font-size:11.5px;color:#64748b;margin-bottom:6px">近一年<b style="color:#cbd5e1">每根K都有單字標記</b>:買=可買足量 · 小=可小買 · 貴=偏貴少量 · 追=追高別追 · 鋸=鋸齒觀望 · 壓=頭上壓力等突破 · 爆=爆量別追 · 停=逼近停損 · 慌=恐慌觀察 · 出=跌破出場 · 清=信用清倉(更早歷史只標轉折;預設視窗=近一年,往左拖看全史)</div>`
+      +`<div style="font-size:11.5px;color:#64748b;margin-bottom:6px">近一年<b style="color:#cbd5e1">每根K都標「建議曝險%」</b>`
+      +`(0%=空手、維持=恐慌觀察別動、其餘=實際可押倉位);唯一單獨標字的是<b style="color:#e0b46a">壓</b>`
+      +`(頭上壓力——事後驗證是唯一明顯比「可買」差的警示,其餘追高/鋸齒/爆量/偏貴警示歷史報酬跟可買差不多,不再分開標,理由都在 hover 裡)。`
+      +`更早歷史只標轉折;預設視窗=近一年,往左拖看全史。</div>`
       +`<div id="kbLatest" style="font-size:13px;margin-bottom:8px;padding:7px 10px;background:var(--panel2);border-radius:6px"></div>`
       +`<div style="position:relative"><div id="kbChart" style="width:100%;height:440px"></div>`
       +`<div id="kbTip" style="position:absolute;display:none;pointer-events:none;z-index:20;background:#0d1424f2;border:1px solid var(--line);border-radius:6px;padding:8px 10px;font-size:12px;color:var(--txt);max-width:280px"></div></div>`
@@ -1178,23 +1181,45 @@ function _kbSelect(sym){
   const bars=t.bars;
   _kb.byTime={}; bars.forEach(b=>{_kb.byTime[b.time]=b;});
   _kb.candle.setData(bars.map(b=>({time:b.time,open:b.open,high:b.high,low:b.low,close:b.close})));
-  _kb.vol.setData(bars.map(b=>({time:b.time,value:b.volume,color:(KB_TONE[b.tone]||'#334155')+'cc'})));
+  // 量條:顏色跟當日K棒漲跌一致(紅漲綠跌,對齊蠟燭配色);量能相對20日均量放大時額外標亮,
+  // 不靠「爆量突破」標籤(那個只在創新高時才觸發)——這樣任何一天真的爆量都看得出來。
+  const VOL_AVG_WIN = 20;
+  _kb.vol.setData(bars.map((b,i)=>{
+    const lo = Math.max(0, i - VOL_AVG_WIN);
+    const win = bars.slice(lo, i).map(x=>x.volume);
+    const avgVol = win.length ? win.reduce((a,c)=>a+c,0) / win.length : b.volume;
+    const relVol = avgVol > 0 ? b.volume / avgVol : 1;
+    const up = b.close >= b.open;
+    const rgb = up ? '255,90,90' : '46,204,113';
+    let color;
+    if (relVol >= 2.5) color = 'rgba(255,215,0,0.95)';       // 明顯爆量:金色高亮,不管漲跌/有沒有創新高
+    else if (relVol >= 1.6) color = `rgba(${rgb},0.9)`;       // 放量:飽和色
+    else color = `rgba(${rgb},0.4)`;                          // 一般量:淡色跟K棒同色
+    return {time: b.time, value: b.volume, color};
+  }));
   _kb.ma.setData(bars.map(b=>({time:b.time,value:b.ma200})));
   _kb.exit.setData(bars.map(b=>({time:b.time,value:b.exit})));
-  // ★每一根都標(近一年):單字碼+tone色;更早的歷史只標轉折(避免2600根文字糊死)
-  const KB_CODE = l => l.includes('信用示警')?'清':l.includes('跌破線')?'出':l.includes('恐慌觀察')?'慌'
-    :l.includes('逼近停損')?'停':l.includes('爆量突破')?'爆':l.includes('頭上壓力')?'壓'
-    :l.includes('鋸齒')?'鋸':l.includes('追高')?'追':l.includes('偏貴')?'貴'
-    :l.includes('可小買')?'小':l.includes('可買')?'買':'·';
+  // ★每一根都標「建議曝險%」(近一年,取代原本11種單字):0%=空手、維持=恐慌觀察別動、
+  //   其餘直接秀百分比——這才是實際操作指令。唯一單獨留字的是「壓」(頭上壓力):事後驗證
+  //   (research_chase_label_validate.py)只有這格明顯比「可買」差(1.6%/61%勝率 vs 2.1%/71%),
+  //   其餘追高/鋸齒/爆量/偏貴四種警示歷史報酬跟「可買」差不多,不再分開佔字,理由收進 hover。
+  //   顏色也從4色收成3色:lime(追高小額試單)併入green——它本來就代表「可進場只是量小」。
+  const KB_MARK = b => {
+    if (b.expo === 0) return '0%';
+    if (b.expo == null) return '維持';
+    const pct = Math.round(b.expo * 100) + '%';
+    return b.label.includes('頭上壓力') ? ('壓' + pct) : pct;
+  };
+  const KB_DISPLAY_COLOR = tone => KB_TONE[tone === 'lime' ? 'green' : tone] || '#8a96ad';
   const PER_BAR_N = 260;                       // 近一年每根都標
   const cut = Math.max(0, bars.length - PER_BAR_N);
   const markers=[]; let prev=null;
   bars.forEach((b,i)=>{
-    const col = KB_TONE[b.tone]||'#8a96ad';
+    const col = KB_DISPLAY_COLOR(b.tone);
     if(i >= cut){                              // 近一年:每根一個標記
       const up = (b.tone==='green'||b.tone==='lime');
       markers.push({time:b.time, position: up?'belowBar':'aboveBar', color: col,
-        shape: b.tone==='red'?'arrowDown':(up?'arrowUp':'circle'), text: KB_CODE(b.label)});
+        shape: b.tone==='red'?'arrowDown':(up?'arrowUp':'circle'), text: KB_MARK(b)});
     } else if(b.tone!==prev){                  // 更早:只標轉折(含完整標籤)
       const shape=b.tone==='red'?'arrowDown':((b.tone==='green'||b.tone==='lime')?'arrowUp':'circle');
       markers.push({time:b.time,position:b.tone==='red'?'aboveBar':'belowBar',color:col,shape,text:b.label});

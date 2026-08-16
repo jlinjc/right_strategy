@@ -169,7 +169,9 @@ def annotate(ohlc: pd.DataFrame, params: dict, vix: pd.Series, canary_closes: di
     relvol = (pd.Series(vol, index=dates) /
               pd.Series(vol, index=dates).rolling(C.VOL_WIN).mean()).values
     prior60 = s_close.rolling(C.BREAKOUT_WIN).max().shift(1).values
-    vix_al = vix.reindex(dates).ffill().values if vix is not None else np.full(len(dates), np.nan)
+    _vix_al_s = vix.reindex(dates).ffill() if vix is not None else pd.Series(np.nan, index=dates)
+    vix_al = _vix_al_s.values
+    vix_ma20 = _vix_al_s.rolling(20).mean().values   # VIX 20日均——判斷「正從高點回落」用(R3 vix_trend)
     health = _canary_health(dates, canary_closes)
     resist = _resistances(high, close, C.PIVOT_K, C.RESIST_LOOKBACK)
     slope20 = s_close.rolling(C.MA).mean().diff(20).values     # MA200 斜率(20日)
@@ -238,14 +240,18 @@ def annotate(ohlc: pd.DataFrame, params: dict, vix: pd.Series, canary_closes: di
             r = resist[t]
             room = (r / c - 1) if r else None
             if ec is not None and c >= ec:
-                # ★R3升級(2026-07-18 review 記分 29✅:3❌):平靜牛市(EWMA波動<中位)+信用滿血+MA200上彎
-                #   的追高日歷史≈買日→給小額試單,別全擋;其餘追高維持別追。
-                _ew_ok = (not np.isnan(ewma_v[t])) and (not np.isnan(ewma_med[t])) and ewma_v[t] > 0
-                _calm_bull = _ew_ok and ewma_v[t] < ewma_med[t] and slope20[t] > 0 and h >= 1.0
+                # ★R3(2026-08-16 改版):原版用「EWMA波動<252日中位」判斷平靜牛市,
+                #   但逐年拆解 2020/2025-26 這種該進未進的急拉段發現:vol比值反而偏高(1.3~1.6倍中位),
+                #   原條件會系統性漏接;能把「該進(2020/2025-26,事後21日+4.2~4.6%)」跟
+                #   「該躲(2018/2022/2023,事後21日-3.4%)」乾淨分開的是 VIX 是否正從近期高點回落
+                #   (VIX-20日均<0),兩組分離度乾淨(好組均值-2.0~-2.2 vs 壞組-0.1),換掉波動條件。
+                _vix_ok = (not np.isnan(vx)) and (not np.isnan(vix_ma20[t]))
+                _calm_bull = _vix_ok and vx < vix_ma20[t] and slope20[t] > 0 and h >= 1.0
                 if _calm_bull and expo is not None:
-                    tone, label = 'lime', f'追高·可小額試單(~{expo*100:.0f}%,平靜牛市)'
-                    note_bits.append(f'距50MA +{(c/ma50[t]-1)*100:.0f}%>門檻,但EWMA波動<中位+信用滿血+MA200上彎'
-                                     f'(此格歷史≈買日,review 29✅:3❌)')
+                    tone, label = 'lime', f'追高·可小額試單(~{expo*100:.0f}%,VIX回落)'
+                    note_bits.append(f'距50MA +{(c/ma50[t]-1)*100:.0f}%>門檻,但VIX正從近期高點回落'
+                                     f'({vx:.0f}<20日均{vix_ma20[t]:.0f})+信用滿血+MA200上彎'
+                                     f'(此格歷史≈買日;R3改用VIX回落取代EWMA波動<中位,2026-08-16)')
                 else:
                     tone, label = 'amber', '追高·別追(等拉回50MA)'
                     note_bits.append(f'距50MA +{(c/ma50[t]-1)*100:.0f}% > 門檻 +{(thr-1)*100:.0f}%')
