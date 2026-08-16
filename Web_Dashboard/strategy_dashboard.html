@@ -1153,11 +1153,41 @@ function renderKbar(kb){
         <tr style="border-top:1px solid rgba(255,255,255,0.06)"><td style="padding:6px 10px"><i style="display:inline-block;width:10px;height:10px;background:${KB_TONE.red};border-radius:2px;vertical-align:middle"></i> 紅</td><td style="padding:6px 10px;color:#ff8a8a">不進場</td><td style="padding:6px 10px;color:#ff8a8a">今天出清轉現金(唯一的「出場」訊號)</td></tr>
       </table>
       <div style="font-size:11px;color:#64748b;margin-bottom:8px">特殊字:<b style="color:#cbd5e1">維持</b>=恐慌觀察期,不管持有或空手都先不動,等3日確認 ・ <b style="color:#e0b46a">壓</b>=頭上壓力,黃色裡唯一驗證過「事後報酬明顯比可買差」的子類別,額外小心其餘黃色警示(追高/鋸齒/爆量/偏貴)歷史報酬跟可買差不多,只是規則上仍不放新錢。</div>`;
+    // ★2026-08-16:新手教學區塊——顏色/數字分工+舉例走一遍,預設展開(這是操作上最容易搞混的地方)。
+    //   刻意不寫死真實股票的當日數字(那會過期變成誤導),全部用「假設」開頭的示範數字。
+    const howToGuide = `
+      <details open style="background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:10px 13px;margin-bottom:10px">
+        <summary style="cursor:pointer;font-weight:700;font-size:13px;color:var(--txt)">📖 顏色跟數字,分別是什麼意思?怎麼操作?(第一次來看這裡)</summary>
+        <div style="font-size:12.5px;line-height:1.85;color:#c3cbdb;margin-top:10px">
+          <b style="color:#cbd5e1">顏色跟數字,管的是兩件不同的事——這是全部操作邏輯裡最重要的一句話:</b><br>
+          <b style="color:#7ee0a0">顏色</b> = 空手的人「今天能不能放新錢進去」。
+          <b style="color:#cbd5e1">數字</b> = 不管顏色,已經持有的人「部位應該調到多大」。
+          兩者是分開判斷的,不要用「數字大小」去猜「該不該進場」——進不進場只看顏色。<br><br>
+
+          <b style="color:#7ee0a0">🟢 綠燈</b>:今天可以放新錢,而且數字就是你的目標。空手 → 直接一次買到數字那個%,不用分批。已持有 → 把部位調到數字那個%(通常是補倉)。<br>
+          <b style="color:#e0b46a">🟡 黃燈</b>:不管數字是30%還是70%,對空手的人來說今天都是「先別放新錢」——因為黃燈本身就是「這個進場點歷史上不夠好」的警訊(可能追太高、剛站上均線不穩、爆量、離前高壓力太近,或下面這條數字太貴)。但如果你已經持有,黃燈不影響你把部位調到那個數字——通常是往下收,這是系統自動幫你「漲多了先收一部分回現金」,不是叫你出場。<br>
+          <b style="color:#ff8a8a">🔴 紅燈</b>:今天不進場;已持有的人今天全部出清轉現金——這是整套系統裡<b>唯一</b>真正的「出場」訊號,不會因為黃燈或數字變小就出場。<br><br>
+
+          <b style="color:#cbd5e1">舉例走一遍(數字是示範用,不是今天的真實報價):</b><br>
+          <div style="background:var(--panel);border-radius:6px;padding:8px 11px;margin:6px 0">
+            <b style="color:#7ee0a0">情境一:綠燈,數字假設是85%</b><br>
+            ・我現在空手 → 今天一次買到85%<br>
+            ・我現在持有70% → 目前不夠,補到85%(方向:加碼)
+          </div>
+          <div style="background:var(--panel);border-radius:6px;padding:8px 11px;margin:6px 0">
+            <b style="color:#e0b46a">情境二:黃燈,數字假設是40%</b><br>
+            ・我現在空手 → 不管40%這數字多大,先別進,等變綠燈再說<br>
+            ・我現在持有70% → 減碼到40%(方向:收回現金;你仍然是「持有中」,只是量變小,不是出場)
+          </div>
+          <b style="color:#cbd5e1">一句話總結</b>:顏色決定空手的人今天能不能動,數字決定持有的人該把部位調到多少——兩件事各管各的,不要混在一起看。
+        </div>
+      </details>`;
     host.innerHTML =
       `<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:8px">`
       +`<div id="kbTickers" style="display:flex;gap:6px;flex-wrap:wrap"></div>`
       +`<div style="margin-left:auto;font-size:11px;color:var(--muted);max-width:430px;text-align:right">${kb.pit_note||''}</div></div>`
       +actionTbl
+      +howToGuide
       +`<div style="font-size:11px;color:#64748b;margin-bottom:6px">底部量條=紅漲綠跌對齊K棒,金色=真放量(≥1.6倍均量) · hover任一K棒看完整標註/理由</div>`
       +`<div style="font-size:11px;color:#64748b;margin-bottom:6px">近一年每根K都標;更早歷史只標轉折。預設視窗=近一年,往左拖看全史。</div>`
       +`<div id="kbLatest" style="font-size:13px;margin-bottom:8px;padding:7px 10px;background:var(--panel2);border-radius:6px"></div>`
