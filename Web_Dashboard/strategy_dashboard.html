@@ -391,7 +391,9 @@ function stratInstr(d, cap, lev){
       r.holder=`調整到曝險 ${Math.round(expo*100)}% = ${moneyFmt(r.dollars)} (${Math.round(r.shares)}股)`;
       r.buyer = (d.entry_state==='can_enter')
         ? `可進場：限價 ≤ $${d.entry_cap}，買 ${Math.round(r.shares)}股 ≈ ${moneyFmt(r.dollars)}（停損距 -${d.stop_risk_pct}%）`
-        : `🟡 追高,等拉回到 ≤ $${d.entry_cap} 再進（距50MA ${d.dist50_pct>0?'+':''}${d.dist50_pct}%）`;
+        : (d.entry_state==='expensive'
+          ? `🟡 空手別新進(停損距太遠,曝險僅${Math.round((d.suggested_expo||0)*100)}%<50%門檻,20年資料負期望)`
+          : `🟡 追高,等拉回到 ≤ $${d.entry_cap} 再進（距50MA ${d.dist50_pct>0?'+':''}${d.dist50_pct}%）`);
       break;
     case 'panic_watch':
       r.verb='🟠 恐慌容忍'; r.holder='維持現有曝險,給3日確認別砍V底'; r.buyer='暫不加碼'; break;
@@ -532,7 +534,7 @@ function renderCore(cs, sig){
     const below = (d.days_below>0) ? ` 跌破${d.days_below}日` : '';
     return `<span style="background:#16233a;border-radius:7px;padding:3px 9px;margin-right:6px;font-size:12px">
        ${emo[d.state]||'⚪'} ${tk} $${d.close} vs 200MA $${d.ma200} (${d.dist_pct>0?'+':''}${d.dist_pct}%)${below}</span>`;}).join('');
-  const entryEmo = {can_enter:'🟢', extended:'🟡', no_entry:'🔴'};
+  const entryEmo = {can_enter:'🟢', extended:'🟡', expensive:'🟡', no_entry:'🔴'};
   const actRows = Object.entries(cs.cores).map(([tk,d])=>{
     const thrTxt = (d.entry_thr!=null)?`進≤+${Math.round((d.entry_thr-1)*100)}% 出×${d.exit_buf}`:'';
     const stopTxt = (d.stop_risk_pct!=null)?`<br><span style="color:var(--muted);font-size:10px">現進場 -${d.stop_risk_pct}%</span>`:'';
@@ -843,7 +845,9 @@ function twCard(title, sub, tk, d){
     hold=`調整曝險到 ${Math.round((d.suggested_expo||0)*100)}%（不停利,騎到跌破線）`;
     buy = d.entry_state==='can_enter'
       ? `可進場：別追貴於現價 +${d.entry_cap_pct}%（停損距 ${d.exit_pct}%）`
-      : `🟡 追高,等拉回（距50MA ${d.dist50_pct>0?'+':''}${d.dist50_pct}% > 門檻 +${Math.round((d.entry_thr-1)*100)}%）`;
+      : (d.entry_state==='expensive'
+        ? `🟡 空手別新進(停損距太遠,曝險僅${Math.round((d.suggested_expo||0)*100)}%<50%門檻,20年資料負期望)`
+        : `🟡 追高,等拉回（距50MA ${d.dist50_pct>0?'+':''}${d.dist50_pct}% > 門檻 +${Math.round((d.entry_thr-1)*100)}%）`);
   } else if(d.state==='warning'){ verb='🟡 逼近停損'; hold='收盤跌破停損線即全出'; buy='不進場'; }
   else if(d.state==='panic_watch'){ verb='🟠 恐慌容忍'; hold='維持現倉,給3日確認別砍V底'; buy='暫不加碼'; }
   else { verb='🔴 出場→現金'; hold='已跌破200MA→全部現金'; buy='不進場(等站回)'; }
@@ -918,6 +922,10 @@ function buyRows(cores, isTW, heldTk, strongestTk){
       bucket=2; color='#e0b46a'; action='🟡 別追高';
       limit = isTW ? `等拉回:現價需回到 +${d.entry_cap_pct}% 以內` : `等拉回 ≤ $${d.entry_cap}`;
       reason = `距50MA +${d.dist50_pct}% 已超過門檻 +${Math.round((d.entry_thr-1)*100)}%＝追高區,別追` + cnote;
+    } else if(d.entry_state==='expensive'){
+      bucket=2; color='#e0b46a'; action='🟡 空手別新進';
+      limit = '—(等曝險≥50%)';
+      reason = `未追高但停損距太遠(${d.stop_risk_pct}%),曝險僅${Math.round((d.suggested_expo||0)*100)}%<50%門檻＝新倉位負期望(D3,20年資料)。已持有者續抱不受影響` + cnote;
     } else if(d.entry_state==='can_enter'){
       const cheap = d.stop_risk_pct<=12;
       bucket = cheap?0:1; color='#7ee0a0';
@@ -985,9 +993,10 @@ function renderBuyList(cs, tw){
 
 // ── 台美股產業龍頭個股(衛星):依產業分組,顏色=狀態 ──
 function leaderChip(d, isTW){
-  const col = d.entry_state==='can_enter' ? '#7ee0a0' : (d.entry_state==='extended' ? '#e0b46a' : '#e06a6a');
+  const cautious = d.entry_state==='extended' || d.entry_state==='expensive';
+  const col = d.entry_state==='can_enter' ? '#7ee0a0' : (cautious ? '#e0b46a' : '#e06a6a');
   const bd  = d.state==='risk_on' ? '#234d34' : (d.state==='warning' ? '#4d4520' : '#4d2424');
-  const act = d.entry_state==='can_enter' ? '🟢可進' : (d.entry_state==='extended' ? '🟡別追' : '🔴避');
+  const act = d.entry_state==='can_enter' ? '🟢可進' : (cautious ? '🟡別追' : '🔴避');
   const px  = (isTW?'':'$') + d.close + (isTW?'':'');
   const lim = d.entry_state==='extended'
         ? (isTW?`回${d.entry_cap_pct}%內`:`≤$${d.entry_cap}`)
@@ -1529,12 +1538,15 @@ function _cmdBlock(name, status, mkt, cur){
   // ▶ 行動一句話(依持有狀態)
   //   ★2026-08-16 拿掉「40/75分批掛限價」——那條線沒被單獨回測過,且跟系統自己驗證過的
   //   「一次全投優於分批」(見進取模式區:1066行、個股衛星對比表:1668行)直接矛盾。
-  //   統一成同一條已驗證規則:曝險>0就一次買到目標,曝險=0就存現金。
+  //   ★2026-08-16 補回 D3(generate_kbar_annotations.py:273,20年資料驗證):曝險<50%代表
+  //   停損太遠、新倉位期望值為負——空手者這個位階不該進場,只有已持有者續抱(用目標%當加減碼參考,
+  //   不是叫你砍倉)。這條之前只存在K棒稽核頁,今日指令卡沒接上,是漏掉的一塊,不是新規則。
   let act, tone;
   if(health<=0 || d.state==='risk_off'){ act='存現金,等信用/趨勢回來'; tone='#ff5a5a'; }
   else if(d.state==='panic_watch'){ act='恐慌觀察:維持現倉,等3日確認'; tone='#ffcb45'; }
   else if(pos==='hold'){ act='續抱:收盤沒破「停損」就不動;加減碼以「目標」為準'; tone='#2ecc71'; }
-  else if(ep>0){ act='進場:一次買到「目標」(回測證實一次全投優於分批)'; tone='#2ecc71'; }
+  else if(ep>=50){ act='進場:一次買到「目標」(回測證實一次全投優於分批)'; tone='#2ecc71'; }
+  else if(ep>0){ act='空手先別進:此位階停損太遠,新倉位20年資料是負期望(D3)——等回到曝險≥50%再進場'; tone='#ffcb45'; }
   else { act='存現金'; tone='#ff5a5a'; }
   // 大數字格
   const tile=(lab,val,col)=>`<div style="flex:1;min-width:84px;background:var(--panel);border-radius:6px;padding:7px 8px;text-align:center"><div style="font-size:10.5px;color:#64748b;white-space:nowrap">${lab}</div><div style="font-size:16.5px;font-weight:800;color:${col||'var(--txt)'}">${val}</div></div>`;

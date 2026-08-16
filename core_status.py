@@ -319,6 +319,13 @@ def core_signal(close: pd.Series, vix_last: float | None, ticker: str,
         else:
             entry_action = (f'追高,等拉回到 ${entry_cap:.2f} 以下'
                             f'(距50MA +{dist50:.0f}% > 門檻 +{(thr-1)*100:.0f}%)')
+    elif expo_raw < 0.5:
+        # ★D3(generate_kbar_annotations.py:273,20年資料驗證):曝險<50%=停損太遠,新倉位負期望;
+        #   價格雖未追高(未過50MA門檻),但停損已經拉太遠,空手別新進,只有已持有者續抱。
+        #   之前這條只存在K棒稽核頁,live entry_action沒接上,是漏掉的一塊,不是新規則。
+        entry_state = 'expensive'
+        entry_action = (f'空手別新進(停損距 -{stop_risk:.0f}%已太遠,曝險僅{expo_raw*100:.0f}%'
+                        f'<50%門檻,20年資料此格新倉位負期望);已持有者續抱,等回到曝險≥50%再進場')
     else:
         entry_state = 'can_enter'
         extra = '；VIX高=恐慌綠燈,果斷進' if panic else ''
@@ -670,7 +677,7 @@ def main():
         json.dump(data, f, ensure_ascii=False, indent=2)
 
     emoji = {'risk_on': '🟢', 'risk_off': '🔴', 'warning': '🟡', 'panic_watch': '🟠'}
-    entry_emoji = {'can_enter': '🟢', 'extended': '🟡', 'no_entry': '🔴'}
+    entry_emoji = {'can_enter': '🟢', 'extended': '🟡', 'expensive': '🟡', 'no_entry': '🔴'}
     vix_str = f"{vix_last:.1f}" if vix_last is not None else "N/A"
     print(f"\n  恐慌計 VIX = {vix_str} ({'🔴恐慌中' if vix_last and vix_last > PANIC_VIX else '🟢平靜'})")
     if intraday_note:
