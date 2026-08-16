@@ -1144,18 +1144,22 @@ function renderKbar(kb){
   if(!kb || !kb.tickers || !kb.tickers.length){ host.innerHTML='<div style="color:var(--muted);padding:10px">尚無 kbar_annotations.json(執行 python generate_kbar_annotations.py)</div>'; return; }
   _kb.data = kb;
   if(!_kb.built){
-    const legend = [['green','可進場/持有(數字=建議曝險%)'],['amber','持有觀望·別加碼(數字=曝險%,維持=不動)'],['red','空手(0%)']]
-      .map(([k,v])=>`<span><i style="display:inline-block;width:11px;height:11px;background:${KB_TONE[k]};border-radius:2px;vertical-align:middle"></i> ${v}</span>`).join('');
+    // ★2026-08-16:改成「顏色×持倉狀態→動作」對照表,讓專業投資人看圖就懂,不用另外想數字/顏色代表什麼。
+    const actionTbl = `
+      <table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:8px;background:var(--panel2);border-radius:8px;overflow:hidden">
+        <tr style="background:rgba(255,255,255,0.04)"><th style="text-align:left;padding:6px 10px;color:var(--muted);font-weight:600">顏色</th><th style="text-align:left;padding:6px 10px;color:var(--muted);font-weight:600">我現在空手</th><th style="text-align:left;padding:6px 10px;color:var(--muted);font-weight:600">我現在持有</th></tr>
+        <tr style="border-top:1px solid rgba(255,255,255,0.06)"><td style="padding:6px 10px"><i style="display:inline-block;width:10px;height:10px;background:${KB_TONE.green};border-radius:2px;vertical-align:middle"></i> 綠</td><td style="padding:6px 10px;color:#7ee0a0">可進場,一次買到數字%</td><td style="padding:6px 10px;color:#7ee0a0">把倉位調到數字%(不足就補)</td></tr>
+        <tr style="border-top:1px solid rgba(255,255,255,0.06)"><td style="padding:6px 10px"><i style="display:inline-block;width:10px;height:10px;background:${KB_TONE.amber};border-radius:2px;vertical-align:middle"></i> 黃</td><td style="padding:6px 10px;color:#e0b46a">先別放新錢,等變綠再進</td><td style="padding:6px 10px;color:#e0b46a">把倉位調到數字%(通常是減碼/taper)</td></tr>
+        <tr style="border-top:1px solid rgba(255,255,255,0.06)"><td style="padding:6px 10px"><i style="display:inline-block;width:10px;height:10px;background:${KB_TONE.red};border-radius:2px;vertical-align:middle"></i> 紅</td><td style="padding:6px 10px;color:#ff8a8a">不進場</td><td style="padding:6px 10px;color:#ff8a8a">今天出清轉現金(唯一的「出場」訊號)</td></tr>
+      </table>
+      <div style="font-size:11px;color:#64748b;margin-bottom:8px">特殊字:<b style="color:#cbd5e1">維持</b>=恐慌觀察期,不管持有或空手都先不動,等3日確認 ・ <b style="color:#e0b46a">壓</b>=頭上壓力,黃色裡唯一驗證過「事後報酬明顯比可買差」的子類別,額外小心其餘黃色警示(追高/鋸齒/爆量/偏貴)歷史報酬跟可買差不多,只是規則上仍不放新錢。</div>`;
     host.innerHTML =
       `<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:8px">`
       +`<div id="kbTickers" style="display:flex;gap:6px;flex-wrap:wrap"></div>`
       +`<div style="margin-left:auto;font-size:11px;color:var(--muted);max-width:430px;text-align:right">${kb.pit_note||''}</div></div>`
-      +`<div style="display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin-bottom:6px">${legend}`
-      +`<span style="color:#64748b">底部量條=當日建議色 · hover任一K棒看完整標註</span></div>`
-      +`<div style="font-size:11.5px;color:#64748b;margin-bottom:6px">近一年<b style="color:#cbd5e1">每根K都標「建議曝險%」</b>`
-      +`(0%=空手、維持=恐慌觀察別動、其餘=實際可押倉位);唯一單獨標字的是<b style="color:#e0b46a">壓</b>`
-      +`(頭上壓力——事後驗證是唯一明顯比「可買」差的警示,其餘追高/鋸齒/爆量/偏貴警示歷史報酬跟可買差不多,不再分開標,理由都在 hover 裡)。`
-      +`更早歷史只標轉折;預設視窗=近一年,往左拖看全史。</div>`
+      +actionTbl
+      +`<div style="font-size:11px;color:#64748b;margin-bottom:6px">底部量條=紅漲綠跌對齊K棒,金色=真放量(≥1.6倍均量) · hover任一K棒看完整標註/理由</div>`
+      +`<div style="font-size:11px;color:#64748b;margin-bottom:6px">近一年每根K都標;更早歷史只標轉折。預設視窗=近一年,往左拖看全史。</div>`
       +`<div id="kbLatest" style="font-size:13px;margin-bottom:8px;padding:7px 10px;background:var(--panel2);border-radius:6px"></div>`
       +`<div style="position:relative"><div id="kbChart" style="width:100%;height:440px"></div>`
       +`<div id="kbTip" style="position:absolute;display:none;pointer-events:none;z-index:20;background:#0d1424f2;border:1px solid var(--line);border-radius:6px;padding:8px 10px;font-size:12px;color:var(--txt);max-width:280px"></div></div>`
