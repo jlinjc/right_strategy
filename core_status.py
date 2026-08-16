@@ -581,7 +581,16 @@ def main():
             else:
                 d['hold_action'] = d['hold_action'] + f'  ⚠️信用部分示警→曝險×{ch:.0%}'
                 d['action'] = d['hold_action']
-                if d.get('entry_state') == 'can_enter':
+                # ★D3補檢查(2026-08-16):entry_state 是用信用減碼前的 expo_raw 判斷的,
+                #   但這裡才套用信用乘數——如果打完折後 suggested_expo 掉到50%以下,
+                #   entry_state 沒有跟著重新檢查,會出現「綠燈但曝險<50%」這種矛盾
+                #   (SOXX 2026-08-16 實例:expo_raw≈80%可進場,信用×50%後剩40%卻還顯示綠燈)。
+                new_expo = d.get('suggested_expo')
+                if d.get('entry_state') == 'can_enter' and new_expo is not None and new_expo < 0.5:
+                    d['entry_state'] = 'expensive'
+                    d['entry_action'] = (f'空手別新進(信用部分示警打折後,曝險僅{new_expo*100:.0f}%'
+                                         f'<50%門檻,20年資料此格新倉位負期望);已持有者續抱不受影響')
+                elif d.get('entry_state') == 'can_enter':
                     d['entry_action'] = d['entry_action'] + f'(信用部分示警,曝險×{ch:.0%})'
 
     # ★ 路線B 最低持有期(最低21交易日≈30日):讀上次 json 的換倉日,鎖滿才准換。

@@ -287,6 +287,13 @@ def main():
             else:
                 d['hold_action'] += f'  🟠部分示警→減碼半倉(仍可買·量×{ch:.0%})'
                 d['action'] = d['hold_action']
+                # ★D3補檢查(2026-08-16,同步core_status.py):信用打折後若曝險掉到50%以下,
+                #   entry_state 要跟著重新檢查,否則會出現「綠燈但曝險<50%」的矛盾。
+                new_expo = d.get('suggested_expo')
+                if d.get('entry_state') == 'can_enter' and new_expo is not None and new_expo < 0.5:
+                    d['entry_state'] = 'expensive'
+                    d['entry_action'] = (f'空手別新進(信用部分示警打折後,曝險僅{new_expo*100:.0f}%'
+                                         f'<50%門檻,20年資料此格新倉位負期望);已持有者續抱不受影響')
 
     # 路線B 最低持有30日鎖(讀上次json)
     path = os.path.join(DASHBOARD_DIR, 'taiwan_status.json')
