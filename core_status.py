@@ -493,7 +493,8 @@ def daily_verdict(out: dict, combined: dict | None, rotation_hold: dict,
         seg.append('空手(無核心站上200MA 或 信用砍0)')
     if combined and combined.get('state') == 'credit_warning':
         seg.append('信用部分示警 → 全體曝險減半')
-    core = '今日核心動作【' + ' · '.join(seg) + '】其餘無動作,沒破停損線就別動手。'
+    core = ('今日核心動作【' + ' · '.join(seg) + '】曝險%會隨位階連續taper,照目標調整;'
+            '沒破停損線就別因為價格嚇人提前出場。')
     return ('⏳ ' + core) if intraday else core
 
 

@@ -178,7 +178,7 @@
       <div class="orb"></div>
       <div>
         <h1>趨勢擇時作戰中心</h1>
-        <div class="sub">站上200MA + 信用哨健康 → 全押最強 · 任一破 → 全現金 — 一套用數據定案的紀律系統</div>
+        <div class="sub">站上200MA + 信用哨健康 → 按位階連續加減碼(RiskTarget,貼近均線多押/遠離自動taper) · 任一破 → 全現金 — 一套用數據定案的紀律系統</div>
       </div>
     </div>
     <div style="display:flex;align-items:center;gap:14px">
@@ -292,7 +292,7 @@
     <div class="gbody">
       <div style="background:#2a2510;border:1px solid var(--yellow-d);border-radius:8px;padding:9px 12px;font-size:11.5px;color:#ffe39a;margin-bottom:14px">
         ⚠️ 此區為「個股衛星」獨立系統，用 <b>ATR停損 / 騎50MA / 分批落袋 / 40天上限</b>——因為個股≠指數ETF，規則本來就不同。
-        <b>它不適用於你的指數/TQQQ策略</b>（那套只有200MA+信用哨、全押/全出、不停利）。看個股訊號才進這區，別把這裡的「分批」套到指數上。
+        <b>它不適用於你的指數/TQQQ策略</b>（那套只有200MA+信用哨進出、RiskTarget隨位階連續調整曝險(taper,非全押/全出二選一)、不停利)。看個股訊號才進這區，別把這裡的「分批」套到指數上。
       </div>
       <div id="menuPanel"></div>
       <section>
@@ -1544,7 +1544,7 @@ function _cmdBlock(name, status, mkt, cur){
   let act, tone;
   if(health<=0 || d.state==='risk_off'){ act='存現金,等信用/趨勢回來'; tone='#ff5a5a'; }
   else if(d.state==='panic_watch'){ act='恐慌觀察:維持現倉,等3日確認'; tone='#ffcb45'; }
-  else if(pos==='hold'){ act='續抱:收盤沒破「停損」就不動;加減碼以「目標」為準'; tone='#2ecc71'; }
+  else if(pos==='hold'){ act='續抱:目標%會隨位階自動taper(貼近均線→升高,離均線越遠→自動縮,這是RiskTarget的核心機制不是裝飾,見「目標部位」);每次來看就照目標調整,收盤真跌破「停損」才全出'; tone='#2ecc71'; }
   else if(ep>=50){ act='進場:一次買到「目標」(回測證實一次全投優於分批)'; tone='#2ecc71'; }
   else if(ep>0){ act='空手先別進:此位階停損太遠,新倉位20年資料是負期望(D3)——等回到曝險≥50%再進場'; tone='#ffcb45'; }
   else { act='存現金'; tone='#ff5a5a'; }
