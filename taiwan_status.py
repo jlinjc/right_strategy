@@ -31,34 +31,29 @@ from scanner_base import DASHBOARD_DIR
 
 # 可回測核心(趨勢載具) + per-index 參數(research_taiwan_core.py + research_taiwan_optimize.py 校準)
 #   per-ticker thr/buf:00757(美科技,波動大)放寬1.12/1.00、0050貼1.06/0.98(grid實益最大),其餘統一1.08/0.99。
+# ★2026-08-17:當天曾一度擴大到14檔測試(2026-08-17早些commit),Jason 看完當天實際輪動結果
+#   (RS排名前6全部是新增、未經熊市考驗的標的)後決定縮回原5檔,先觀察那些新標的一段時間再說。
+#   9檔(00733/00762/00895/00935/00913/00921/00891/00892/00981A)保留在下方TW_WATCH,
+#   不是刪除——backtest本身仍支持它們(portfolio層級Sharpe/CAGR/2022都測出正面結果),
+#   只是尚未經過真正熊市考驗+用的是未個別校準的預設參數,先觀察不進live輪動。
 TW_PARAMS = {
     '0050.TW':   {'name': '元大台灣50',  'entry_thr': 1.06, 'exit_buf': 0.98, 'budget': 0.0863, 'cap': 1.5, 'resist_warn': 0.005},
     '0052.TW':   {'name': '富邦科技',    'entry_thr': 1.08, 'exit_buf': 0.99, 'budget': 0.0936, 'cap': 1.5},
     '006208.TW': {'name': '富邦台50',    'entry_thr': 1.08, 'exit_buf': 0.99, 'budget': 0.0807, 'cap': 1.5, 'resist_warn': 0.005},
     '0051.TW':   {'name': '元大中型100', 'entry_thr': 1.08, 'exit_buf': 0.99, 'budget': 0.0787, 'cap': 1.5},
     '00757.TW':  {'name': '統一FANG+',   'entry_thr': 1.12, 'exit_buf': 1.00, 'budget': 0.1276, 'cap': 1.5},
-    # ★2026-08-17 Jason 要求擴大候選池:6檔新增,參數沿用DEFAULT_PARAM風格(同0052/0051既有做法,
-    #   沒有另外發明校準流程)。00935/00913/00921 未經過2022年熊市考驗(上市太晚,0~1年熊市曝險),
-    #   Jason 已知情、明確要求仍納入live輪動,不是我自己判斷後偷塞進去的。
-    '00733.TW':  {'name': '富邦中小',    'entry_thr': 1.08, 'exit_buf': 0.99, 'budget': 0.09, 'cap': 1.5},
-    '00762.TW':  {'name': '元大全球AI',  'entry_thr': 1.08, 'exit_buf': 0.99, 'budget': 0.09, 'cap': 1.5},
-    '00895.TW':  {'name': '富邦未來車',  'entry_thr': 1.08, 'exit_buf': 0.99, 'budget': 0.09, 'cap': 1.5},
-    '00935.TW':  {'name': '野村臺灣新科技50', 'entry_thr': 1.08, 'exit_buf': 0.99, 'budget': 0.09, 'cap': 1.5},
-    '00913.TW':  {'name': '兆豐台灣晶圓製造', 'entry_thr': 1.08, 'exit_buf': 0.99, 'budget': 0.09, 'cap': 1.5},
-    '00921.TW':  {'name': '兆豐龍頭等權重',  'entry_thr': 1.08, 'exit_buf': 0.99, 'budget': 0.09, 'cap': 1.5},
-    # ★2026-08-17 續:原觀察名單3檔轉正。00891/00892 有5.2年含2022,00981A 只有1.3年、
-    #   未經2022熊市考驗(比00935/00913/00921更短),同樣是 Jason 知情後仍要求納入。
-    '00891.TW':  {'name': '中信關鍵半導體',  'entry_thr': 1.08, 'exit_buf': 0.99, 'budget': 0.09, 'cap': 1.5},
-    '00892.TW':  {'name': '富邦台灣半導體',  'entry_thr': 1.08, 'exit_buf': 0.99, 'budget': 0.09, 'cap': 1.5},
-    '00981A.TW': {'name': '主動統一台股增長', 'entry_thr': 1.08, 'exit_buf': 0.99, 'budget': 0.09, 'cap': 1.5},
 }
 # live-only 候選(歷史不足,有≥200日資料才顯示、且標註不可回測)
-# ★2026-08-17:00403A/00991A 查詢結果(2026-08-17當天):
-#   00403A.TW(UPAMC台灣優動50主動式)上市2026-04-28,才78個交易日——連200日均線都算不出來。
-#   00991A.TW(復華台灣未來50主動式)上市2025-12-09,166個交易日——也還沒到200日。
-#   這兩檔不是「風險高但可以加」的等級,是核心訊號(200MA)技術上還算不出數字,
-#   不能進TW_PARAMS。先放觀察名單,00991A約7週後、00403A約6個月後資料才夠,屆時要重新評估。
 TW_WATCH = {
+    '00733.TW':  '富邦中小',
+    '00762.TW':  '元大全球AI',
+    '00895.TW':  '富邦未來車',
+    '00935.TW':  '野村臺灣新科技50',
+    '00913.TW':  '兆豐台灣晶圓製造',
+    '00921.TW':  '兆豐龍頭等權重',
+    '00891.TW':  '中信關鍵半導體',
+    '00892.TW':  '富邦台灣半導體',
+    '00981A.TW': '主動統一台股增長',
     '00403A.TW': 'UPAMC台灣優動50主動式',
     '00991A.TW': '復華台灣未來50主動式',
 }
@@ -204,7 +199,9 @@ def compute_rotation_hold(out, today_strongest, prev, today_str):
         except Exception: return date.fromisoformat(today_str)
     def eligible(tk):
         d = out.get(tk)
-        return bool(d) and d.get('state') == 'risk_on' and not d.get('credit_cut')
+        # ★2026-08-17修:watch_only(候選池被移除/尚不可回測)不算eligible,否則縮回候選池後
+        #   舊的持有紀錄(prev_hold)會被誤判成「還能續抱」,卡住不換成真正在TW_PARAMS裡的標的。
+        return bool(d) and d.get('state') == 'risk_on' and not d.get('credit_cut') and not d.get('watch_only')
     today = parse(today_str)
     prev_tk = prev.get('ticker') if prev else None
     if prev_tk and eligible(prev_tk):
