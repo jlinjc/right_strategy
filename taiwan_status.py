@@ -37,10 +37,18 @@ TW_PARAMS = {
     '006208.TW': {'name': '富邦台50',    'entry_thr': 1.08, 'exit_buf': 0.99, 'budget': 0.0807, 'cap': 1.5, 'resist_warn': 0.005},
     '0051.TW':   {'name': '元大中型100', 'entry_thr': 1.08, 'exit_buf': 0.99, 'budget': 0.0787, 'cap': 1.5},
     '00757.TW':  {'name': '統一FANG+',   'entry_thr': 1.12, 'exit_buf': 1.00, 'budget': 0.1276, 'cap': 1.5},
+    # ★2026-08-17 Jason 要求擴大候選池:6檔新增,參數沿用DEFAULT_PARAM風格(同0052/0051既有做法,
+    #   沒有另外發明校準流程)。00935/00913/00921 未經過2022年熊市考驗(上市太晚,0~1年熊市曝險),
+    #   Jason 已知情、明確要求仍納入live輪動,不是我自己判斷後偷塞進去的。
+    '00733.TW':  {'name': '富邦中小',    'entry_thr': 1.08, 'exit_buf': 0.99, 'budget': 0.09, 'cap': 1.5},
+    '00762.TW':  {'name': '元大全球AI',  'entry_thr': 1.08, 'exit_buf': 0.99, 'budget': 0.09, 'cap': 1.5},
+    '00895.TW':  {'name': '富邦未來車',  'entry_thr': 1.08, 'exit_buf': 0.99, 'budget': 0.09, 'cap': 1.5},
+    '00935.TW':  {'name': '野村臺灣新科技50', 'entry_thr': 1.08, 'exit_buf': 0.99, 'budget': 0.09, 'cap': 1.5},
+    '00913.TW':  {'name': '兆豐台灣晶圓製造', 'entry_thr': 1.08, 'exit_buf': 0.99, 'budget': 0.09, 'cap': 1.5},
+    '00921.TW':  {'name': '兆豐龍頭等權重',  'entry_thr': 1.08, 'exit_buf': 0.99, 'budget': 0.09, 'cap': 1.5},
 }
 # live-only 候選(歷史不足,有≥200日資料才顯示、且標註不可回測)
 TW_WATCH = {
-    '00935.TW':  '野村臺灣新科技50',
     '00891.TW':  '中信關鍵半導體',
     '00892.TW':  '富邦台灣半導體',
     '00981A.TW': '主動統一台股增長',
