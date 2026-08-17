@@ -46,13 +46,14 @@ TW_PARAMS = {
     '00935.TW':  {'name': '野村臺灣新科技50', 'entry_thr': 1.08, 'exit_buf': 0.99, 'budget': 0.09, 'cap': 1.5},
     '00913.TW':  {'name': '兆豐台灣晶圓製造', 'entry_thr': 1.08, 'exit_buf': 0.99, 'budget': 0.09, 'cap': 1.5},
     '00921.TW':  {'name': '兆豐龍頭等權重',  'entry_thr': 1.08, 'exit_buf': 0.99, 'budget': 0.09, 'cap': 1.5},
+    # ★2026-08-17 續:原觀察名單3檔轉正。00891/00892 有5.2年含2022,00981A 只有1.3年、
+    #   未經2022熊市考驗(比00935/00913/00921更短),同樣是 Jason 知情後仍要求納入。
+    '00891.TW':  {'name': '中信關鍵半導體',  'entry_thr': 1.08, 'exit_buf': 0.99, 'budget': 0.09, 'cap': 1.5},
+    '00892.TW':  {'name': '富邦台灣半導體',  'entry_thr': 1.08, 'exit_buf': 0.99, 'budget': 0.09, 'cap': 1.5},
+    '00981A.TW': {'name': '主動統一台股增長', 'entry_thr': 1.08, 'exit_buf': 0.99, 'budget': 0.09, 'cap': 1.5},
 }
 # live-only 候選(歷史不足,有≥200日資料才顯示、且標註不可回測)
-TW_WATCH = {
-    '00891.TW':  '中信關鍵半導體',
-    '00892.TW':  '富邦台灣半導體',
-    '00981A.TW': '主動統一台股增長',
-}
+TW_WATCH = {}
 CORE_TICKERS = list(TW_PARAMS)
 # ★台股最佳哨(research_taiwan_optimize.py 對決):HYG+LQD+SOXX(全球信用+費半SOXX)。
 #   SOXX費半單獨 Sharpe1.99>SMH1.93;HYG+LQD+SOXX三合 OOS最差1.40最穩(信用補費半在利率型回撤的盲點)。

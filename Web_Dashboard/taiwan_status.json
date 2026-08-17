@@ -1,20 +1,20 @@
 {
   "market": "TW",
   "currency": "TWD",
-  "last_updated": "2026-08-17 22:35:32",
+  "last_updated": "2026-08-17 22:48:13",
   "daily_verdict": "今日核心動作【持有 00921.TW(曝險 31%) · 鎖定中(還 30 日才准換) · 信用部分示警 → 曝險減碼】曝險%會隨位階連續taper,照目標調整;沒破停損線就別因為價格嚇人提前出場。",
   "ma_window": 200,
   "panic_vix": 30.0,
-  "vix": 2.0,
+  "vix": 2.01,
   "risk_mult": 1.0,
-  "strongest": "00921.TW",
+  "strongest": "00892.TW",
   "rotation_hold": {
     "ticker": "00921.TW",
     "since": "2026-08-17",
     "days_held": 0,
     "locked": true,
     "lock_days_left": 30,
-    "today_strongest": "00921.TW",
+    "today_strongest": "00892.TW",
     "min_hold_days": 30,
     "forced_out_prev": false
   },
@@ -25,11 +25,7 @@
   "data_note": "⚠️ yfinance台股adjusted有假分割/尖刺(0050.TW 2014、0052.TW 2025)已splice清理;報酬/Sharpe/回撤可信,絕對價位 yfinance 可能標錯(僅參考,以券商實際報價為準)。",
   "rotation_manual_note": "路線B最低持有30日鎖(換進至少抱一個月才准換、跌破200MA仍立刻出)。",
   "watch_note": "主動式ETF(00991A/00981A等)歷史<1.5年無法回測,列為觀察候選;滿200日MA200可算後才顯示狀態,但暫不納入輪動(無OOS驗證)。",
-  "watch_have": [
-    "00891.TW",
-    "00892.TW",
-    "00981A.TW"
-  ],
+  "watch_have": [],
   "cores": {
     "0050.TW": {
       "name": "元大台灣50",
@@ -329,7 +325,7 @@
       "exit_pct": -19.7,
       "suggested_expo": 0.31,
       "rs_score": 1.438,
-      "is_strongest": true,
+      "is_strongest": false,
       "days_below": 0,
       "panic": false,
       "state": "risk_on",
@@ -366,7 +362,6 @@
       "hold_action": "續抱;建議曝險 32%(RiskTarget,不停利騎到跌破線)  🟠部分示警→減碼半倉(仍可買·量×67%)",
       "entry_state": "expensive",
       "entry_action": "空手別新進(停損距 -28%已太遠,曝險僅32%<50%門檻,20年資料此格新倉位負期望);已持有者續抱,等回到曝險≥50%再進場",
-      "watch_only": true,
       "credit_mult": 0.667
     },
     "00892.TW": {
@@ -387,7 +382,7 @@
       "exit_pct": -25.8,
       "suggested_expo": 0.23,
       "rs_score": 1.562,
-      "is_strongest": false,
+      "is_strongest": true,
       "days_below": 0,
       "panic": false,
       "state": "risk_on",
@@ -395,7 +390,6 @@
       "hold_action": "續抱;建議曝險 35%(RiskTarget,不停利騎到跌破線)  🟠部分示警→減碼半倉(仍可買·量×67%)",
       "entry_state": "expensive",
       "entry_action": "空手別新進(停損距 -26%已太遠,曝險僅35%<50%門檻,20年資料此格新倉位負期望);已持有者續抱,等回到曝險≥50%再進場",
-      "watch_only": true,
       "credit_mult": 0.667
     },
     "00981A.TW": {
@@ -424,7 +418,6 @@
       "hold_action": "續抱;建議曝險 32%(RiskTarget,不停利騎到跌破線)  🟠部分示警→減碼半倉(仍可買·量×67%)",
       "entry_state": "expensive",
       "entry_action": "空手別新進(停損距 -28%已太遠,曝險僅32%<50%門檻,20年資料此格新倉位負期望);已持有者續抱,等回到曝險≥50%再進場",
-      "watch_only": true,
       "credit_mult": 0.667
     }
   },
@@ -435,23 +428,23 @@
     "assets": {
       "HYG": {
         "name": "美高收益債",
-        "close": 79.71,
+        "close": 79.68,
         "ma200": 78.35,
-        "dist_pct": 1.73,
+        "dist_pct": 1.69,
         "ok": true
       },
       "LQD": {
         "name": "美投資級債",
-        "close": 106.0,
+        "close": 105.96,
         "ma200": 107.44,
-        "dist_pct": -1.35,
+        "dist_pct": -1.38,
         "ok": false
       },
       "SOXX": {
         "name": "費半SOXX",
-        "close": 560.89,
-        "ma200": 416.16,
-        "dist_pct": 34.78,
+        "close": 562.87,
+        "ma200": 416.17,
+        "dist_pct": 35.25,
         "ok": true
       }
     },
