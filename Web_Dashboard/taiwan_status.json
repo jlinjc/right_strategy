@@ -1,7 +1,7 @@
 {
   "market": "TW",
   "currency": "TWD",
-  "last_updated": "2026-08-31 21:21:24",
+  "last_updated": "2026-08-31 22:08:27",
   "daily_verdict": "今日核心動作【持有 006208.TW(曝險 25%) · 鎖定中(還 16 日才准換) · 信用部分示警 → 曝險減碼】曝險%會隨位階連續taper,照目標調整;沒破停損線就別因為價格嚇人提前出場。",
   "ma_window": 200,
   "panic_vix": 30.0,
@@ -452,23 +452,23 @@
     "assets": {
       "HYG": {
         "name": "美高收益債",
-        "close": 79.87,
-        "ma200": 78.47,
-        "dist_pct": 1.79,
+        "close": 79.66,
+        "ma200": 78.48,
+        "dist_pct": 1.5,
         "ok": true
       },
       "LQD": {
         "name": "美投資級債",
-        "close": 106.73,
+        "close": 106.03,
         "ma200": 107.41,
-        "dist_pct": -0.63,
+        "dist_pct": -1.28,
         "ok": false
       },
       "SOXX": {
         "name": "費半SOXX",
-        "close": 525.43,
-        "ma200": 424.83,
-        "dist_pct": 23.68,
+        "close": 510.89,
+        "ma200": 425.88,
+        "dist_pct": 19.96,
         "ok": true
       }
     },

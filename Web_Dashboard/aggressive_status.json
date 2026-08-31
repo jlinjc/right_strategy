@@ -1,30 +1,30 @@
 {
-  "last_updated": "2026-07-19 15:37:15",
-  "vix": 18.8,
+  "last_updated": "2026-08-31 22:08:46",
+  "vix": 15.3,
   "canary": {
     "ok": false,
     "healthy": 2,
     "total": 3,
     "assets": {
       "HYG": {
-        "close": 79.65,
+        "close": 79.67,
         "ma200": 78.48,
         "dist_pct": 1.5,
-        "dist50_pct": 0.3,
+        "dist50_pct": 0.4,
         "above": true
       },
       "LQD": {
-        "close": 107.56,
-        "ma200": 108.08,
-        "dist_pct": -0.5,
-        "dist50_pct": -0.5,
+        "close": 106.04,
+        "ma200": 107.41,
+        "dist_pct": -1.3,
+        "dist50_pct": -0.7,
         "above": false
       },
       "SOXX": {
-        "close": 521.81,
-        "ma200": 390.6,
-        "dist_pct": 33.6,
-        "dist50_pct": -7.8,
+        "close": 510.7,
+        "ma200": 425.88,
+        "dist_pct": 19.9,
+        "dist50_pct": -7.2,
         "above": true
       }
     }
@@ -37,15 +37,15 @@
       "tag": "較能睡·先驗證心臟",
       "cagr": "+39%",
       "mdd": "-47%",
-      "etf_price": 67.53,
-      "sig_close": 695.33,
-      "sig_ma200": 639.53,
-      "sig_buffer_pct": 8.7,
-      "sig_dist50": -3.2,
+      "etf_price": 71.15,
+      "sig_close": 714.24,
+      "sig_ma200": 654.18,
+      "sig_buffer_pct": 9.2,
+      "sig_dist50": 0.3,
       "state": "red",
       "clean_entry": true,
       "action": "🔴 賣出：信用哨示警 → TQQQ 轉現金",
-      "sell_line_note": "QQQ 收盤跌破 $640(其200MA) → 賣光 TQQQ"
+      "sell_line_note": "QQQ 收盤跌破 $654(其200MA) → 賣光 TQQQ"
     },
     {
       "etf": "SOXL",
@@ -54,15 +54,15 @@
       "tag": "報酬最高·最兇",
       "cagr": "+61%",
       "mdd": "-70%",
-      "etf_price": 135.47,
-      "sig_close": 556.53,
-      "sig_ma200": 439.41,
-      "sig_buffer_pct": 26.7,
-      "sig_dist50": -6.8,
+      "etf_price": 112.68,
+      "sig_close": 555.86,
+      "sig_ma200": 472.08,
+      "sig_buffer_pct": 17.7,
+      "sig_dist50": -4.6,
       "state": "red",
       "clean_entry": true,
       "action": "🔴 賣出：信用哨示警 → SOXL 轉現金",
-      "sell_line_note": "SMH 收盤跌破 $439(其200MA) → 賣光 SOXL"
+      "sell_line_note": "SMH 收盤跌破 $472(其200MA) → 賣光 SOXL"
     }
   ],
   "note": "進取模式給「$30k以下·要成長·能扛深回撤」用。一次全投(回測證實分批少賺);母指數跌破200MA或信用哨破→賣光;只看週收盤;狂存錢。本金長大→降槓桿。",
