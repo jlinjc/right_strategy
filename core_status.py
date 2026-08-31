@@ -612,6 +612,8 @@ def main():
     #   QQQ/XLK/SPY 已測:QQQ反彈太淺轉負;XLK/SPY ΔSharpe≈0(雜訊)→不啟用。
     #   誠實限制:2026-03型「低VIX V崩」(尖峰僅31<2022的36.5)在恐慌維度不可分→此訊號救不到,已證不可能。
     VBOTTOM_TICKERS = {'SMH', 'SOXX'}
+    VBOTTOM_TRANCHE = 0.5    # 半倉(research_vbottom.py TRANCHE,回測 expo[t]=TRANCHE 就是這樣算出Sharpe改善的)
+    VBOTTOM_STOP_MULT = 0.93  # 停損 = 進場價×0.93(-7%,research_vbottom.py RESCUE_STOP)
     try:
         vix_s = raw[PANIC_TICKER]['Close'].dropna()
         for vtk in VBOTTOM_TICKERS:
@@ -627,11 +629,19 @@ def main():
             vb = {'active': bool(active), 'vix_peak15': round(vspike, 1),
                   'vix_now': round(vnow, 1), 'dd252_pct': round(dd252 * 100, 1)}
             if active:
-                stop_px = round(out[vtk]['close'] * 0.93, 2)
-                vb.update({'tranche': 0.5, 'stop': stop_px})
+                stop_px = round(out[vtk]['close'] * VBOTTOM_STOP_MULT, 2)
+                vb.update({'tranche': VBOTTOM_TRANCHE, 'stop': stop_px})
                 out[vtk]['entry_action'] = (f'🚑 V底救援:VIX尖峰{vspike:.0f}→現{vnow:.0f}退燒+距高{dd252*100:.0f}%'
                                             f'→半倉進場,停損 ${stop_px}(-7%);收復200MA+信用回血後併回正常系統')
                 out[vtk]['entry_state'] = 'can_enter'
+                # ★2026-08-31修:先前只改了上面這段「說明文字」,沒有改 suggested_expo/exit_price/
+                #   entry_cap——但全站每個算金額/股數/停損價的地方(命令卡/掛單表/K棒)都是讀這三個
+                #   欄位,不是讀文字。結果會變成文字說「半倉進場」,金額卻還停在觸發前的舊值(通常是
+                #   0%,因為vbottom只在系統空手時觸發)。且回測(research_vbottom.py)驗證出的
+                #   Sharpe改善正是靠「真的把倉位設成0.5」,不寫回這裡等於那段回測優勢從未在live實現。
+                out[vtk]['suggested_expo'] = VBOTTOM_TRANCHE
+                out[vtk]['exit_price'] = stop_px
+                out[vtk]['entry_cap'] = out[vtk]['close']   # 救援是當下進場,不是等拉回,進場上限=現價
             out[vtk]['vbottom'] = vb
     except Exception:
         pass

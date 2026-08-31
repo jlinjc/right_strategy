@@ -36,7 +36,6 @@ TW = [('006208.TW', '富邦台50'), ('0050.TW', '元大台灣50')]
 US_CANARY = ['HYG', 'LQD']
 TW_CANARY = ['HYG', 'LQD', 'SOXX']
 BULL_CAP = 2.0          # 自適應版:牛市(MA200上彎+信用健康)cap 1.5→2.0;轉熊自動收回(research_regime_adaptive.py)
-SWEEP_CAPS = [1.5, 1.75, 2.0, 2.5, 3.0]   # 積極度取捨掃描(1.5=原版;讓 Jason 挑「睡得著的回撤」那檔)
 
 
 def _clean_ohlc(df: pd.DataFrame, is_tw: bool) -> pd.DataFrame:
@@ -110,49 +109,6 @@ def _buy_word(expo, quiet):
     return w + ('·無量緩破健康' if quiet else '')
 
 
-def _state_expo(c, ma, el, h, vx, bull, budget, cap, floor, bull_cap):
-    """狀態機曝險(進出邏輯完全相同,只差牛市 cap=bull_cap;bull_cap=cap 即原版=公正比較核心)。"""
-    n = len(c)
-    below = c < el
-    db = np.zeros(n, int); run = 0
-    for t in range(n):
-        run = run + 1 if below[t] else 0
-        db[t] = run
-    expo = np.zeros(n); in_pos = False; last_base = 0.0
-    for t in range(n):
-        credit_off = h[t] <= 0
-        reclaim = (not np.isnan(ma[t])) and c[t] >= ma[t]
-        panic = (not np.isnan(vx[t])) and vx[t] > C.PANIC_VIX
-        cap_eff = ((bull_cap[t] if hasattr(bull_cap, '__len__') else bull_cap) if bull[t] else cap)
-        if not in_pos:
-            if reclaim and not credit_off:
-                in_pos = True
-        else:
-            if credit_off:
-                in_pos = False
-            elif below[t] and not (panic and db[t] < C.PANIC_DELAY):
-                in_pos = False
-        if in_pos and reclaim:
-            sd = (c[t] - el[t]) / c[t]
-            last_base = min(budget / max(sd, floor), cap_eff)
-            expo[t] = last_base * h[t]
-        elif in_pos:
-            expo[t] = last_base * h[t]
-    return expo
-
-
-def _stats(r):
-    r = r[~np.isnan(r)]
-    if len(r) < 20:
-        return {}
-    mu, sd = r.mean(), r.std()
-    eq = np.cumprod(1 + r)
-    dd = (eq / np.maximum.accumulate(eq) - 1).min()
-    return {'sharpe': round(float(mu / sd * np.sqrt(252)), 3) if sd > 0 else None,
-            'cagr': round(float(eq[-1] ** (252 / len(r)) - 1) * 100, 1),
-            'mdd': round(float(dd) * 100, 1)}
-
-
 def annotate(ohlc: pd.DataFrame, params: dict, vix: pd.Series, canary_closes: dict):
     """對單一標的逐日產生 PIT 標註。回傳 bars list。"""
     df = ohlc
@@ -178,10 +134,6 @@ def annotate(ohlc: pd.DataFrame, params: dict, vix: pd.Series, canary_closes: di
     _n = len(close)
     f63 = np.array([close[i + 63] / close[i] - 1 if i + 63 < _n else np.nan for i in range(_n)])  # 事後63日(診斷證據)
     f21 = np.array([close[i + 21] / close[i] - 1 if i + 21 < _n else np.nan for i in range(_n)])  # 事後21日(review打分)
-    # EWMA 波動 vs 中位(與 live vol-timing 同源,PIT trailing)——review R3/R7 用
-    _ew = s_close.pct_change().ewm(span=C.VOL_WIN).std() * np.sqrt(252)
-    ewma_v = _ew.values
-    ewma_med = _ew.rolling(C.VOL_MED).median().values
 
     thr, buf = params['entry_thr'], params['exit_buf']
     budget, cap = params['budget'], params['cap']
@@ -196,7 +148,6 @@ def annotate(ohlc: pd.DataFrame, params: dict, vix: pd.Series, canary_closes: di
         days_below[t] = run
 
     bars = []
-    out_idx = []
     for t in range(len(close)):
         d = dates[t]
         if d < pd.Timestamp(START_OUT) or np.isnan(ma200[t]):
@@ -209,10 +160,14 @@ def annotate(ohlc: pd.DataFrame, params: dict, vix: pd.Series, canary_closes: di
         panic = (not np.isnan(vx)) and vx > C.PANIC_VIX
 
         # RiskTarget 曝險(信用健康×budget,同 live 平滑減碼)
-        budget_eff = budget * h
+        # ★2026-08-31修:原本「budget先乘信用h、才套cap」跟core_status.py live引擎「先套cap、
+        #   信用h最後乘」順序不同——停損夠緊(budget/停損距已頂到cap)時兩者答案不同(驗證過差達
+        #   +31個百分點,足以讓燈號從「偏貴」誤判成「可買足量」)。改成跟live同順序,PIT稽核頁才
+        #   真的等於「那天live系統會給的建議」。
         expo = None
         if sr > 0:
-            expo = round(min(budget_eff / max(sr, C.STOP_DIST_FLOOR), cap), 2)
+            expo_raw = min(budget / max(sr, C.STOP_DIST_FLOOR), cap)
+            expo = round(expo_raw * h, 2)
 
         note_bits = []
         # ── 判定標註 ──
@@ -312,9 +267,6 @@ def annotate(ohlc: pd.DataFrame, params: dict, vix: pd.Series, canary_closes: di
 
         # ── 💡第二意見 review(放下成見逐根重審;理由全 PIT,事後打分另存 verdict)──
         review = None
-        ew_ok = (not np.isnan(ewma_v[t])) and (not np.isnan(ewma_med[t])) and ewma_v[t] > 0
-        vol_calm = ew_ok and ewma_v[t] < ewma_med[t]
-        vol_hot = ew_ok and ewma_v[t] > ewma_med[t] * 1.25
         if cg == 'credit_clear' and c >= ma and slope_up and (not np.isnan(vspk)) and vspk > C.PANIC_VIX and vfall:
             review = {'rule': 'R1', 'better': '🟢小買回補試單',
                       'why': '已收復200MA且MA200仍上彎+VIX自尖峰回落=V底結構(2022式陷阱MA200是下彎的,PIT可分);信用慢哨落後'}
@@ -349,7 +301,6 @@ def annotate(ohlc: pd.DataFrame, params: dict, vix: pd.Series, canary_closes: di
             'expo': expo, 'note': ' · '.join(note_bits), 'diag': diag, 'adaptive': adaptive,
             'review': review,
         })
-        out_idx.append(t)
 
     # 同類診斷連續多日→只留每段第一天(避免markers爆量)
     prev = None
@@ -377,55 +328,11 @@ def annotate(ohlc: pd.DataFrame, params: dict, vix: pd.Series, canary_closes: di
         else:                              # 建議多買→漲才算建議對
             rv['verdict'] = '✅建議較好' if f > 2 else ('❌原標較好' if f < -2 else '≈差不多')
 
-    # ── 兩版狀態機權益曲線 + 全期統計(公正比較:同進出,只差牛市 cap) ──
-    bull_arr = (~np.isnan(slope20)) & (slope20 > 0) & (health >= 1.0)
-    floor = C.STOP_DIST_FLOOR
-    ret = np.zeros(_n); ret[1:] = close[1:] / close[:-1] - 1
-    valid = ~np.isnan(ma200)
-    eb = _state_expo(close, ma200, exit_line, health, vix_al, bull_arr, budget, cap, floor, cap)
-    ea = _state_expo(close, ma200, exit_line, health, vix_al, bull_arr, budget, cap, floor, BULL_CAP)
-    # vol-timing:牛市 cap 隨波動縮放(平靜加碼/動盪縮);EWMA 波動預測,QQQ+SMH 穩健(research_sizing_deepen.py)
-    #   × 信用cushion(信用薄→再縮,降回撤器)
-    rv_ser = s_close.pct_change().ewm(span=C.VOL_WIN).std() * np.sqrt(252)
-    rvs = rv_ser.values
-    medvs = rv_ser.rolling(C.VOL_MED).median().values
-    cf_arr = np.ones(_n)
-    if C.CREDIT_CUSHION and canary_closes:
-        cc = [v for k, v in canary_closes.items() if k in ('HYG', 'LQD')]
-        if cc:
-            cdl = [(v / v.rolling(C.MA).mean() - 1).reindex(dates).ffill() for v in cc]
-            cs = sum(cdl) / len(cdl)
-            cf = (0.8 + (cs - cs.rolling(C.CUSHION_MED).median()) * C.CUSHION_K).clip(C.CUSHION_LO, C.CUSHION_HI)
-            cf_arr = cf.reindex(dates).fillna(1.0).values
-    vcap = np.clip(cap * medvs / rvs * cf_arr, cap * C.VOL_CAP_LO_MULT, cap * C.VOL_CAP_HI_MULT)
-    vcap = np.where(np.isnan(vcap), cap, vcap)
-    ev = _state_expo(close, ma200, exit_line, health, vix_al, bull_arr, budget, cap, floor, vcap)
-    rb = np.zeros(_n); rb[1:] = eb[:-1] * ret[1:]
-    ra = np.zeros(_n); ra[1:] = ea[:-1] * ret[1:]
-    rvret = np.zeros(_n); rvret[1:] = ev[:-1] * ret[1:]
-    stats = {'base': _stats(rb[valid]), 'adapt': _stats(ra[valid]), 'vol': _stats(rvret[valid]),
-             'bull_share': round(float(np.mean(bull_arr[valid])) * 100, 0),
-             'avg_expo_base': round(float(np.mean(eb[valid])) * 100, 0),
-             'avg_expo_adapt': round(float(np.mean(ea[valid])) * 100, 0),
-             'avg_expo_vol': round(float(np.mean(ev[valid])) * 100, 0)}
-    eqb = np.cumprod(1 + rb); eqa = np.cumprod(1 + ra); eqv = np.cumprod(1 + rvret)
-    if out_idx:
-        b0, a0, v0 = eqb[out_idx[0]] or 1.0, eqa[out_idx[0]] or 1.0, eqv[out_idx[0]] or 1.0
-        eq_base = [round(float(eqb[t] / b0 * 100), 2) for t in out_idx]
-        eq_adapt = [round(float(eqa[t] / a0 * 100), 2) for t in out_idx]
-        eq_vol = [round(float(eqv[t] / v0 * 100), 2) for t in out_idx]
-    else:
-        eq_base = eq_adapt = eq_vol = []
-    # ★積極度取捨掃描:牛市 cap 1.5→3.0 各自的 報酬↔回撤(讓 Jason 挑睡得著那檔)
-    sweep = []
-    for bc in SWEEP_CAPS:
-        ex = _state_expo(close, ma200, exit_line, health, vix_al, bull_arr, budget, cap, floor, bc)
-        rr = np.zeros(_n); rr[1:] = ex[:-1] * ret[1:]
-        st = _stats(rr[valid])
-        sweep.append({'cap': bc, 'sharpe': st.get('sharpe'), 'cagr': st.get('cagr'),
-                      'mdd': st.get('mdd'), 'avg_expo': round(float(np.mean(ex[valid])) * 100, 0)})
-    extra = {'stats': stats, 'eq_base': eq_base, 'eq_adapt': eq_adapt, 'eq_vol': eq_vol, 'sweep': sweep}
-    return bars, extra
+    # ★2026-08-31:拿掉「兩版狀態機權益曲線+全期統計+積極度掃描」——這段算出的 stats/sweep/
+    #   eq_base/eq_adapt/eq_vol 只餵給前端已死的「牛熊自適應」頁(renderAdaptive,7→5頁籤整併時
+    #   砍掉頁籤但沒砍這段計算)。extra 留空 dict 只為了跟 research_chase_label_validate.py 等
+    #   舊研究腳本的 `bars, extra = annotate(...)` 呼叫介面相容,不是真的還有人在用。
+    return bars, {}
 
 
 def main():
@@ -462,7 +369,7 @@ def main():
             continue
         params = dict((T.TW_PARAMS.get(sym) if is_tw else C.PARAMS.get(sym)) or C.DEFAULT_PARAM, _sym=sym)
         canary_closes = {k: canary_raw[k] for k in (TW_CANARY if is_tw else US_CANARY) if k in canary_raw}
-        bars, extra = annotate(d, params, vix, canary_closes)
+        bars, _extra = annotate(d, params, vix, canary_closes)
         if not bars:
             continue
         last = bars[-1]
@@ -470,13 +377,8 @@ def main():
                             'market': 'tw' if is_tw else 'us',
                             'params': {'entry_thr': params['entry_thr'], 'exit_buf': params['exit_buf'],
                                        'budget': params['budget'], 'cap': params['cap']},
-                            'bars': bars, 'stats': extra['stats'], 'sweep': extra['sweep'],
-                            'eq_base': extra['eq_base'], 'eq_adapt': extra['eq_adapt'],
-                            'eq_vol': extra['eq_vol']})
-        st = extra['stats']
-        print(f"  ✓ {sym:11} {name:8} {len(bars)} 根K  最新[{last['time']}] {last['label']}"
-              f"  | 原Sharpe {st['base'].get('sharpe')}/自適應 {st['adapt'].get('sharpe')}"
-              f" CAGR {st['base'].get('cagr')}→{st['adapt'].get('cagr')}%")
+                            'bars': bars})
+        print(f"  ✓ {sym:11} {name:8} {len(bars)} 根K  最新[{last['time']}] {last['label']}")
 
     out = {
         'generated': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),

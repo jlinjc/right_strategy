@@ -329,40 +329,19 @@ const $ = s => document.querySelector(s);
 const fmtF = v => (v==null ? '—' : v);
 async function getJSON(f){ const r = await fetch(f + '?t=' + Date.now()); if(!r.ok) throw 0; return r.json(); }
 
-// ★頂部燈號 = 核心策略(平滑信用哨:一壞×50%仍可買、兩壞才全出)。與「今日掛單/今日紀律/K棒」同一套,
-//   不再用進取模式的二元哨(那個更嚴格、收進下方進取卡片),解決三面板互相矛盾。
-function renderRegime(cs, ag){
-  const el = $('#regime'); if(!el) return;
-  if(!cs || !cs.combined){
-    el.className='regime'; el.innerHTML='<div class="light"></div><div><div class="lbl">載入中…</div></div>'; return;
-  }
-  const st = cs.combined.state;
-  el.className = 'regime ' + (st==='risk_on'?'green':(st==='risk_off'?'red':'yellow'));
-  const qqq = cs.cores && cs.cores.QQQ, can = cs.canary;
-  const cstr = (can&&can.assets) ? Object.entries(can.assets).map(([k,a])=>k+(a.ok?'🟢':'🔴')).join(' ') : '';
-  const aggOff = ag && ag.canary && !ag.canary.ok;
-  const lbl = st==='risk_on' ? '🟢 綠燈 · 趨勢+信用健康 → 持有最強核心'
-    : st==='risk_off' ? '🔴 紅燈 · 核心全部轉現金(信用全壞 或 跌破200MA)'
-    : st==='panic_watch' ? '🟠 恐慌觀察 · VIX高+跌破 → 別砍V底,維持現倉'
-    : '🟠 黃燈 · 信用部分示警 → 新買量減半(持有者續抱不動,不是叫你賣)';
-  el.innerHTML = `
-    <div class="light"></div>
-    <div>
-      <div class="lbl">${lbl}</div>
-      <div class="act">▶ 核心=平滑信用哨:一壞×50%仍可買、兩壞才全出、不停利騎到跌破。${aggOff?'　<b style="color:var(--red)">⚠️進取模式(TQQQ/SOXL·更嚴格二元哨:任一壞就全出)今日=全出</b>,見下方進取卡片。':''}</div>
-    </div>
-    <div class="qqq">
-      核心主力 <b>${cs.primary||'—'}</b> · QQQ <b>$${qqq?qqq.close:'—'}</b><br>
-      QQQ 200MA $${qqq?qqq.ma200:'—'}（${qqq&&qqq.dist_pct>0?'+':''}${qqq?qqq.dist_pct:''}%）<br>
-      信用哨 ${cstr} 健康${can?Math.round(can.health*100):''}%
-    </div>`;
-}
-
+// ★2026-08-31修:entryRules/exitRules 原本只讀 ev.final_config(backtest_evidence.json,一次性
+//   研究快照,research_date後從未跟著 generate_signals.py 的規則變動更新)。查到時已經跟live差了
+//   兩個多月:出場從「+3ATR分批+40天限」換成「騎乘到跌破50MA、無時間限制」,不追高門檻1.08→1.20,
+//   股池50檔AI股→全S&P500系統化篩選——每天都在秀已淘汰的舊規則。改用即時 cfg(sig.config,
+//   generate_signals.py 每次執行都重新算)當進出場規則的真相來源;fc.expectation(Sharpe/PF/WR/MDD)
+//   留著當「這套機制當初怎麼驗證」的佐證數字,但標明是哪次研究快照,避免看起來像今天的即時績效。
 function renderPlaybook(ev, cfg){
   const fc = ev.final_config;
-  $('#entryRules').innerHTML = fc.entry.map(t =>
+  const entryList = (cfg && cfg.entry) ? cfg.entry.split(/\s*\+\s*/).filter(Boolean) : fc.entry;
+  const exitList = (cfg && cfg.exit) ? cfg.exit.split(/[；;]\s*/).filter(Boolean) : fc.exit;
+  $('#entryRules').innerHTML = entryList.map(t =>
     `<div class="chk g"><span class="i">✓</span><span>${t}</span></div>`).join('');
-  $('#exitRules').innerHTML = fc.exit.map(t =>
+  $('#exitRules').innerHTML = exitList.map(t =>
     `<div class="chk b"><span class="i">▸</span><span>${t}</span></div>`).join('');
   const e = fc.expectation;
   $('#expect').innerHTML = `
@@ -370,101 +349,40 @@ function renderPlaybook(ev, cfg){
     <div class="kpi"><div class="v">${e.pf}</div><div class="k">獲利因子 PF</div></div>
     <div class="kpi"><div class="v">${e.wr}</div><div class="k">勝率 WR</div></div>
     <div class="kpi"><div class="v neg">${e.mdd}</div><div class="k">最大回撤 MDD</div></div>`;
-  $('#expectNote').textContent = '※ ' + e.note;
+  $('#expectNote').textContent = '※ ' + e.note +
+    `(以上績效數字是 ${ev.research_date||'?'} 研究快照,細部參數可能跟目前即時規則有落差;上方進出場規則卡固定跟著即時系統走,不會過期)`;
 }
 
-// ── 兩策略今日操作面板(A 全押SMH / B 輪動最強) ──
-let LAST_CS = null;
-function moneyFmt(n){ return '$'+Math.round(n).toLocaleString(); }
-function stratInstr(d, cap, lev){
-  lev = lev || 1;
-  const r = {price:d?d.close:0, expo:0, dollars:0, shares:0, entry:d?d.entry_cap:null,
-             exit:d?d.exit_price:null, verb:'—', holder:'', buyer:''};
-  if(!d) return r;
-  const expo = (d.suggested_expo!=null ? d.suggested_expo : 0) * lev;
-  r.expo = expo; r.dollars = cap*expo; r.shares = d.close>0 ? r.dollars/d.close : 0;
-  if(d.credit_cut){ r.verb='🔴 出場→現金'; r.holder='信用示警:全部出場轉現金';
-                    r.buyer='不進場(等HYG站回200MA)'; r.expo=0; r.dollars=0; r.shares=0; return r; }
-  switch(d.state){
-    case 'risk_on':
-      r.verb='🟢 持有 / 可進';
-      r.holder=`調整到曝險 ${Math.round(expo*100)}% = ${moneyFmt(r.dollars)} (${Math.round(r.shares)}股)`;
-      r.buyer = (d.entry_state==='can_enter')
-        ? `可進場：限價 ≤ $${d.entry_cap}，買 ${Math.round(r.shares)}股 ≈ ${moneyFmt(r.dollars)}（停損距 -${d.stop_risk_pct}%）`
-        : (d.entry_state==='expensive'
-          ? `🟡 空手別新進(停損距太遠,曝險僅${Math.round((d.suggested_expo||0)*100)}%<50%門檻,20年資料負期望)`
-          : `🟡 追高,等拉回到 ≤ $${d.entry_cap} 再進（距50MA ${d.dist50_pct>0?'+':''}${d.dist50_pct}%）`);
-      break;
-    case 'panic_watch':
-      r.verb='🟠 恐慌容忍'; r.holder='維持現有曝險,給3日確認別砍V底'; r.buyer='暫不加碼'; break;
-    case 'warning':
-      r.verb='🟡 逼近停損'; r.holder='收盤跌破停損線即全出'; r.buyer='不進場';
-      r.expo=0;r.dollars=0;r.shares=0; break;
-    default:
-      r.verb='🔴 出場→現金'; r.holder='已跌破200MA→全部現金,等站回'; r.buyer='不進場(等站回200MA)';
-      r.expo=0;r.dollars=0;r.shares=0;
-  }
-  return r;
+// ── 核心路線(A/B配置)★2026-08-30重寫:單一事實來源 ──
+// 原本這裡(進階區)有自己的一組 capA/capB 本金輸入+即時A/B卡片,跟主頁「🎯今日唯一指令」卡
+// (_cmdBlock,用 cap_us/cap_tw)是兩條完全獨立、互不同步的計算路徑——選了「A+B各半」/「純A」
+// 也不會反映到主卡片,主卡片永遠只顯示B(輪動)一條腿,金額也可能跟這裡兜不起來。
+// 現在改成:本金只填一次(主卡片的 cap_us/cap_tw),這裡只負責選「路線」(allocMode)+槓桿,
+// 主卡片吃 allocMode 直接算兩腿金額——路線一改,主卡片立刻照新比例重算,不會有兩份數字打架。
+let LAST_CS = null, LAST_TW = null, LAST_AG = null, LAST_SIG = null;
+const ALLOC_WEIGHTS = {core:[1,0], balanced:[0.5,0.5], wealth:[0.6,0.4]};
+// ★2026-08-30補(瀏覽器實測抓到,修了兩輪才抓齊):allocMode 是共用狀態,凡是讀它的render函式
+//   都要在路線一改時跟著重render,少一個就會留下一個「主卡片對了、別處還在講舊路線」的矛盾。
+//   目前讀 allocMode 的地方:twoStratShell(refreshShellChrome)、_cmdBlock(renderCommandCard)、
+//   disciplineBanner+今日該怎麼做表(renderCore)、buyRows(renderBuyList)、K棒圖的_kbHeldTickers
+//   (要重跑目前選中那檔的_kbSelect,不然切分頁回來時note還是切路線前算的)。
+function _refreshAfterModeChange(){
+  refreshShellChrome();
+  renderCommandCard(LAST_CS, LAST_TW, LAST_AG);
+  renderCore(LAST_CS, LAST_SIG);
+  renderBuyList(LAST_CS, LAST_TW);
+  if(_kb.built && _kb.cur) _kbSelect(_kb.cur);
 }
-function cardHTML(title, sub, tk, d, cap, lev){
-  const it = stratInstr(d, cap, lev);
-  return `
-  <div style="background:#0b1727;border:1px solid #1d3a5e;border-radius:10px;padding:12px;height:100%">
-    <div style="display:flex;justify-content:space-between;align-items:baseline;gap:6px">
-      <div style="font-weight:800;font-size:14px">${title}</div>
-      <div style="font-size:12px;color:#6fd0ff;white-space:nowrap">${tk||'—'} $${d?d.close:'—'}${d&&d.rs_score!=null?' · RS'+d.rs_score:''}</div>
-    </div>
-    <div style="color:var(--muted);font-size:11px;margin-bottom:8px">${sub}</div>
-    <div style="font-size:16px;font-weight:800;margin:4px 0">${it.verb}</div>
-    <table style="width:100%;font-size:12.5px;border-collapse:collapse">
-      <tr><td style="color:var(--muted);padding:3px 0;vertical-align:top">🏠 持有者</td><td style="text-align:right">${it.holder}</td></tr>
-      <tr><td style="color:var(--muted);padding:3px 0;vertical-align:top">💵 空手者</td><td style="text-align:right">${it.buyer}</td></tr>
-      <tr><td style="color:var(--muted);padding:3px 0">🎯 進場上限價</td><td style="text-align:right;color:#7ee0a0;font-weight:700">$${it.entry!=null?it.entry:'—'}</td></tr>
-      <tr><td style="color:var(--muted);padding:3px 0">🛑 出場/停損價</td><td style="text-align:right;color:#e06a6a;font-weight:700">$${it.exit!=null?it.exit:'—'}</td></tr>
-      <tr><td style="color:var(--muted);padding:3px 0">📊 建議曝險→金額</td><td style="text-align:right;font-weight:800;color:#7ee0a0">${Math.round(it.expo*100)}% = ${moneyFmt(it.dollars)} (${Math.round(it.shares)}股)</td></tr>
-    </table>
-  </div>`;
-}
-function updateCards(cs){
-  if(!cs || !cs.cores) return;
-  const capA = Number(localStorage.getItem('capA')||10000);
-  const capB = Number(localStorage.getItem('capB')||10000);
-  const lev = Number(localStorage.getItem('lev')||1);
-  const A = cs.cores['SMH'];
-  // ★ B 用「最低持有30日鎖」後的實際持有(rotation_hold),非每日生變的最強
-  const rh = cs.rotation_hold || {};
-  const Bp = rh.ticker || cs.strongest;
-  const B = Bp ? cs.cores[Bp] : null;
-  let lockTxt;
-  if(rh.ticker){
-    if(rh.locked) lockTxt = `🔒 已抱${rh.days_held}日·還${rh.lock_days_left}日滿鎖才可換`
-      + (rh.today_strongest&&rh.today_strongest!==rh.ticker?`（今日最強 ${rh.today_strongest}，滿鎖再換）`:'');
-    else lockTxt = `🔓 已滿${rh.min_hold_days||30}日可換（今日最強 ${rh.today_strongest||'—'}）`;
-    if(rh.forced_out_prev) lockTxt += ' ⚠️前任跌破已被換出';
-  } else lockTxt = '空手（無核心站上200MA 或 信用砍0）';
-  const ca=$('#cardA'), cb=$('#cardB');
-  if(ca) ca.innerHTML = cardHTML('🅰️ A · 抱SMH（核心）','擇時抱半導體龍頭·換手少·稅最省','SMH',A,capA,lev);
-  if(cb) cb.innerHTML = cardHTML('🅱️ B · 輪動最強（衛星）','最低持有30日·跌破立刻出 — '+lockTxt, Bp||'(全在200MA下)', B, capB,lev);
-}
-function setCap(k,v){ localStorage.setItem(k, v||0); localStorage.setItem('allocMode','custom'); updateCards(LAST_CS); refreshShellChrome(); }
-function setLev(v){ localStorage.setItem('lev', v||1); updateCards(LAST_CS); }
-// ★ 配置模式預設(research_core_satellite.py / confirm_refinements.py):一鍵設好 A/B 比例 + 槓桿
+function setLev(v){ localStorage.setItem('lev', v||1); _refreshAfterModeChange(); }
 function setMode(m){
-  const total = Number(localStorage.getItem('capA')||10000) + Number(localStorage.getItem('capB')||10000);
-  let a,b,lev;
-  if(m==='core'){ a=total; b=0; lev=1; }            // 🛡️ 純A:省事
-  else if(m==='balanced'){ a=total/2; b=total/2; lev=1; }   // ⚖️ A+B各半:最穩
-  else { a=total*0.6; b=total*0.4; lev=1.35; }      // 🚀 A60/B40×1.35:最大財富
-  localStorage.setItem('capA',Math.round(a)); localStorage.setItem('capB',Math.round(b));
-  localStorage.setItem('lev',lev); localStorage.setItem('allocMode',m);
-  updateCards(LAST_CS); refreshShellChrome();
+  const lev = m==='wealth' ? 1.35 : 1;
+  localStorage.setItem('lev', lev); localStorage.setItem('allocMode', m);
+  _refreshAfterModeChange();
 }
 function refreshShellChrome(){ const el=$('#twoStratShell'); if(el) el.innerHTML=twoStratShell(); }
 function twoStratShell(){
-  const capA = Number(localStorage.getItem('capA')||10000);
-  const capB = Number(localStorage.getItem('capB')||10000);
   const lev = Number(localStorage.getItem('lev')||1);
-  const mode = localStorage.getItem('allocMode')||'custom';
+  const mode = localStorage.getItem('allocMode')||'balanced';
   const inS = 'width:88px;background:#0b1727;color:#fff;border:1px solid #1d3a5e;border-radius:6px;padding:3px 6px';
   const opt=(v,t)=>`<option value="${v}" ${lev==v?'selected':''}>${t}</option>`;
   const mb=(m,emoji,t,sub)=>{
@@ -477,38 +395,50 @@ function twoStratShell(){
   return `
   <div style="background:#0e1b2e;border:1px solid #2a4a72;border-radius:12px;padding:14px 16px;margin:10px 0">
     <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
-      <div style="font-weight:800;font-size:15px">🎯 兩策略今日操作 <span style="color:var(--muted);font-weight:400;font-size:11px">(收盤訊號;先選下方配置模式)</span></div>
-      <div style="font-size:12px;color:var(--muted)">本金A <input type="number" value="${capA}" oninput="setCap('capA',this.value)" style="${inS}"> · 本金B <input type="number" value="${capB}" oninput="setCap('capB',this.value)" style="${inS}">
-        · 槓桿 <select onchange="setLev(this.value)" style="${inS}">${opt(0.67,'保守 0.67x')}${opt(1,'標準 1.0x')}${opt(1.25,'積極 1.25x')}${opt(1.35,'財富 1.35x')}</select></div>
+      <div style="font-weight:800;font-size:15px">🧭 核心路線選擇 <span style="color:var(--muted);font-weight:400;font-size:11px">(選這裡,上方「🎯今日唯一指令」卡自動照比例分兩腿,不用在這裡重填本金)</span></div>
+      <div style="font-size:12px;color:var(--muted)">槓桿 <select onchange="setLev(this.value)" style="${inS}">${opt(0.67,'保守 0.67x')}${opt(1,'標準 1.0x')}${opt(1.25,'積極 1.25x')}${opt(1.35,'財富 1.35x')}</select></div>
     </div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
-      ${mb('core','🛡️','純A · 省事','抱最強單一 · 換手少稅省 · 回撤較深')}
+      ${mb('core','🛡️','純A · 省事','只抱長抱腿(SMH/0052) · 換手少稅省 · 回撤較深')}
       ${mb('balanced','⚖️','A+B各半 · 最穩','各50% · Sharpe最高/回撤最淺 · 不加槓桿')}
       ${mb('wealth','🚀','A60/B40 加槓桿 · 衝報酬','報酬更高但回撤更深(槓桿≤1.5,扣成本後CAGR約27%級)')}
     </div>
-    <div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:10px;align-items:stretch">
-      <div id="cardA" style="flex:1;min-width:290px"></div>
-      <div id="cardB" style="flex:1;min-width:290px"></div>
-    </div>
-    <div style="color:var(--muted);font-size:11px;margin-top:8px">限價別追貴於進場上限 · 跌破出場價轉現金 · 信用示警自動砍曝險 · 預設穩健版(輪動+平滑哨,槓桿1.0)。</div>
+    <div style="color:var(--muted);font-size:11px;margin-top:10px">即時金額/股數/持有還是空手,回「🎯今日作戰」頁看「今日唯一指令」卡——它已經套用這裡選的路線+槓桿。</div>
   </div>`;
 }
 
 // ★ 殺盤紀律橫幅:一眼看出「今天該不該動手」,防恐慌砍底(真edge=不手賤)
+//   2026-08-30修:原本只硬編SMH,但下面A/B兩策略卡B抱的是「輪動最強」(可能不是SMH,例如現在是XLK)。
+//   只印SMH的話,B持有人看到「SMH續抱」會誤以為在講自己手上的部位——分開列A(SMH固定)/B(實際輪動標的)。
+function disciplineLine(d, label){
+  if(!d) return `${label}：無資料`;
+  if(d.credit_cut) return `${label}：信用示警 → 今天<b>出場轉現金</b>(HYG/LQD 跌破)。這是少數該動手的日子。`;
+  if(d.state==='risk_on') return `${label}：沒破線(停損 <b>$${d.exit_price}</b>)→ <b>續抱,今天不要動手</b>。只看收盤、只在<b>收盤跌破 $${d.exit_price}</b>才出。`;
+  if(d.state==='warning') return `${label}：逼近停損 <b>$${d.exit_price}</b> → 不要提前砍,<b>收盤跌破才出</b>,否則續抱。`;
+  if(d.state==='panic_watch') return `${label}：恐慌跌破但 VIX 高+信用尚健康 → <b>給3日確認,別砍在 V 底</b>(維持現倉)。`;
+  return `${label}：已跌破停損 <b>$${d.exit_price}</b> → <b>出場轉現金</b>,等站回再進。`;
+}
 function disciplineBanner(cs){
   if(!cs || !cs.cores) return '';
   const A = cs.cores['SMH']; if(!A) return '';
-  let bg,emoji,msg;
-  if(A.credit_cut){ bg='#3a1620'; emoji='🔴'; msg=`信用示警 → 今天<b>出場轉現金</b>(HYG/LQD 跌破)。這是少數該動手的日子。`; }
-  else if(A.state==='risk_on'){ bg='#12251a'; emoji='✅'; msg=`SMH 沒破線(停損 <b>$${A.exit_price}</b>)→ <b>續抱,今天不要動手</b>。盤中殺盤是雜訊,只看收盤、只在<b>收盤跌破 $${A.exit_price}</b>才出。`; }
-  else if(A.state==='warning'){ bg='#2a2410'; emoji='🟡'; msg=`SMH 逼近停損 <b>$${A.exit_price}</b> → 不要提前砍,<b>收盤跌破才出</b>,否則續抱。`; }
-  else if(A.state==='panic_watch'){ bg='#2a1e10'; emoji='🟠'; msg=`恐慌跌破但 VIX 高+信用尚健康 → <b>給3日確認,別砍在 V 底</b>(維持現倉)。`; }
-  else { bg='#3a1620'; emoji='🔴'; msg=`SMH 已跌破停損 <b>$${A.exit_price}</b> → <b>出場轉現金</b>,等站回再進。`; }
+  // ★2026-08-30:純A路線根本不持有B腿(輪動標的),還印它的紀律會讓人誤以為自己有這個部位——
+  //   跟主卡片(_cmdBlock)用同一個 allocMode 判斷要不要顯示B腿。
+  const mode = localStorage.getItem('allocMode') || 'balanced';
+  const wB = (ALLOC_WEIGHTS[mode] || ALLOC_WEIGHTS.balanced)[1];
+  const rh = cs.rotation_hold || {};
+  const Bticker = rh.ticker || cs.strongest;
+  const B = (wB > 0 && Bticker && Bticker!=='SMH') ? cs.cores[Bticker] : null;
+  const lines = [ disciplineLine(A, '🅰️ SMH(長抱策略)') ];
+  if(B) lines.push(disciplineLine(B, `🅱️ ${Bticker.replace('.TW','')}(本輪輪動實際持有)`));
+  const worst = d => !d ? 0 : (d.credit_cut || (d.state!=='risk_on' && d.state!=='panic_watch' && d.state!=='warning')) ? 3
+    : (d.state==='warning' || d.state==='panic_watch') ? 1 : 0;
+  const level = Math.max(worst(A), worst(B));
+  const [bg, emoji] = level>=3 ? ['#3a1620','🔴'] : level>=1 ? ['#2a2410','🟡'] : ['#12251a','✅'];
   return `
   <div style="background:${bg};border:1px solid #2a4a72;border-radius:12px;padding:12px 16px;margin:10px 0;display:flex;gap:12px;align-items:center">
     <div style="font-size:30px">${emoji}</div>
-    <div><div style="font-weight:800;font-size:14px;margin-bottom:2px">📋 今日紀律</div>
-      <div style="font-size:13px;line-height:1.5">${msg}</div>
+    <div><div style="font-weight:800;font-size:14px;margin-bottom:2px">📋 今日紀律 <span style="color:var(--muted);font-weight:400;font-size:11px">(分開看,別把SMH的判斷套到你B策略實際持有的標的)</span></div>
+      <div style="font-size:13px;line-height:1.6">${lines.join('<br>')}</div>
       <div style="color:var(--muted);font-size:11px;margin-top:3px">真 edge = 熊市躲現金 + 不手賤砍底(擇時相對買持只多 +0.08 Sharpe)。紀律比參數值錢。</div>
     </div>
   </div>`;
@@ -518,7 +448,7 @@ function renderCore(cs, sig){
   const el = $('#coreBanner');
   if(!el) return;
   if(!cs || !cs.cores){ el.innerHTML=''; return; }
-  LAST_CS = cs;
+  LAST_CS = cs; LAST_SIG = sig;
   const emo = {risk_on:'🟢', risk_off:'🔴', warning:'🟡', panic_watch:'🟠', credit_warning:'🟠', core_warning:'🟡'};
   const txt = {risk_on:'抱住(滿核心倉)', risk_off:'轉現金(空手等站回200MA)', warning:'逼近200MA,跌破即出',
                panic_watch:'恐慌容忍(VIX高,給3日確認別砍V底)', credit_warning:'信用示警,提前減/出',
@@ -535,20 +465,33 @@ function renderCore(cs, sig){
     return `<span style="background:#16233a;border-radius:7px;padding:3px 9px;margin-right:6px;font-size:12px">
        ${emo[d.state]||'⚪'} ${tk} $${d.close} vs 200MA $${d.ma200} (${d.dist_pct>0?'+':''}${d.dist_pct}%)${below}</span>`;}).join('');
   const entryEmo = {can_enter:'🟢', extended:'🟡', expensive:'🟡', no_entry:'🔴'};
+  // ★2026-08-30:跟buyRows同一種bug——這張表對每檔都印entry_action,QQQ/SPY只要價位符合
+  //   entry_state=='can_enter'就會亮🟢可進場+具體建議曝險%,跟輪動策略「只押XLK一檔」互相矛盾。
+  //   只有 SMH(A策略固定長抱)或 本輪輪動實際持有(B策略)才算「今天真的該動作」的標的,其餘只能當參考。
+  const rhTk = cs.rotation_hold ? cs.rotation_hold.ticker : null;
+  const modeWB = (ALLOC_WEIGHTS[localStorage.getItem('allocMode')||'balanced'] || ALLOC_WEIGHTS.balanced)[1];
+  const Bticker = modeWB > 0 ? (rhTk || cs.strongest) : null;   // 純A路線不參與輪動,B腿不算actionable
+  const actionSet = new Set(['SMH', Bticker].filter(Boolean));
   const actRows = Object.entries(cs.cores).map(([tk,d])=>{
     const thrTxt = (d.entry_thr!=null)?`進≤+${Math.round((d.entry_thr-1)*100)}% 出×${d.exit_buf}`:'';
     const stopTxt = (d.stop_risk_pct!=null)?`<br><span style="color:var(--muted);font-size:10px">現進場 -${d.stop_risk_pct}%</span>`:'';
+    const isActionable = actionSet.has(tk);
+    const roleTag = tk==='SMH' ? '🅰️' : (tk===Bticker ? '🅱️' : '');
+    const entryCell = (d.entry_state==='can_enter' && !isActionable)
+      ? `⚪ <span style="color:#8a96ad">非本輪標的,不新進(${Bticker?'輪動鎖在 '+Bticker.replace('.TW',''):'目前路線=純A,不參與輪動'})</span>`
+      : `${entryEmo[d.entry_state]||''} ${d.entry_action||''}`;
     return `
     <tr style="border-top:1px solid #16273f">
-      <td style="padding:5px 4px;font-weight:700;white-space:nowrap">${emo[d.state]||'⚪'} ${tk}<br><span style="color:#6fd0ff;font-size:10px;font-weight:400">${thrTxt}</span></td>
+      <td style="padding:5px 4px;font-weight:700;white-space:nowrap">${roleTag} ${emo[d.state]||'⚪'} ${tk}<br><span style="color:#6fd0ff;font-size:10px;font-weight:400">${thrTxt}</span></td>
       <td style="padding:5px 4px;text-align:right;white-space:nowrap">$${d.close}<br><span style="color:var(--muted);font-size:10px">50MA ${d.dist50_pct>0?'+':''}${d.dist50_pct}%</span>${d.suggested_expo!=null?`<br><span style="color:#7ee0a0;font-size:10px;font-weight:700">曝險 ${Math.round(d.suggested_expo*100)}%</span>`:(d.state==='panic_watch'?'<br><span style="color:#e0b070;font-size:10px">曝險 維持</span>':'')}</td>
       <td style="padding:5px 4px">${d.hold_action||d.action||''}</td>
-      <td style="padding:5px 4px">${entryEmo[d.entry_state]||''} ${d.entry_action||''}</td>
+      <td style="padding:5px 4px">${entryCell}</td>
       <td style="padding:5px 4px;text-align:right;color:#e06a6a;white-space:nowrap">$${d.exit_price!=null?d.exit_price:'—'}${stopTxt}</td>
     </tr>`;}).join('');
   const actionTable = `
     <div style="margin-top:12px;background:#0b1727;border:1px solid #1d3a5e;border-radius:9px;padding:10px 12px">
       <div style="font-weight:800;font-size:13px;margin-bottom:6px">📋 今日該怎麼做 <span style="color:var(--muted);font-weight:400;font-size:11px">(收盤訊號;盤前盤中是雜訊,不看 · 每指數用自校參數)</span></div>
+      <div style="color:var(--muted);font-size:11px;margin-bottom:6px">🅰️=A策略固定持有(SMH) · 🅱️=B策略本輪輪動實際持有(${Bticker?Bticker.replace('.TW',''):'目前路線=純A,不參與輪動'}) · 其餘檔=候選參考,即使💵欄顯示條件符合也不新進(單一持倉,等輪動到它)。</div>
       <div class="tblwrap"><table style="width:100%;border-collapse:collapse;font-size:12.5px">
         <thead><tr style="color:var(--muted);font-size:11px;text-align:left">
           <th style="padding:3px 4px">指數<br>(自校門檻)</th><th style="padding:3px 4px;text-align:right">現價</th>
@@ -584,7 +527,6 @@ function renderCore(cs, sig){
       </div>
       ${actionTable}
     </div>`;
-  updateCards(cs);
 }
 
 function renderAllocation(al){
@@ -906,14 +848,21 @@ function renderTaiwan(tw){
 }
 
 // ── ★今日掛單建議:把策略翻成「該買什麼/別追/掛單價/原因」(台美股共用) ──
-function buyRows(cores, isTW, heldTk, strongestTk){
+function buyRows(cores, isTW, heldTk, strongestTk, aTicker){
   const rows=[];
+  // ★2026-08-30:單一持倉輪動策略下,「符合進場價位」≠「今天該買」——只有A腿(長抱,依路線可能
+  //   不參與)或B腿(輪動持有,heldTk無持有時退回strongestTk,純A路線下不算)才是真的要動作,
+  //   其餘檔即使entry_state=='can_enter' 也不該亮🟢可買(否則會同時出現好幾個綠燈,跟上方
+  //   「今日唯一指令」互相矛盾,使用者分不清買哪個)。actionable集合跟主卡片同一個 allocMode 來源。
+  const wB = (ALLOC_WEIGHTS[localStorage.getItem('allocMode')||'balanced'] || ALLOC_WEIGHTS.balanced)[1];
+  const bTk = wB>0 ? (heldTk || strongestTk || null) : null;
+  const actionSet = new Set([aTicker, bTk].filter(Boolean));
   for(const tk in cores){
     const d=cores[tk]; if(!d || d.watch_only) continue;
     const cut=d.credit_cut;
     const cm = (d.credit_mult!=null && d.credit_mult<1) ? d.credit_mult : 1;   // 信用部分示警的減碼倍率
     const cnote = cm<1 ? `；🟠信用示警→此建議量已×${Math.round(cm*100)}%(半倉,仍可買)` : '';
-    const tag = tk===heldTk ? '🅱️持有' : (tk===strongestTk ? '👑最強' : '');
+    const tag = tk===heldTk ? '🅱️持有' : (tk===strongestTk ? '👑最強' : (tk===aTicker?'🅰️長抱':''));
     let bucket, action, limit, reason, color;
     if(cut || d.state==='risk_off' || d.entry_state==='no_entry' || d.dist_pct<0){
       bucket=3; color='#e06a6a'; action='🔴 不要碰';
@@ -926,6 +875,11 @@ function buyRows(cores, isTW, heldTk, strongestTk){
       bucket=2; color='#e0b46a'; action='🟡 空手別新進';
       limit = '—(等曝險≥50%)';
       reason = `未追高但停損距太遠(${d.stop_risk_pct}%),曝險僅${Math.round((d.suggested_expo||0)*100)}%<50%門檻＝新倉位負期望(D3,20年資料)。已持有者續抱不受影響` + cnote;
+    } else if(d.entry_state==='can_enter' && actionSet.size && !actionSet.has(tk)){
+      // 價位條件符合,但不是本輪路線下該持有的腿——別跟著亮綠燈
+      bucket=1; color='#8a96ad'; action='⚪ 非本輪標的';
+      limit = '—(等輪動到它)';
+      reason = `價位/停損距皆符合進場,但目前路線下該持有的是 ${[...actionSet].map(x=>x.replace('.TW','')).join('、')||'—'}。單一持倉策略下不重複進場`;
     } else if(d.entry_state==='can_enter'){
       // ★2026-08-16 拿掉「stop_risk_pct<=12=便宜/偏貴」這條沒驗證過的切分線(來源commit 4296f95
       //   沒附任何數據,且跟D3的50%曝險門檻是兩套獨立標準,沒有交叉核對過)。停損距/曝險本來就是連續的
@@ -971,10 +925,10 @@ function renderBuyList(cs, tw){
   const el=$('#buyList'); if(!el) return;
   let usRows=[], twRows=[];
   if(cs && cs.cores){
-    usRows = buyRows(cs.cores, false, (cs.rotation_hold||{}).ticker, cs.strongest);
+    usRows = buyRows(cs.cores, false, (cs.rotation_hold||{}).ticker, cs.strongest, 'SMH');
   }
   if(tw && tw.cores){
-    twRows = buyRows(tw.cores, true, (tw.rotation_hold||{}).ticker, tw.strongest);
+    twRows = buyRows(tw.cores, true, (tw.rotation_hold||{}).ticker, tw.strongest, tw.anchor_a);
   }
   if(!usRows.length && !twRows.length){ el.innerHTML=''; return; }
   el.innerHTML = `
@@ -987,7 +941,7 @@ function renderBuyList(cs, tw){
     </div>
     ${buyTable('🇺🇸 美股', usRows)}
     ${twRows.length?buyTable('🇹🇼 台股（價位用「%」×你券商現價換算,yfinance絕對價可能失真）', twRows):''}
-    <div style="color:var(--muted);font-size:11px;margin-top:8px">🟢可買 · 🟡別追(等拉回) · 🔴不碰(跌破200MA或信用<b>全</b>示警) · 🟠信用<b>部分</b>示警=可買但每筆量砍半(見上方上限) — 別買貴於掛單價,跌破停損轉現金。</div>
+    <div style="color:var(--muted);font-size:11px;margin-top:8px">🟢可買=<b>今天真的該買的那一檔</b>(輪動持有/最強) · ⚪非本輪標的(價位雖符合,但單一持倉策略不重複進場) · 🟡別追(等拉回) · 🔴不碰(跌破200MA或信用<b>全</b>示警) · 🟠信用<b>部分</b>示警=可買但每筆量砍半(見上方上限) — 別買貴於掛單價,跌破停損轉現金。</div>
   </div>`;
 }
 
@@ -1138,11 +1092,47 @@ function _kbInitChart(){
   });
 }
 
-function renderKbar(kb){
+// ★2026-08-30:K棒圖是逐檔獨立技術診斷(PIT稽核用),SPY/QQQ今天技術面綠燈時,howToGuide會寫
+//   「空手→今天一次買到數字%」——但這5檔美股(TW同理)是單一持倉輪動策略,只有SMH(A長抱)+
+//   本輪輪動實際持有(B)才是真的該動作的標的。不能改這裡的顏色/數字(那是驗證過的稽核資料),
+//   但選到非本輪標的時要在圖表旁明講「這張圖今天不是買它的指令」,否則跟「今日唯一指令」矛盾。
+// ★2026-08-30:純A路線根本不參與輪動,B腿(rotation_hold)不該算「持有中」——跟主卡片/紀律
+//   橫幅同一個 allocMode 判斷,純A模式下K棒圖也不該把輪動標的當成「本輪實際持有」。
+function _kbHeldTickers(cs, tw){
+  const wB = (ALLOC_WEIGHTS[localStorage.getItem('allocMode')||'balanced'] || ALLOC_WEIGHTS.balanced)[1];
+  const set = new Set();
+  if(cs && cs.cores){
+    set.add('SMH');
+    const b = (cs.rotation_hold && cs.rotation_hold.ticker) || cs.strongest;
+    if(b && wB>0) set.add(b);
+  }
+  if(tw && tw.cores){
+    if(tw.anchor_a) set.add(tw.anchor_a);
+    const b = (tw.rotation_hold && tw.rotation_hold.ticker) || tw.strongest;
+    if(b && wB>0) set.add(b);
+  }
+  return set;
+}
+function _kbHeldLabel(){
+  const wB = (ALLOC_WEIGHTS[localStorage.getItem('allocMode')||'balanced'] || ALLOC_WEIGHTS.balanced)[1];
+  const bits = [];
+  const cs = _kb.cs, tw = _kb.tw;
+  if(cs && cs.cores){
+    const b = wB>0 ? ((cs.rotation_hold && cs.rotation_hold.ticker) || cs.strongest) : null;
+    bits.push('🇺🇸 SMH(A)' + (b ? '、' + b.replace('.TW','') + '(B)' : ''));
+  }
+  if(tw && tw.cores){
+    const b = wB>0 ? ((tw.rotation_hold && tw.rotation_hold.ticker) || tw.strongest) : null;
+    const a = tw.anchor_a;
+    bits.push('🇹🇼 ' + (a ? a.replace('.TW','') + '(A)' : '') + (b ? '、' + b.replace('.TW','') + '(B)' : ''));
+  }
+  return bits.join('　') || '—';
+}
+function renderKbar(kb, cs, tw){
   const host = document.getElementById('kbarPanel');
   if(!host) return;
   if(!kb || !kb.tickers || !kb.tickers.length){ host.innerHTML='<div style="color:var(--muted);padding:10px">尚無 kbar_annotations.json(執行 python generate_kbar_annotations.py)</div>'; return; }
-  _kb.data = kb;
+  _kb.data = kb; _kb.cs = cs; _kb.tw = tw;
   if(!_kb.built){
     // ★2026-08-16:改成「顏色×持倉狀態→動作」對照表,讓專業投資人看圖就懂,不用另外想數字/顏色代表什麼。
     const actionTbl = `
@@ -1186,6 +1176,7 @@ function renderKbar(kb){
       `<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:8px">`
       +`<div id="kbTickers" style="display:flex;gap:6px;flex-wrap:wrap"></div>`
       +`<div style="margin-left:auto;font-size:11px;color:var(--muted);max-width:430px;text-align:right">${kb.pit_note||''}</div></div>`
+      +`<div id="kbActionNote" style="display:none;font-size:12.5px;line-height:1.6;background:#2a2510;border:1px solid var(--yellow-d);color:#ffe39a;border-radius:8px;padding:9px 12px;margin-bottom:8px"></div>`
       +actionTbl
       +howToGuide
       +`<div style="font-size:11px;color:#64748b;margin-bottom:6px">底部量條=紅漲綠跌對齊K棒,金色=真放量(≥1.6倍均量) · hover任一K棒看完整標註/理由</div>`
@@ -1216,6 +1207,16 @@ function _kbSelect(sym){
   const t = _kb.data.tickers.find(x=>x.symbol===sym);
   if(!t || !_kb.candle) return;
   _kb.cur = sym;
+  const noteEl = document.getElementById('kbActionNote');
+  if(noteEl){
+    const held = _kbHeldTickers(_kb.cs, _kb.tw);
+    if(held.size && !held.has(sym)){
+      noteEl.style.display='block';
+      noteEl.innerHTML = `⚠️ <b>${sym.replace('.TW','')}</b> 目前不是輪動實際持有的標的——下面顏色/數字是它自己的技術面診斷(逐日稽核用),<b>不是今天真的去買它的指令</b>。本輪實際持有:${_kbHeldLabel()}。實際操作以「🎯今日唯一指令」卡為準。`;
+    } else {
+      noteEl.style.display='none';
+    }
+  }
   document.querySelectorAll('#kbTickers button').forEach(b=>{
     const on=b.dataset.sym===sym;
     b.style.background=on?'rgba(77,163,255,0.25)':'var(--panel2)';
@@ -1321,292 +1322,76 @@ function _kbSelect(sym){
   try{ _kb.chart.timeScale().setVisibleLogicalRange({from: Math.max(0,bars.length-262), to: bars.length+3}); }catch(e){}
 }
 
-// ── 信號診斷(用後見之明標出可改善的決策點,供下一步改動) ──
-const DG_COL = {D1:'#2ecc71', D2:'#ffcb45', D3:'#ff9d5a', D4:'#4da3ff', D5:'#b085ff'};
-const DG_NAME = {D1:'V底回補漏接', D2:'出場洗損', D3:'偏貴誤標', D4:'鋸齒誤判', D5:'做頭滿槓桿'};
-let _dg = {chart:null, candle:null, ma:null, exit:null, byTime:{}, cur:null, built:false, data:null};
-
-function _dgInitChart(){
-  if(_dg.chart || typeof LightweightCharts==='undefined') return;
-  const dom=document.getElementById('dgChart'); if(!dom) return;
-  _dg.chart = LightweightCharts.createChart(dom,{
-    layout:{background:{type:'solid',color:'transparent'},textColor:'#8a96ad'},
-    grid:{vertLines:{color:'rgba(255,255,255,0.03)'},horzLines:{color:'rgba(255,255,255,0.03)'}},
-    crosshair:{mode:LightweightCharts.CrosshairMode.Normal},
-    rightPriceScale:{borderColor:'rgba(255,255,255,0.08)'},
-    timeScale:{borderColor:'rgba(255,255,255,0.08)',timeVisible:false}
-  });
-  _dg.candle = _dg.chart.addCandlestickSeries({upColor:'#ff5a5a',downColor:'#2ecc71',borderUpColor:'#ff5a5a',borderDownColor:'#2ecc71',wickUpColor:'#ff5a5a',wickDownColor:'#2ecc71'});
-  _dg.ma = _dg.chart.addLineSeries({color:'rgba(138,150,173,0.7)',lineWidth:1,priceLineVisible:false,lastValueVisible:false});
-  _dg.exit = _dg.chart.addLineSeries({color:'rgba(255,90,90,0.55)',lineWidth:1,lineStyle:2,priceLineVisible:false,lastValueVisible:false});
-  new ResizeObserver(es=>{if(es.length)_dg.chart.applyOptions({width:es[0].contentRect.width,height:es[0].contentRect.height});}).observe(dom);
-  const tip=document.getElementById('dgTip');
-  _dg.chart.subscribeCrosshairMove(p=>{
-    if(!p||!p.time||!p.point){tip.style.display='none';return;}
-    const b=_dg.byTime[_kbTimeStr(p.time)];
-    if(!b||!b.diag){tip.style.display='none';return;}
-    const g=b.diag, col=DG_COL[g.code]||'#8a96ad';
-    const fwd=(g.fwd63==null)?'—':((g.fwd63>0?'+':'')+g.fwd63+'%');
-    tip.innerHTML = `<div style="color:#cbd5e1;margin-bottom:3px">${b.time}</div>`
-      +`<div style="color:${col};font-weight:700">${g.code} ${g.name}</div>`
-      +`<div style="color:#8a96ad;margin:3px 0">原本標:${g.original}</div>`
-      +`<div style="color:#e6ecf5">建議:${g.better}</div>`
-      +`<div style="margin-top:3px">事後63日:<b style="color:${g.fwd63>0?'#2ecc71':'#ff5a5a'}">${fwd}</b></div>`;
-    tip.style.display='block';
-    const w=tip.offsetWidth, cw=dom.clientWidth;
-    let x=p.point.x+16; if(x+w>cw) x=p.point.x-w-16;
-    tip.style.left=Math.max(0,x)+'px'; tip.style.top=Math.max(0,p.point.y-10)+'px';
-  });
-}
-
-function renderDiag(kb){
-  const host=document.getElementById('diagPanel'); if(!host) return;
-  if(!kb||!kb.tickers||!kb.tickers.length){host.innerHTML='<div style="color:var(--muted);padding:10px">尚無資料</div>';return;}
-  _dg.data=kb;
-  if(!_dg.built){
-    const legend=Object.keys(DG_COL).map(k=>`<span><i style="display:inline-block;width:11px;height:11px;background:${DG_COL[k]};border-radius:2px;vertical-align:middle"></i> ${k} ${DG_NAME[k]}</span>`).join('');
-    host.innerHTML =
-      `<div style="background:#1a2233;border:1px solid var(--line);border-radius:8px;padding:9px 12px;font-size:12px;color:var(--muted);margin-bottom:10px">🔍 此頁用<b style="color:#e6ecf5">後見之明(事後63日報酬)</b>標出策略歷史上<b style="color:#e6ecf5">可能出錯/可改善</b>的決策點——不是即時訊號,是做下一步改動的診斷。hover任一標記看「原本→建議→事後真的漲跌」。fwd63 綠=之後漲(在該賣處=洗損、在該買處=漏接)。</div>`
-      +`<div id="dgTickers" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px"></div>`
-      +`<div style="display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin-bottom:6px">${legend}</div>`
-      +`<div id="dgSummary" style="font-size:12.5px;margin-bottom:8px;line-height:1.9"></div>`
-      +`<div style="position:relative"><div id="dgChart" style="width:100%;height:420px"></div>`
-      +`<div id="dgTip" style="position:absolute;display:none;pointer-events:none;z-index:20;background:#0d1424f2;border:1px solid var(--line);border-radius:6px;padding:8px 10px;font-size:12px;color:var(--txt);max-width:300px"></div></div>`
-      +`<div style="margin-top:10px;overflow:auto;max-height:300px"><table id="dgTable" style="width:100%;border-collapse:collapse;font-size:12px"></table></div>`;
-    const box=document.getElementById('dgTickers');
-    kb.tickers.forEach(t=>{
-      const btn=document.createElement('button');
-      btn.textContent=t.symbol.replace('.TW','');
-      btn.dataset.sym=t.symbol;
-      btn.style.cssText='padding:5px 10px;font-size:12px;cursor:pointer;border:1px solid var(--line);background:var(--panel2);color:var(--txt);border-radius:5px';
-      btn.onclick=()=>_dgSelect(t.symbol);
-      box.appendChild(btn);
-    });
-    _dgInitChart();
-    _dg.built=true;
-  }
-  _dgSelect(_dg.cur || 'QQQ');
-}
-
-function _dgSelect(sym){
-  const t=_dg.data.tickers.find(x=>x.symbol===sym) || _dg.data.tickers[0];
-  if(!t||!_dg.candle) return;
-  _dg.cur=t.symbol;
-  document.querySelectorAll('#dgTickers button').forEach(b=>{const on=b.dataset.sym===t.symbol; b.style.background=on?'rgba(77,163,255,0.25)':'var(--panel2)'; b.style.borderColor=on?'var(--accent)':'var(--line)';});
-  const bars=t.bars;
-  _dg.byTime={}; bars.forEach(b=>{_dg.byTime[b.time]=b;});
-  _dg.candle.setData(bars.map(b=>({time:b.time,open:b.open,high:b.high,low:b.low,close:b.close})));
-  _dg.ma.setData(bars.map(b=>({time:b.time,value:b.ma200})));
-  _dg.exit.setData(bars.map(b=>({time:b.time,value:b.exit})));
-  const events=bars.filter(b=>b.diag);
-  _dg.candle.setMarkers(events.map(b=>{const g=b.diag, up=(g.code==='D1'||g.code==='D4');
-    return {time:b.time, position:up?'belowBar':'aboveBar', color:DG_COL[g.code]||'#8a96ad', shape:up?'arrowUp':(g.code==='D2'?'arrowDown':'circle'), text:g.code};}));
-  const cnt={}, fwds={};
-  events.forEach(b=>{const c=b.diag.code; cnt[c]=(cnt[c]||0)+1; if(b.diag.fwd63!=null)(fwds[c]=fwds[c]||[]).push(b.diag.fwd63);});
-  const med=a=>{if(!a||!a.length)return null; const s=[...a].sort((x,y)=>x-y); return s[Math.floor(s.length/2)];};
-  document.getElementById('dgSummary').innerHTML = Object.keys(DG_COL).filter(c=>cnt[c]).map(c=>{
-    const m=med(fwds[c]); return `<span style="color:${DG_COL[c]}">●</span> ${c} ${DG_NAME[c]}:<b>${cnt[c]}</b>次(事後63d中位 ${m==null?'—':(m>0?'+':'')+m+'%'})`;
-  }).join('　·　') || '<span style="color:var(--muted)">此標的無診斷事件</span>';
-  const rows=events.slice().reverse().map(b=>{
-    const g=b.diag, col=DG_COL[g.code]||'#8a96ad';
-    const fwd=(g.fwd63==null)?'—':`<b style="color:${g.fwd63>0?'#2ecc71':'#ff5a5a'}">${g.fwd63>0?'+':''}${g.fwd63}%</b>`;
-    return `<tr style="border-bottom:1px solid rgba(255,255,255,0.05)"><td style="padding:4px 8px;color:var(--muted);white-space:nowrap">${b.time}</td>`
-      +`<td style="padding:4px 8px;white-space:nowrap"><span style="color:${col}">●${g.code}</span> ${g.name}</td>`
-      +`<td style="padding:4px 8px;color:var(--muted)">${g.original}</td>`
-      +`<td style="padding:4px 8px">${g.better}</td>`
-      +`<td style="padding:4px 8px;text-align:right">${fwd}</td></tr>`;
-  }).join('');
-  document.getElementById('dgTable').innerHTML =
-    `<thead><tr style="color:#64748b;text-align:left;border-bottom:1px solid var(--line)"><th style="padding:4px 8px">日期</th><th style="padding:4px 8px">缺陷</th><th style="padding:4px 8px">原本標籤</th><th style="padding:4px 8px">建議改成</th><th style="padding:4px 8px;text-align:right">事後63日</th></tr></thead><tbody>${rows}</tbody>`;
-  try{ _dg.chart.timeScale().fitContent(); }catch(e){}
-}
-
-// ── 牛熊自適應(牛市積極 cap2.0 / 熊市保守;與原版公正比較) ──
-const AD_REG = {bull:'#2ecc71', bear:'#8a96ad'};
-let _ad = {chart:null, candle:null, vol:null, eqc:null, eqb:null, eqa:null, byTime:{}, cur:null, built:false, data:null};
-
-function _adInit(){
-  if(_ad.chart || typeof LightweightCharts==='undefined') return;
-  const dom=document.getElementById('adChart'); if(!dom) return;
-  const opt={layout:{background:{type:'solid',color:'transparent'},textColor:'#8a96ad'},
-    grid:{vertLines:{color:'rgba(255,255,255,0.03)'},horzLines:{color:'rgba(255,255,255,0.03)'}},
-    crosshair:{mode:LightweightCharts.CrosshairMode.Normal},
-    rightPriceScale:{borderColor:'rgba(255,255,255,0.08)'},timeScale:{borderColor:'rgba(255,255,255,0.08)',timeVisible:false}};
-  _ad.chart=LightweightCharts.createChart(dom,opt);
-  _ad.candle=_ad.chart.addCandlestickSeries({upColor:'#ff5a5a',downColor:'#2ecc71',borderUpColor:'#ff5a5a',borderDownColor:'#2ecc71',wickUpColor:'#ff5a5a',wickDownColor:'#2ecc71'});
-  _ad.candle.priceScale().applyOptions({scaleMargins:{top:0.05,bottom:0.3}});
-  _ad.vol=_ad.chart.addHistogramSeries({priceFormat:{type:'volume'},priceScaleId:''});
-  _ad.vol.priceScale().applyOptions({scaleMargins:{top:0.82,bottom:0}});
-  new ResizeObserver(es=>{if(es.length)_ad.chart.applyOptions({width:es[0].contentRect.width,height:es[0].contentRect.height});}).observe(dom);
-  const eqd=document.getElementById('adEqChart');
-  _ad.eqc=LightweightCharts.createChart(eqd,Object.assign({},opt,{rightPriceScale:{borderColor:'rgba(255,255,255,0.08)',mode:LightweightCharts.PriceScaleMode.Logarithmic}}));
-  _ad.eqb=_ad.eqc.addLineSeries({color:'#8a96ad',lineWidth:2,priceLineVisible:false,title:'原版'});
-  _ad.eqa=_ad.eqc.addLineSeries({color:'#ffcb45',lineWidth:2,priceLineVisible:false,title:'自適應'});
-  _ad.eqv=_ad.eqc.addLineSeries({color:'#4da3ff',lineWidth:2,priceLineVisible:false,title:'vol-timing'});
-  new ResizeObserver(es=>{if(es.length)_ad.eqc.applyOptions({width:es[0].contentRect.width,height:es[0].contentRect.height});}).observe(eqd);
-  const tip=document.getElementById('adTip');
-  _ad.chart.subscribeCrosshairMove(p=>{
-    if(!p||!p.time||!p.point){tip.style.display='none';return;}
-    const b=_ad.byTime[_kbTimeStr(p.time)]; if(!b||!b.adaptive){tip.style.display='none';return;}
-    const a=b.adaptive, col=(a.tone==='green'?'#2ecc71':a.tone==='lime'?'#a3e635':a.tone==='amber'?'#ffcb45':'#ff5a5a');
-    const rc=AD_REG[a.regime], ex=(a.expo==null)?'維持':(a.expo*100).toFixed(0)+'%';
-    const oex=(b.expo==null)?'維持':(b.expo*100).toFixed(0)+'%';
-    tip.innerHTML=`<div style="color:#cbd5e1;margin-bottom:3px">${b.time} <span style="color:${rc}">${a.regime==='bull'?'🐂牛市':'🐻熊市'}</span> <span style="color:#8a96ad">(${a.why||''})</span></div>`
-      +`<div style="color:${col};font-weight:700">${a.label}</div>`
-      +`<div style="color:#8a96ad;margin-top:3px">自適應曝險 <b style="color:#ffcb45">${ex}</b> ｜ 原版 <b style="color:#8a96ad">${oex}</b></div>`
-      +`<div style="color:#8a96ad">收 ${b.close} · 200MA ${b.ma200} · 停損線 ${b.exit}</div>`;
-    tip.style.display='block';
-    const w=tip.offsetWidth, cw=dom.clientWidth; let x=p.point.x+16; if(x+w>cw)x=p.point.x-w-16;
-    tip.style.left=Math.max(0,x)+'px'; tip.style.top=Math.max(0,p.point.y-10)+'px';
-  });
-}
-
-function renderAdaptive(kb){
-  const host=document.getElementById('adaptPanel'); if(!host) return;
-  if(!kb||!kb.tickers||!kb.tickers.length){host.innerHTML='<div style="color:var(--muted);padding:10px">尚無資料</div>';return;}
-  _ad.data=kb;
-  if(!_ad.built){
-    const verdict=`<div style="background:#1a2233;border:1px solid var(--line);border-radius:8px;padding:11px 14px;font-size:12.5px;color:var(--muted);margin-bottom:12px;line-height:1.75">
-      <div style="color:#e6ecf5;font-weight:700;margin-bottom:4px">🐂 牛熊自適應版 — 我的設計與建議</div>
-      進出邏輯<b style="color:#e6ecf5">與原版完全相同</b>(回測證實「牛市抱過洗損」有害、已剔除);<b style="color:#e6ecf5">唯一差異</b>=偵測到牛市(MA200上彎+信用HYG/LQD健康)時,倉位上限 cap 1.5→<b style="color:#ffcb45">2.0 積極</b>;一轉熊(信用壞/MA200下彎)<b style="color:#2ecc71">自動收回保守</b>。2022 全年 0% 判牛市→積極自動關掉,不會被套。<b style="color:#e6ecf5">下面每根K標的是「這套自適應會怎麼建議/下注」,PIT 公正,再跟原版比。</b></div>`;
-    host.innerHTML = verdict
-      +`<div id="adTickers" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px"></div>`
-      +`<div id="adLatest" style="font-family:var(--font-mono);font-size:13px;margin-bottom:8px;padding:7px 10px;background:var(--panel2);border-radius:6px"></div>`
-      +`<div style="font-size:12px;color:var(--muted);margin-bottom:4px">① 自適應逐日標註(底部量條:🟢牛市積極檔 / ⚪熊市保守檔;hover看自適應vs原版曝險)</div>`
-      +`<div style="position:relative"><div id="adChart" style="width:100%;height:400px"></div>`
-      +`<div id="adTip" style="position:absolute;display:none;pointer-events:none;z-index:20;background:#0d1424f2;border:1px solid var(--line);border-radius:6px;padding:8px 10px;font-size:12px;color:var(--txt);max-width:300px"></div></div>`
-      +`<div style="font-size:12px;color:var(--muted);margin:12px 0 4px">② 權益曲線對比(<span style="color:#8a96ad">■原版</span> vs <span style="color:#ffcb45">■自適應(牛市cap2.0)</span> vs <span style="color:#4da3ff">■vol-timing(波動縮放·僅QQQ穩健)</span>,對數軸)</div>`
-      +`<div id="adEqChart" style="width:100%;height:240px"></div>`
-      +`<div style="font-size:12px;color:var(--muted);margin:12px 0 4px">③ 全期統計對比(2006起,含2008 GFC=公正;不高估自適應)</div>`
-      +`<div style="overflow:auto"><table id="adStats" style="width:100%;border-collapse:collapse;font-size:12px;font-family:var(--font-mono)"></table></div>`
-      +`<div id="adVolNote" style="font-size:11.5px;color:var(--muted);margin-top:6px;line-height:1.6"></div>`
-      +`<div style="font-size:12px;color:var(--muted);margin:14px 0 4px">④ 積極度取捨掃描(牛市 cap 1.5→3.0;<b style="color:#e6ecf5">挑你「睡得著的回撤」那檔</b>。Sharpe 幾乎不變=純風險旋鈕,不是更好的擇時)</div>`
-      +`<div style="overflow:auto"><table id="adSweep" style="width:100%;border-collapse:collapse;font-size:12px;font-family:var(--font-mono)"></table></div>`
-      +`<div style="background:#141a28;border:1px solid var(--line);border-radius:8px;padding:12px 14px;font-size:12.5px;color:#cbd5e1;margin-top:14px;line-height:1.85">
-        <div style="color:#e6ecf5;font-weight:700;margin-bottom:6px">📌 結論:哪個好 / 能否互相借箭 / 缺陷</div>
-        <b style="color:#ffcb45">哪個好?</b> 風險調整後(Sharpe)<b>兩版幾乎一樣</b>(美股 −0.01~+0.02=雜訊)。自適應多的 CAGR(+3~5%)<b>幾乎全是牛市多冒的險</b>換來,回撤同步變深 → 這正是你的<b>資本配置線鐵律:槓桿是風險旋鈕,不是更聰明的擇時</b>。<br>
-        <b style="color:#2ecc71">互相借箭?</b> 可以,而且本就是同一套:自適應<b>借原版的信用哨/熊市保守當「保險絲」</b>(2022自動收手、回撤不惡化);原版<b>借自適應的「牛市自動調高RISK_MULT」當財富引擎</b>。合體=同一策略 + 一個 regime 旋鈕。<br>
-        <b style="color:#ff5a5a">缺陷?</b> 自適應:牛市<b>中途</b>啟動的急崩(如COVID 2020)因帶槓桿→回撤加深;regime 判斷有延遲。原版:牛市過度保守→<b>把利潤留在桌上</b>。<br>
-        <b style="color:#e6ecf5">給你的選擇:</b>要最大財富、能扛更深回撤 → 自適應(=regime-gated RISK_MULT,牛市積極熊市收手);要最穩、睡得著 → 原版。<b>這是風險胃納的取捨,不是誰「更對」——回測無法幫你證明自適應「更好」,只能證明它「牛市更肥、崩盤更痛」。</b></div>`;
-    const box=document.getElementById('adTickers');
-    kb.tickers.forEach(t=>{const b=document.createElement('button');b.textContent=t.symbol.replace('.TW','');b.dataset.sym=t.symbol;
-      b.style.cssText='padding:5px 10px;font-size:12px;cursor:pointer;border:1px solid var(--line);background:var(--panel2);color:var(--txt);border-radius:5px';
-      b.onclick=()=>_adSelect(t.symbol);box.appendChild(b);});
-    // 統計表(全標的)
-    const hd=`<thead><tr style="color:#64748b;text-align:right;border-bottom:1px solid var(--line)"><th style="padding:5px 8px;text-align:left">標的</th><th style="padding:5px 8px">原Sharpe</th><th style="padding:5px 8px">自適應</th><th style="padding:5px 8px">vol-timing</th><th style="padding:5px 8px">原CAGR</th><th style="padding:5px 8px">自適應</th><th style="padding:5px 8px">原MDD</th><th style="padding:5px 8px">自適應</th><th style="padding:5px 8px">平均曝險</th></tr></thead>`;
-    const rws=kb.tickers.map(t=>{const s=t.stats,b=s.base,a=s.adapt,v=s.vol;
-      const dS=(a.sharpe-b.sharpe), dc=dS>=0?'#2ecc71':'#ff5a5a';
-      const dV=(v.sharpe-b.sharpe), robust=(t.symbol==='QQQ'||t.symbol==='SMH');
-      const vcol=robust?(dV>=0?'#2ecc71':'#ff5a5a'):'#8a96ad';
-      return `<tr data-sym="${t.symbol}" style="border-bottom:1px solid rgba(255,255,255,0.05);text-align:right"><td style="padding:5px 8px;text-align:left">${t.symbol.replace('.TW','')}</td>`
-        +`<td style="padding:5px 8px">${b.sharpe}</td><td style="padding:5px 8px;color:${dc}">${a.sharpe} (${dS>=0?'+':''}${dS.toFixed(3)})</td>`
-        +`<td style="padding:5px 8px;color:${vcol}">${v.sharpe} (${dV>=0?'+':''}${dV.toFixed(3)})${robust?' ✅':'*'}</td>`
-        +`<td style="padding:5px 8px">${b.cagr}%</td><td style="padding:5px 8px;color:#ffcb45">${a.cagr}%</td>`
-        +`<td style="padding:5px 8px">${b.mdd}%</td><td style="padding:5px 8px;color:#ff5a5a">${a.mdd}%</td>`
-        +`<td style="padding:5px 8px;color:var(--muted)">${s.avg_expo_base}→${s.avg_expo_adapt}% · 牛${s.bull_share}%</td></tr>`;}).join('');
-    document.getElementById('adStats').innerHTML=hd+'<tbody>'+rws+'</tbody>';
-    document.getElementById('adVolNote').innerHTML='vol-timing:牛市 cap 隨<b>EWMA 波動預測</b>縮放(平靜加碼/動盪縮)<b> × 信用cushion</b>(信用薄→再縮=降回撤)。48格掃描:<b style="color:#2ecc71">✅QQQ 48/48、SMH 40/48</b>(EWMA 救活 SMH);加 cushion 後<b style="color:#e6ecf5">回撤再降</b>(QQQ MDD -33→-27、SMH -38→-36),Sharpe 仍 +0.04。→<b style="color:#e6ecf5">已 live,QQQ+SMH 啟用</b>。<b style="color:#8a96ad">*SPY 無效不啟用</b>。';
-    _adInit(); _ad.built=true;
-  }
-  _adSelect(_ad.cur||'QQQ');
-}
-
-function _adSelect(sym){
-  const t=_ad.data.tickers.find(x=>x.symbol===sym)||_ad.data.tickers[0];
-  if(!t||!_ad.candle) return;
-  _ad.cur=t.symbol;
-  document.querySelectorAll('#adTickers button').forEach(b=>{const on=b.dataset.sym===t.symbol;b.style.background=on?'rgba(255,203,69,0.25)':'var(--panel2)';b.style.borderColor=on?'#ffcb45':'var(--line)';});
-  document.querySelectorAll('#adStats tr[data-sym]').forEach(r=>{r.style.background=r.dataset.sym===t.symbol?'rgba(255,203,69,0.08)':'transparent';});
-  const bars=t.bars; _ad.byTime={}; bars.forEach(b=>{_ad.byTime[b.time]=b;});
-  _ad.candle.setData(bars.map(b=>({time:b.time,open:b.open,high:b.high,low:b.low,close:b.close})));
-  _ad.vol.setData(bars.map(b=>({time:b.time,value:b.volume,color:(b.adaptive&&b.adaptive.regime==='bull'?'#2ecc7188':'#8a96ad55')})));
-  // regime 轉折 markers
-  const mk=[]; let pr=null;
-  bars.forEach(b=>{const rg=b.adaptive?b.adaptive.regime:null; if(rg&&rg!==pr){mk.push({time:b.time,position:rg==='bull'?'belowBar':'aboveBar',color:AD_REG[rg],shape:rg==='bull'?'arrowUp':'arrowDown',text:rg==='bull'?'🐂積極':'🐻保守'});pr=rg;}});
-  _ad.candle.setMarkers(mk);
-  _ad.eqb.setData(bars.map((b,i)=>({time:b.time,value:t.eq_base[i]})));
-  _ad.eqa.setData(bars.map((b,i)=>({time:b.time,value:t.eq_adapt[i]})));
-  if(t.eq_vol)_ad.eqv.setData(bars.map((b,i)=>({time:b.time,value:t.eq_vol[i]})));
-  const last=bars[bars.length-1], a=last.adaptive, rc=AD_REG[a.regime];
-  const ex=(a.expo==null)?'維持':(a.expo*100).toFixed(0)+'%', oex=(last.expo==null)?'維持':(last.expo*100).toFixed(0)+'%';
-  document.getElementById('adLatest').innerHTML=`最新 <b>${t.symbol.replace('.TW','')}</b> [${last.time}] <span style="color:${rc};font-weight:700">${a.regime==='bull'?'🐂牛市積極':'🐻熊市保守'}</span>　${a.label}　自適應曝險 <b style="color:#ffcb45">${ex}</b>(原版 ${oex})`;
-  // ④ 取捨掃描表
-  const sw=t.sweep||[];
-  if(sw.length){
-    const capNote=c=>c<=1.5?'原版·最穩·睡得著':c<1.9?'小積極':c<2.2?'平衡(推薦起點)':c<2.7?'積極':'博命·效率遞減';
-    const capLbl=c=>Number.isInteger(c)?c+'.0':(''+c);
-    const maxC=Math.max(...sw.map(x=>x.cagr)), maxM=Math.max(...sw.map(x=>Math.abs(x.mdd)));
-    const rws=sw.map(x=>{const rec=Math.abs(x.cap-2)<0.01;
-      const cbar=`<div style="display:inline-block;height:9px;width:${(x.cagr/maxC*80).toFixed(0)}px;background:#2ecc71;border-radius:2px;vertical-align:middle;margin-right:5px"></div>${x.cagr}%`;
-      const mbar=`<div style="display:inline-block;height:9px;width:${(Math.abs(x.mdd)/maxM*80).toFixed(0)}px;background:#ff5a5a;border-radius:2px;vertical-align:middle;margin-right:5px"></div>${x.mdd}%`;
-      return `<tr style="border-bottom:1px solid rgba(255,255,255,0.05);${rec?'background:rgba(255,203,69,0.08)':''}">`
-        +`<td style="padding:5px 8px;font-weight:${rec?700:400};color:${rec?'#ffcb45':'#e6ecf5'};white-space:nowrap">cap ${capLbl(x.cap)}${rec?' ★':''}</td>`
-        +`<td style="padding:5px 8px;color:var(--muted)">${capNote(x.cap)}</td>`
-        +`<td style="padding:5px 8px;text-align:right">${x.sharpe}</td>`
-        +`<td style="padding:5px 8px">${cbar}</td><td style="padding:5px 8px">${mbar}</td>`
-        +`<td style="padding:5px 8px;text-align:right;color:var(--muted)">${x.avg_expo}%</td></tr>`;}).join('');
-    document.getElementById('adSweep').innerHTML=
-      `<thead><tr style="color:#64748b;border-bottom:1px solid var(--line)"><th style="padding:5px 8px;text-align:left">牛市cap</th><th style="padding:5px 8px;text-align:left">定位</th><th style="padding:5px 8px;text-align:right">Sharpe</th><th style="padding:5px 8px;text-align:left">CAGR</th><th style="padding:5px 8px;text-align:left">最大回撤</th><th style="padding:5px 8px;text-align:right">平均曝險</th></tr></thead><tbody>${rws}</tbody>`;
-  }
-  try{_ad.chart.timeScale().fitContent(); _ad.eqc.timeScale().fitContent();}catch(e){}
-}
-
 // ── 🎯今日唯一指令卡:狀態+RS輪動+信用+額度+換算(單一數字來源=suggested_expo,
 //    已含 RiskTarget×vol-timing×信用減碼;金額/股數=純乘法換算,不新增任何未回測規則) ──
-function _cmdBlock(name, status, mkt, cur){
-  if(!status || !status.cores) return '';
-  const rh = status.rotation_hold || {};
-  let veh = (rh.ticker && status.cores[rh.ticker]) ? rh.ticker : status.strongest;
-  if(!veh || !status.cores[veh]) veh = (status.primary && status.cores[status.primary]) ? status.primary : Object.keys(status.cores)[0];
-  if(!veh || !status.cores[veh]) return '';
-  const d = status.cores[veh];
+// ★2026-08-30:單一腿的「行動一句話+數字格」——被 _cmdBlock 呼叫1或2次(依路線 純A=1腿/A+B=2腿)。
+//   跟以前一樣的邏輯(D3門檻/一次全投/panic容忍),只是抽成可重複用在A腿跟B腿的函式。
+function _legTile(status, tk, cap, lev, cur, posKey, legTag){
+  const d = status.cores[tk]; if(!d) return '';
   const health = status.canary ? status.canary.health : 1;
-  const expo = d.suggested_expo;                       // ★唯一數字來源(已含RiskTarget×vol-timing×信用)
+  const expo = d.suggested_expo;
   const ep = (expo==null)?null:Math.round(expo*100);
-  const cr = health>=1?'信用🟢':(health>0?`信用🟠×${Math.round(health*100)}%`:'信用🔴');
-  const lock = rh.ticker?(rh.locked?`🔒換倉鎖${rh.lock_days_left}日`:'🔓可換'):'';
-  const K = parseFloat(localStorage.getItem('cap_'+mkt)) || null;
-  const pos = localStorage.getItem('pos_'+mkt) || '';
+  const pos = localStorage.getItem(posKey) || '';
   let shares=null;
-  if(K && ep!=null && ep>0){ shares=Math.floor(K*expo/d.close); }
-  // ▶ 行動一句話(依持有狀態)
-  //   ★2026-08-16 拿掉「40/75分批掛限價」——那條線沒被單獨回測過,且跟系統自己驗證過的
-  //   「一次全投優於分批」(見進取模式區:1066行、個股衛星對比表:1668行)直接矛盾。
-  //   ★2026-08-16 補回 D3(generate_kbar_annotations.py:273,20年資料驗證):曝險<50%代表
-  //   停損太遠、新倉位期望值為負——空手者這個位階不該進場,只有已持有者續抱(用目標%當加減碼參考,
-  //   不是叫你砍倉)。這條之前只存在K棒稽核頁,今日指令卡沒接上,是漏掉的一塊,不是新規則。
+  if(cap && ep!=null && ep>0){ shares=Math.floor(cap*expo*lev/d.close); }
   let act, tone;
   if(health<=0 || d.state==='risk_off'){ act='存現金,等信用/趨勢回來'; tone='#ff5a5a'; }
   else if(d.state==='panic_watch'){ act='恐慌觀察:維持現倉,等3日確認'; tone='#ffcb45'; }
-  else if(pos==='hold'){ act='續抱:目標%會隨位階自動taper(貼近均線→升高,離均線越遠→自動縮,這是RiskTarget的核心機制不是裝飾,見「目標部位」);每次來看就照目標調整,收盤真跌破「停損」才全出'; tone='#2ecc71'; }
+  else if(pos==='hold'){ act='續抱:目標%會隨位階自動taper(貼近均線→升高,離均線越遠→自動縮);每次來看就照目標調整,收盤真跌破「停損」才全出'; tone='#2ecc71'; }
   else if(ep>=50){ act='進場:一次買到「目標」(回測證實一次全投優於分批)'; tone='#2ecc71'; }
   else if(ep>0){ act='空手先別進:此位階停損太遠,新倉位20年資料是負期望(D3)——等回到曝險≥50%再進場'; tone='#ffcb45'; }
   else { act='存現金'; tone='#ff5a5a'; }
-  // 大數字格
-  const tile=(lab,val,col)=>`<div style="flex:1;min-width:84px;background:var(--panel);border-radius:6px;padding:7px 8px;text-align:center"><div style="font-size:10.5px;color:#64748b;white-space:nowrap">${lab}</div><div style="font-size:16.5px;font-weight:800;color:${col||'var(--txt)'}">${val}</div></div>`;
+  const tile=(lab,val,col)=>`<div style="flex:1;min-width:74px;background:var(--panel);border-radius:6px;padding:6px 7px;text-align:center"><div style="font-size:10px;color:#64748b;white-space:nowrap">${lab}</div><div style="font-size:15px;font-weight:800;color:${col||'var(--txt)'}">${val}</div></div>`;
   const tgtStr = ep==null?'—':(ep<=0?'現金':(shares!=null?`${shares.toLocaleString()}股`:`${ep}%`));
-  const tgtSub = (ep!=null&&ep>0)?`(曝險${ep}%${expo>1?'·需融資,現金戶=全倉':''})`:'';
-  const tiles = `<div style="display:flex;gap:6px;margin:8px 0;flex-wrap:wrap">
-    ${tile('現價', cur+d.close)}
-    ${tile('進場限價 ≤', cur+d.entry_cap, '#4da3ff')}
-    ${tile('停損·跌破全出', cur+d.exit_price, '#ff5a5a')}
-    ${tile('目標部位', tgtStr, '#2ecc71')}
+  const tgtSub = (ep!=null&&ep>0)?`(曝險${ep}%${lev!==1?'×'+lev+'槓桿':''})`:'';
+  const pbtn=(v,txt)=>`<button onclick="_setPos('${posKey}','${v}')" style="padding:2px 8px;font-size:10.5px;cursor:pointer;border-radius:5px;margin-left:4px;border:1px solid ${pos===v?'var(--accent)':'var(--line)'};background:${pos===v?'rgba(77,163,255,0.2)':'var(--panel2)'};color:var(--txt)">${txt}</button>`;
+  return `<div style="flex:1;min-width:255px;background:#0b1727;border:1px solid #16233a;border-radius:8px;padding:9px 11px">
+    <div style="font-size:11px;color:var(--muted);display:flex;align-items:center;flex-wrap:wrap">${legTag} <b style="color:var(--txt);margin-left:4px;font-size:13px">${tk.replace('.TW','')}</b>
+      <span style="margin-left:auto">${pbtn('hold','持有中')}${pbtn('cash','空手')}</span></div>
+    <div style="display:flex;gap:5px;margin:7px 0;flex-wrap:wrap">
+      ${tile('現價', cur+d.close)}
+      ${tile('進場≤', cur+d.entry_cap, '#4da3ff')}
+      ${tile('停損', cur+d.exit_price, '#ff5a5a')}
+      ${tile('目標', tgtStr, '#2ecc71')}
+    </div>
+    <div style="font-size:13px;font-weight:700;color:${tone}">▶ ${act} <span style="font-size:10.5px;color:#64748b;font-weight:400">${tgtSub}</span></div>
   </div>`;
-  // RS 排名(輪動候選;台股觀察名單另列)
+}
+// ★2026-08-30重寫:原本這裡永遠只顯示B(輪動)一條腿,跟「進階」區選的核心路線(純A/A+B/A60B40)
+//   完全沒關係——選了A+B blend,這張全站最顯眼的卡片還是隻字不提A腿,是最深的一個矛盾。
+//   現在吃 allocMode 決定要顯示1腿(純A)還是2腿(A+B,依比例分本金),不用去猜路線。
+function _cmdBlock(name, status, mkt, cur, aTicker){
+  if(!status || !status.cores) return '';
+  const mode = localStorage.getItem('allocMode') || 'balanced';
+  const [wA, wB] = ALLOC_WEIGHTS[mode] || ALLOC_WEIGHTS.balanced;
+  const lev = Number(localStorage.getItem('lev')||1);
+  const totalCap = parseFloat(localStorage.getItem('cap_'+mkt)) || null;
+  const rh = status.rotation_hold || {};
+  const bTicker = (rh.ticker && status.cores[rh.ticker]) ? rh.ticker : status.strongest;
+  const hasA = !!(aTicker && status.cores[aTicker]);
+  const hasB = !!(bTicker && status.cores[bTicker] && wB > 0);
+  if(!hasA && !hasB) return '';
+  const capA = totalCap!=null ? totalCap*wA : null;
+  const capB = totalCap!=null ? totalCap*wB : null;
+  const legs = [];
+  if(hasA) legs.push(_legTile(status, aTicker, capA, lev, cur, `pos_${mkt}_A`, '🅰️長抱'));
+  if(hasB) legs.push(_legTile(status, bTicker, capB, lev, cur, `pos_${mkt}_B`, '🅱️輪動'+(rh.locked?`🔒${rh.lock_days_left}日`:'🔓')));
+  const modeLabel = {core:'🛡️純A', balanced:'⚖️A+B各半', wealth:`🚀A60/B40×${lev}`}[mode] || '⚖️A+B各半';
+  const health = status.canary ? status.canary.health : 1;
+  const cr = health>=1?'信用🟢':(health>0?`信用🟠×${Math.round(health*100)}%`:'信用🔴');
   const all = Object.entries(status.cores).filter(([k,v])=>v.rs_score!=null);
   const elig = all.filter(([k,v])=>!v.watch_only).sort((x,y)=>y[1].rs_score-x[1].rs_score);
   const watch = all.filter(([k,v])=>v.watch_only).sort((x,y)=>y[1].rs_score-x[1].rs_score);
-  const rank = elig.map(([k,v])=>k===veh?`<b style="color:var(--txt)">${k.replace('.TW','')} ${v.rs_score.toFixed(2)}</b>`:`${k.replace('.TW','')} ${v.rs_score.toFixed(2)}`).join(' › ');
+  const rank = elig.map(([k,v])=>k===bTicker?`<b style="color:var(--txt)">${k.replace('.TW','')} ${v.rs_score.toFixed(2)}</b>`:`${k.replace('.TW','')} ${v.rs_score.toFixed(2)}`).join(' › ');
   const watchStr = watch.length?`<br>觀察(RS更高但無回測背書·主動型/太年輕,不參與輪動):${watch.slice(0,3).map(([k,v])=>`${k.replace('.TW','')} ${v.rs_score.toFixed(2)}`).join('、')}`:'';
-  const pbtn=(v,txt)=>`<button onclick="_setPos('${mkt}','${v}')" style="padding:3px 10px;font-size:11.5px;cursor:pointer;border-radius:5px;margin-left:6px;border:1px solid ${pos===v?'var(--accent)':'var(--line)'};background:${pos===v?'rgba(77,163,255,0.2)':'var(--panel2)'};color:var(--txt)">${txt}</button>`;
+  const rsBlock = hasB
+    ? `<div style="font-size:11px;color:#64748b;margin-top:6px;line-height:1.6">🅱️腿輪動 RS=126日報酬÷年化波動(半年風險調整動能;跌破200MA/信用砍才失格換人):${rank}${watchStr}<br>適用<b>任何一次</b>進場,非限每月。</div>`
+    : `<div style="font-size:11px;color:#64748b;margin-top:6px">純A路線:只抱${aTicker?aTicker.replace('.TW',''):'—'},不參與輪動(改路線去「配置/策略→進階:核心路線選擇」)。</div>`;
   return `<div style="flex:1;min-width:330px;background:var(--panel2);border-radius:8px;padding:11px 13px">
-    <div style="font-size:12px;color:var(--muted);display:flex;align-items:center;flex-wrap:wrap">${name} · ${lock} · ${cr}
-      <span style="margin-left:auto">我:${pbtn('hold','持有中')}${pbtn('cash','空手')}</span></div>
-    <div style="font-size:19px;font-weight:800;margin:3px 0">${veh.replace('.TW','')} <span style="font-size:11.5px;font-weight:400;color:var(--muted)">RS第一·輪動持有中</span></div>
-    ${tiles}
-    <div style="font-size:14px;font-weight:700;color:${tone}">▶ ${act} <span style="font-size:11px;color:#64748b;font-weight:400">${tgtSub}</span></div>
-    <div style="font-size:11px;color:#64748b;margin-top:6px;line-height:1.6">RS=126日報酬÷年化波動(半年維度風險調整動能;近期回檔不翻盤,跌破200MA/信用砍才失格換人):${rank}${watchStr}<br>適用<b>任何一次</b>進場(多次進場都看這張卡),非限每月。</div>
-    <div style="font-size:11px;color:#64748b;margin-top:4px">核心資金 ${cur}<input type="number" value="${K||''}" placeholder="投入此策略的錢" onchange="_setCap('${mkt}',this.value)" style="width:100px;background:var(--panel);border:1px solid var(--line);border-radius:4px;color:var(--txt);padding:2px 6px;font-size:11px"> =分配給核心策略的錢(70/20/10→總資產×70%)${mkt==='tw'&&shares!=null?' · 股數以券商現價為準,可零股':''}</div>
+    <div style="font-size:12px;color:var(--muted);display:flex;align-items:center;flex-wrap:wrap;gap:6px">${name} · ${modeLabel} · ${cr}</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">${legs.join('')}</div>
+    ${rsBlock}
+    <div style="font-size:11px;color:#64748b;margin-top:6px">核心資金 ${cur}<input type="number" value="${totalCap||''}" placeholder="投入此策略的錢" onchange="_setCap('${mkt}',this.value)" style="width:100px;background:var(--panel);border:1px solid var(--line);border-radius:4px;color:var(--txt);padding:2px 6px;font-size:11px"> =分配給核心策略的錢(70/20/10→總資產×70%),依上面路線自動分兩腿${mkt==='tw'?'(股數以券商現價為準,可零股)':''}</div>
   </div>`;
 }
 
@@ -1615,26 +1400,34 @@ function renderCommandCard(cs, tw, ag){
   const KEY='dca_log';
   const log=JSON.parse(localStorage.getItem(KEY)||'{}');
   const month=new Date().toISOString().slice(0,7);
+  LAST_CS = cs; LAST_TW = tw; LAST_AG = ag;
   window._dcaMark=()=>{ log[month]={ts:Date.now()}; localStorage.setItem(KEY,JSON.stringify(log)); renderCommandCard(cs,tw,ag); };
   window._setCap=(m,v)=>{ if(v) localStorage.setItem('cap_'+m,v); else localStorage.removeItem('cap_'+m); renderCommandCard(cs,tw,ag); };
-  window._setPos=(m,v)=>{ const c=localStorage.getItem('pos_'+m); if(c===v) localStorage.removeItem('pos_'+m); else localStorage.setItem('pos_'+m,v); renderCommandCard(cs,tw,ag); };
+  // ★posKey現在是完整key(pos_us_A/pos_us_B/pos_tw_A/pos_tw_B),不是市場前綴——見_legTile
+  window._setPos=(key,v)=>{ const c=localStorage.getItem(key); if(c===v) localStorage.removeItem(key); else localStorage.setItem(key,v); renderCommandCard(cs,tw,ag); };
   const done=!!log[month];
   const aggOff = ag && ag.canary && !ag.canary.ok;
-  // ★狀態列=原頂部regime橫幅併入(單一聲音;與 core_status.combined 同源)
-  const st = cs && cs.combined ? cs.combined.state : null;
+  // ★2026-08-31修:原本頂部狀態橫幅只讀 cs.combined(美股),卻印在美股+台股共用的標題上——
+  //   台股本來就沒有 combined 欄位(已在 taiwan_status.py 補上,重用 core_status.combine()),
+  //   兩市場信用哨組成不同(美股HYG+LQD、台股多算SOXX),健康度可能不同步(今天50% vs 67%),
+  //   單一橫幅會誤導其中一邊。改成美股/台股分開各自的狀態燈號。
   const stMap = {risk_on:['#2ecc71','🟢 趨勢+信用健康 → 持有最強核心'],
                  risk_off:['#ff5a5a','🔴 核心全部轉現金(信用全壞或跌破200MA)'],
                  panic_watch:['#ffcb45','🟠 恐慌觀察:VIX高+跌破 → 別砍V底,維持現倉'],
                  credit_warning:['#ffcb45','🟠 信用部分示警 → 新買量減半(持有者續抱不動,不是叫你賣)'],
                  core_warning:['#ffcb45','🟡 核心跌破200MA → 出場(信用尚健康)']};
-  const [stc, stt] = stMap[st] || ['#8a96ad', (cs&&cs.combined)?cs.combined.action:'載入中…'];
+  const stChip = status => stMap[(status && status.combined) ? status.combined.state : null]
+    || ['#8a96ad', (status&&status.combined)?status.combined.action:'載入中…'];
+  const [usc, ust] = stChip(cs);
+  const [twc, twt] = stChip(tw);
   host.innerHTML=`<div style="background:var(--panel);border:2px solid var(--accent);border-radius:12px;padding:13px 16px;margin:14px 0">
     <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px">
       <div style="font-weight:800;font-size:15px">🎯 今日唯一指令</div>
-      <div style="font-size:13px;color:${stc};font-weight:700">${stt}</div>
+      <div style="font-size:12.5px;color:${usc};font-weight:700">🇺🇸 ${ust}</div>
+      <div style="font-size:12.5px;color:${twc};font-weight:700">🇹🇼 ${twt}</div>
       <button onclick="_dcaMark()" style="margin-left:auto;padding:6px 14px;font-size:13px;cursor:pointer;border-radius:6px;border:1px solid ${done?'#2ecc71':'var(--line)'};background:${done?'#2ecc7133':'var(--panel2)'};color:var(--txt)">${done?'✅ 本月定投已執行':'本月定投完成點我'}</button>
     </div>
-    <div style="display:flex;gap:12px;flex-wrap:wrap">${_cmdBlock('🇺🇸 美股', cs, 'us', '$')}${_cmdBlock('🇹🇼 台股', tw, 'tw', 'NT$')}</div>
+    <div style="display:flex;gap:12px;flex-wrap:wrap">${_cmdBlock('🇺🇸 美股', cs, 'us', '$', 'SMH')}${_cmdBlock('🇹🇼 台股', tw, 'tw', 'NT$', tw&&tw.anchor_a)}</div>
     ${aggOff?`<div style="font-size:12px;color:#ff9d5a;margin-top:8px">⚠️ 只影響槓桿玩家:TQQQ/SOXL(獨立二元哨,更嚴格)今日=空手。不玩槓桿ETF可無視,詳見下方收合面板。</div>`:''}
     <div style="font-size:11.5px;color:#64748b;margin-top:8px">依據分級:🥇<b>機制=回測背書</b>(輪動最強Sharpe1.37/OOS最差1.12 · 信用哨2022 -4.5% · RiskTarget · vol-timing 48格掃描 · 一次全投優於分批 · 載具>>買點:SMH定投7.9x vs SPY2.4x)｜🥈<b>校準</b>(標籤文字/R3小額=逐根審計)｜🥉<b>介面設計</b>(金額/股數換算的顯示方式)——2026-08-16已拿掉沒被單獨驗證、且跟「一次全投優於分批」矛盾的75%/40%分批線。收盤訊號→隔日限價,不追盤中。</div>
   </div>`;
@@ -1781,15 +1574,32 @@ async function loadAll(){
       getJSON('kbar_annotations.json').catch(()=>null),
     ]);
     // ★資料斷供防線:JSON 太舊(>36小時)就大字紅色警告,別依過期標籤下單
+    // ★2026-08-31修:原本只檢查 cs(核心指數/美股)一份。但 pages.yml 排程對每支腳本各自
+    //   continue-on-error(單支失敗不擋部署,沿用舊JSON)——如果只有其中一支(例如台股或
+    //   K棒)開始默默失敗、其他都正常,原本的檢查完全不會跳警告,那個面板會一直沿用舊資料到
+    //   沒人發現。改成5份承重JSON全部個別檢查,任一份過期或完全抓不到都列進警告。
     try{
-      const ts = cs && cs.last_updated ? new Date(cs.last_updated.replace(' ','T')) : null;
-      const ageH = ts ? (Date.now()-ts.getTime())/3.6e6 : 999;
+      const feeds = [
+        ['核心指數(美股)', cs, 'last_updated'],
+        ['台股', tw, 'last_updated'],
+        ['個股信號', sig, 'last_updated'],
+        ['進取模式', ag, 'last_updated'],
+        ['每日K棒', kb, 'generated'],
+      ];
+      const stale = feeds.map(([label, obj, key])=>{
+        const raw = obj ? obj[key] : null;
+        const ts = raw ? new Date(String(raw).replace(' ','T')) : null;
+        const ageH = (ts && !isNaN(ts.getTime())) ? (Date.now()-ts.getTime())/3.6e6 : Infinity;
+        return {label, raw, ageH};
+      }).filter(f => f.ageH > 36);
       let sb = document.getElementById('staleBanner');
-      if(ageH > 36){
+      if(stale.length){
         if(!sb){ sb=document.createElement('div'); sb.id='staleBanner';
-          sb.style.cssText='background:#5e1f1f;border:2px solid #ff5a5a;color:#ffb4b4;border-radius:10px;padding:12px 16px;margin:14px 0;font-size:15px;font-weight:700';
+          sb.style.cssText='background:#5e1f1f;border:2px solid #ff5a5a;color:#ffb4b4;border-radius:10px;padding:12px 16px;margin:14px 0;font-size:14px;font-weight:700';
           const w=document.querySelector('.wrap'); w.insertBefore(sb, w.firstChild.nextSibling); }
-        sb.textContent = `🔴 資料過期警告:核心訊號最後更新 ${cs.last_updated}(約 ${Math.round(ageH)} 小時前)。抓價可能斷供,以下標籤是舊的——別依此下單,先查 GitHub Actions 是否失敗。`;
+        sb.innerHTML = `🔴 資料過期警告:` + stale.map(f=>
+          `${f.label} ${f.raw?('最後更新 '+f.raw+'(約'+Math.round(f.ageH)+'小時前)'):'完全抓不到資料'}`).join('、') +
+          `。抓價可能斷供,對應面板的標籤是舊的——別依此下單,先查 GitHub Actions 是否失敗。`;
       } else if(sb){ sb.remove(); }
     }catch(e){}
     $('#updated').innerHTML =
@@ -1813,11 +1623,18 @@ async function loadAll(){
     renderSignals(sig);
     renderWatch(sig);
     renderEvidence(ev);
-    renderKbar(kb);
+    renderKbar(kb, cs, tw);
     $('#foot').textContent = `${sig.config.universe||''}　|　進場：${sig.config.entry}　|　出場：${sig.config.exit}`;
   }catch(e){
-    $('#regime').innerHTML = '<div class="lbl" style="color:var(--red)">⚠️ 資料載入失敗</div>'+
-      '<div class="act">請先執行：python generate_signals.py 與 python generate_evidence.py，再用 web_server.py 開啟。</div>';
+    // ★2026-08-31修:原本寫 $('#regime').innerHTML,但 #regime 這個容器在更早的頁面整併時已經
+    //   拿掉(併進 #commandCard),留著的話資料真的載入失敗時,這段錯誤處理本身會因為對 null
+    //   設 innerHTML 而再炸一次,使用者連「資料載入失敗」這行提示都看不到。改寫到一定存在的
+    //   #commandCard(strategy_signals.json/backtest_evidence.json 是唯二沒包 .catch(()=>null)
+    //   的必要抓取,失敗最常見就是這兩支腳本沒跑過)。
+    const host = $('#commandCard');
+    if(host) host.innerHTML = '<div style="color:var(--red);font-weight:700;padding:14px 16px">⚠️ 資料載入失敗</div>'+
+      '<div style="color:var(--muted);padding:0 16px 14px">請先執行：python generate_signals.py 與 python generate_evidence.py，再用 web_server.py 開啟；或查看瀏覽器 console 詳細錯誤。</div>';
+    console.error('loadAll failed:', e);
   }
 }
 loadAll();

@@ -28,6 +28,7 @@ import numpy as np
 import pandas as pd
 import yfinance as yf
 from scanner_base import DASHBOARD_DIR
+import core_status as C   # ★2026-08-31:借 combine() 產生台股版 combined 判斷,見下方 ANCHOR_A/main()
 
 # 可回測核心(趨勢載具) + per-index 參數(research_taiwan_core.py + research_taiwan_optimize.py 校準)
 #   per-ticker thr/buf:00757(美科技,波動大)放寬1.12/1.00、0050貼1.06/0.98(grid實益最大),其餘統一1.08/0.99。
@@ -69,6 +70,7 @@ RISK_MULT = 1.0
 RISK_MULT = min(RISK_MULT, 1.5)
 STOP_DIST_FLOOR = 0.02
 MIN_HOLD_DAYS = 30          # 路線B最低持有(≈21交易日,同美股 research_rotation_manual.py)
+ANCHOR_A = '0052.TW'        # Route A 建議主力(回測Sharpe最高);也當 combine() 的「核心」輸入(見main())
 DEFAULT_PARAM = {'name': '?', 'entry_thr': 1.08, 'exit_buf': 0.99, 'budget': 0.09, 'cap': 1.5}
 
 
@@ -322,13 +324,22 @@ def main():
     if rotation_hold.get('ticker') in out:
         out[rotation_hold['ticker']]['is_held'] = True
 
+    # ★2026-08-31補:core_status.py(美股)有 combine()產生的『核心+信用合併判斷』(combined欄位),
+    #   台股原本沒有對應欄位——前端「今日唯一指令」卡頂部狀態橫幅因此只能用美股的 combined 當
+    #   全站標題,兩市場信用哨組成不同(美股HYG+LQD、台股多算SOXX)時會誤導台股使用者。
+    #   直接重用 core_status.combine()(純函式,只吃 primary['state'] + canary),不重新刻一份
+    #   邏輯,避免美股/台股兩份獨立實作又日後長出新的漂移。ANCHOR_A(0052.TW)當台股的「核心」輸入,
+    #   跟美股用 SMH 當 primary 對稱。
+    combined = C.combine(out[ANCHOR_A], canary) if (ANCHOR_A in out and canary) else None
+
     data = {
         'market': 'TW', 'currency': 'TWD',
         'last_updated': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
         'daily_verdict': daily_verdict(out, rotation_hold, canary),
         'ma_window': MA, 'panic_vix': PANIC_VIX, 'vix': round(vix_last, 2) if vix_last is not None else None,
         'risk_mult': RISK_MULT, 'strongest': strongest, 'rotation_hold': rotation_hold,
-        'anchor_a': '0052.TW',   # Route A 建議主力(回測Sharpe最高)
+        'primary': ANCHOR_A, 'combined': combined,
+        'anchor_a': ANCHOR_A,   # Route A 建議主力(回測Sharpe最高)
         'route_note': ('台股實證(research_taiwan_core/optimize.py):趨勢ETF擇時加分、高股息(0056)擇時傷已排除。'
                        '★台股無資本利得稅(僅證交稅0.1%)→Route B輪動淨報酬反勝A(+35.1 vs +32.1%),'
                        '不像美股偏A!建議台股偏 B(月輪動)或 A+B各半。Route A抱0052富邦科技為保守主力。'
