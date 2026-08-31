@@ -286,20 +286,24 @@
     </div>
   </details>
 
-  <!-- 個股衛星系統(獨立規則:ATR停損/騎均線/分批) — 與指數策略不同,別混用 -->
+  <!-- 個股衛星系統(獨立規則:ATR/均線出場) — 與指數策略不同,別混用 -->
+  <!-- ★2026-08-31修:原本這裡的badge/警示框寫死「分批落袋/40天上限/四個條件」,是backtest_evidence.json
+       時代(2026-06-12前)的舊規則描述,跟下方entryRules/exitRules(已改讀即時sig.config)已經對不上——
+       同一個收合區塊「標題說分批,內容說不分批」,矛盾比只看單一函式更明顯。改成不寫死條件數/出場
+       細節,一律「見下方即時卡片」,避免規則再變一次又要記得回來改這幾處。 -->
   <details class="grp">
-    <summary>📊 個股衛星系統 — 紀律/回測/選單 <span style="color:#e0b46a;font-weight:400;font-size:11px">（獨立系統·ATR停損·騎均線·分批,≠指數策略的200MA邏輯）</span><span class="ar">▸</span></summary>
+    <summary>📊 個股衛星系統 — 紀律/回測/選單 <span style="color:#e0b46a;font-weight:400;font-size:11px">（獨立系統·ATR/均線出場,≠指數策略的200MA邏輯,細節見下方即時卡片）</span><span class="ar">▸</span></summary>
     <div class="gbody">
       <div style="background:#2a2510;border:1px solid var(--yellow-d);border-radius:8px;padding:9px 12px;font-size:11.5px;color:#ffe39a;margin-bottom:14px">
-        ⚠️ 此區為「個股衛星」獨立系統，用 <b>ATR停損 / 騎50MA / 分批落袋 / 40天上限</b>——因為個股≠指數ETF，規則本來就不同。
-        <b>它不適用於你的指數/TQQQ策略</b>（那套只有200MA+信用哨進出、RiskTarget隨位階連續調整曝險(taper,非全押/全出二選一)、不停利)。看個股訊號才進這區，別把這裡的「分批」套到指數上。
+        ⚠️ 此區為「個股衛星」獨立系統(進出場細節見下方「📜個股衛星紀律」即時卡片)——因為個股≠指數ETF，規則本來就不同。
+        <b>它不適用於你的指數/TQQQ策略</b>（那套只有200MA+信用哨進出、RiskTarget隨位階連續調整曝險(taper,非全押/全出二選一)、不停利)。看個股訊號才進這區，別把這裡的規則套到指數上。
       </div>
       <div id="menuPanel"></div>
       <section>
-        <div class="stitle"><h2>📜 個股衛星紀律（非指數策略）</h2><span class="tag">個股專用規則</span><div class="line"></div></div>
+        <div class="stitle"><h2>📜 個股衛星紀律（非指數策略）</h2><span class="tag">個股專用規則·即時</span><div class="line"></div></div>
         <div class="play">
-          <div class="card"><h3><span class="pill in">進場</span> 四個條件全中才進(個股)</h3><div id="entryRules"></div></div>
-          <div class="card"><h3><span class="pill out">出場</span> ATR分批落袋 + 騎均線(個股)</h3><div id="exitRules"></div></div>
+          <div class="card"><h3><span class="pill in">進場</span> 全中才進(個股)</h3><div id="entryRules"></div></div>
+          <div class="card"><h3><span class="pill out">出場</span> 出場規則(個股)</h3><div id="exitRules"></div></div>
         </div>
         <div class="expect" id="expect"></div>
         <div class="note" id="expectNote"></div>
@@ -635,6 +639,12 @@ function renderMenu(mn){
     </section>`;
 }
 
+// ★2026-08-31補:這裡的 portfolio_heat 完全來自 positions.json——但這個檔案不存在於 repo、
+//   也不在 pages.yml 排程內(唯一寫入路徑是本機 web_server.py 的 /api/positions,deploy 到
+//   GitHub Pages 的 strategy_dashboard.html 從不呼叫它)。結果是 GitHub Actions 每次重算都讀到
+//   空持倉清單,這兩條進度條在 live 網站上永遠是「0% / 無持倉」,不管你手上實際有幾檔個股——
+//   看起來像即時風控,實際上從沒真的算進你的持倉。加一行明講,別讓人誤以為這裡有在防你的
+//   個股集中度風險。
 function renderHeatBanner(d){
   const el = $('#heatBanner');
   const h = d.portfolio_heat; const max = (d.config.max_portfolio_heat_pct)||3;
@@ -646,8 +656,8 @@ function renderHeatBanner(d){
   const gw = Math.min(gpct/gmax*100, 100);
   const col = pct >= max ? 'var(--red)' : (pct >= max*0.67 ? 'var(--yellow)' : 'var(--green)');
   const gcol = gpct >= gmax ? 'var(--red)' : (gpct >= gmax*0.67 ? 'var(--yellow)' : 'var(--green)');
-  const held = (h.held_tickers&&h.held_tickers.length)
-    ? h.held_tickers.join(', ') : '無持倉';
+  const noTrack = !(h.held_tickers && h.held_tickers.length);
+  const held = noTrack ? '無持倉' : h.held_tickers.join(', ');
   const secs = h.sector_counts ? Object.entries(h.sector_counts)
     .map(([s,n])=>`${s}×${n}`).join(' · ') : '';
   el.innerHTML = `
@@ -655,7 +665,8 @@ function renderHeatBanner(d){
     <div class="bar"><i style="width:${w}%;background:${col}"></i></div>
     <div style="margin-top:6px">📦 gross 名目曝險 <b>${gpct.toFixed(1)}%</b> / 上限 ${gmax}%　（群聚跳空左尾）</div>
     <div class="bar"><i style="width:${gw}%;background:${gcol}"></i></div>
-    <div style="color:var(--muted);font-size:12px">持倉：${held}${secs?'　|　'+secs:''}</div>`;
+    <div style="color:var(--muted);font-size:12px">持倉：${held}${secs?'　|　'+secs:''}</div>
+    ${noTrack ? `<div style="color:#e0b46a;font-size:11px;margin-top:5px">⚠️ 這裡的持倉清單這台伺服器沒有在追蹤(positions.json 沒接進自動排程)——上面兩條進度條只算「今天新訊號彼此之間」的熱度,<b>不包含你實際手上的個股</b>,別當成真實總曝險的風控依據。</div>` : ''}`;
 }
 
 function pqColor(q){ return q>=60?'var(--green)':(q>=40?'var(--yellow)':'var(--red)'); }
