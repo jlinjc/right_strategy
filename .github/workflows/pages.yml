@@ -61,6 +61,24 @@ jobs:
         continue-on-error: true
         run: python generate_signals.py || echo "generate_signals skipped"
 
+      # push 部署不重掃個股信號 → 原本會直接部署 repo 裡 commit 的舊 strategy_signals.json,
+      # 把線上排程剛算好的新資料「倒退」回舊版。改成:push 時先抓線上現有版本,比較新就沿用。
+      - name: Keep live stock signals on push (best-effort)
+        if: github.event_name == 'push'
+        continue-on-error: true
+        run: |
+          curl -sf "https://jlinjc.github.io/right_strategy/strategy_signals.json?nc=$(date +%s)" -o /tmp/live_sig.json && python - <<'PY'
+          import json, shutil
+          p = 'Web_Dashboard/strategy_signals.json'
+          live = json.load(open('/tmp/live_sig.json', encoding='utf-8'))
+          repo = json.load(open(p, encoding='utf-8'))
+          if str(live.get('last_updated', '')) > str(repo.get('last_updated', '')):
+              shutil.copy('/tmp/live_sig.json', p)
+              print('use live signals', live.get('last_updated'), 'over repo', repo.get('last_updated'))
+          else:
+              print('keep repo signals', repo.get('last_updated'))
+          PY
+
       # 讓網站根網址直接導到策略儀表板
       - name: Root redirect -> strategy_dashboard.html
         run: |
