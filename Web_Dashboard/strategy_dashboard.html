@@ -19,8 +19,9 @@
   .wrap{max-width:1180px;margin:0 auto;padding:0 18px}
 
   /* Header */
+  /* header 不黏頂(只讓頁籤列黏頂):原本 sticky header 在手機折成一大塊,擋掉大半畫面 */
   header{background:linear-gradient(180deg,#0e1422,#0a0e17);border-bottom:1px solid var(--line);
-    padding:18px 0;position:sticky;top:0;z-index:20;backdrop-filter:blur(6px)}
+    padding:18px 0;position:relative}
   .hrow{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
   .brand{display:flex;align-items:center;gap:12px}
   .orb{width:34px;height:34px;border-radius:50%;background:radial-gradient(circle at 30% 30%,#7fd0ff,#1a6fff 60%,#0a2a66);
@@ -166,6 +167,29 @@
     background:var(--panel);color:var(--muted);border-radius:10px;transition:.15s}
   .tabbtn:hover{color:var(--txt);border-color:var(--mid)}
   .tabbtn.active{color:var(--txt);background:var(--panel2);border-color:var(--accent)}
+  .updated details summary{cursor:pointer;list-style:none}
+  .updated details summary::-webkit-details-marker{display:none}
+  .updated details[open] .updmore{margin-top:4px}
+  .updmore{font-size:11px;line-height:1.6}
+  /* 手機:header 精簡成一行、頁籤列單行橫向滑動 */
+  @media(max-width:720px){
+    .wrap{padding:0 12px}
+    header{padding:10px 0}
+    .hrow{gap:8px;flex-wrap:nowrap}
+    .brand{gap:8px;min-width:0}
+    .orb{width:24px;height:24px}
+    .brand h1{font-size:16px;white-space:nowrap}
+    .brand .sub{display:none}
+    .hctl{gap:8px!important;flex:none}
+    .updated{font-size:11px}
+    .btn{padding:5px 9px;font-size:12px}
+    .btn .btxt{display:none}
+    .updated details[open]{position:absolute;right:12px;left:12px;z-index:40;background:var(--panel);
+      border:1px solid var(--line);border-radius:10px;padding:10px 12px;text-align:left;margin-top:-2px}
+    .tabbar{flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;margin:8px 0 4px;padding:6px 0}
+    .tabbar::-webkit-scrollbar{display:none}
+    .tabbtn{flex:none;padding:7px 11px;font-size:13px;white-space:nowrap}
+  }
   .tabpane{display:none}
   .tabpane.active{display:block;animation:fadein .2s ease}
   @keyframes fadein{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
@@ -181,9 +205,9 @@
         <div class="sub">站上200MA + 信用哨健康 → 按位階連續加減碼(RiskTarget,貼近均線多押/遠離自動taper) · 任一破 → 全現金 — 一套用數據定案的紀律系統</div>
       </div>
     </div>
-    <div style="display:flex;align-items:center;gap:14px">
+    <div class="hctl" style="display:flex;align-items:center;gap:14px">
       <div class="updated" id="updated">載入中…</div>
-      <button class="btn" onclick="loadAll()">↻ 重新整理</button>
+      <button class="btn" onclick="loadAll()" title="重新整理">↻<span class="btxt"> 重新整理</span></button>
     </div>
   </div>
 </header>
@@ -515,7 +539,7 @@ function renderCore(cs, sig){
     <div style="background:linear-gradient(90deg,#0e1b2e,#10243d);border:1px solid #1d3a5e;border-radius:12px;padding:14px 16px;margin:10px 0">
       <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
         <div style="font-weight:800;font-size:15px">👑 核心-衛星配置</div>
-        <div style="color:var(--muted);font-size:12px">建議 核心70% / 衛星20% / VRP10%(見下方資產配置面板 · 月再平衡) · 核心更新 ${cs.last_updated||''}</div>
+        <div style="color:var(--muted);font-size:12px">建議 核心70% / 衛星20% / VRP10%(見下方資產配置面板 · 月再平衡) ${updLag(cs.last_updated)}</div>
       </div>
       <div style="margin-top:10px;display:flex;gap:18px;flex-wrap:wrap">
         <div style="flex:1;min-width:260px">
@@ -845,7 +869,7 @@ function renderTaiwan(tw){
   el.innerHTML = `
   <div style="background:#0e1b2e;border:1px solid #2a4a72;border-radius:12px;padding:14px 16px;margin:10px 0">
     <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
-      <div style="font-weight:800;font-size:15px">🇹🇼 台股版今日操作 <span style="color:var(--muted);font-weight:400;font-size:11px">(同一套引擎·收盤訊號·更新 ${tw.last_updated||''})</span></div>
+      <div style="font-weight:800;font-size:15px">🇹🇼 台股版今日操作 <span style="color:var(--muted);font-weight:400;font-size:11px">(同一套引擎·收盤訊號)</span>${updLag(tw.last_updated)}</div>
       <div style="font-size:12px;color:${can.health>=1?'#7ee0a0':(can.health>0?'#e0b46a':'#e06a6a')}">${cE} 信用+費半哨 ${can.n_healthy}/${can.n_total} → 曝險×${Math.round((can.health??1)*100)}%</div>
     </div>
     <div style="color:var(--muted);font-size:11px;margin-top:3px">${cStr}</div>
@@ -986,7 +1010,7 @@ function renderLeaders(ld){
   if(!ld || !ld.leaders){ el.innerHTML=''; return; }
   el.innerHTML = `
   <div style="background:#0e1b2e;border:1px solid #2a4a72;border-radius:12px;padding:14px 16px;margin:10px 0">
-    <div style="font-weight:800;font-size:15px">🏆 台美股產業龍頭個股 <span style="color:var(--muted);font-weight:400;font-size:11px">(衛星·同趨勢引擎·依產業分組·更新 ${ld.last_updated||''})</span></div>
+    <div style="font-weight:800;font-size:15px">🏆 台美股產業龍頭個股 <span style="color:var(--muted);font-weight:400;font-size:11px">(衛星·同趨勢引擎·依產業分組)</span>${updLag(ld.last_updated)}</div>
     <div style="color:var(--muted);font-size:11px;margin:3px 0 8px">🟢可進=站上200MA沒追高 · 🟡別追=超門檻等拉回 · 🔴避=跌破200MA。每檔標 距200MA% 與掛單價(滑鼠移上看停損/RS)。</div>
     <div style="display:flex;gap:18px;flex-wrap:wrap">
       ${leaderCol('🇺🇸','美股龍頭', ld.leaders.US, false)}
@@ -1029,7 +1053,7 @@ function renderAggressive(ag){
   return el.innerHTML = `
   <div style="background:#0e1b2e;border:1px solid #3a5a82;border-radius:14px;padding:15px 17px;margin:14px 0">
     <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
-      <div style="font-weight:800;font-size:16px">🚀 進取模式 <span style="color:var(--muted);font-weight:400;font-size:11px">(TQQQ/SOXL 槓桿 · $30k以下成長階段 · 更新 ${ag.last_updated||''})</span></div>
+      <div style="font-weight:800;font-size:16px">🚀 進取模式 <span style="color:var(--muted);font-weight:400;font-size:11px">(TQQQ/SOXL 槓桿 · $30k以下成長階段)</span>${updLag(ag.last_updated)}</div>
       <div style="font-size:12px;color:var(--muted)">本金 $<input type="number" value="${cap}" oninput="setAggCap(this.value)" style="${inS}"> · <b style="color:${c.ok?'#7ee0a0':'#ff8a8a'}">${cChip}</b> · VIX ${ag.vix??'—'}</div>
     </div>
     <div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:12px;align-items:stretch">
@@ -1570,6 +1594,17 @@ function renderAdherence(cs, tw){
   </div>`;
 }
 
+let _DATA_TIME = null;
+function _ts(raw){ if(!raw) return null; const d=new Date(String(raw).replace(' ','T')); return isNaN(d.getTime())?null:d; }
+function _fmtT(d){ const p=n=>String(n).padStart(2,'0'); return d?`${p(d.getMonth()+1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`:'—'; }
+// 面板時間只在落後全站統一時間 >2 小時時才顯示(紅字),否則回傳空字串
+function updLag(raw){
+  const d=_ts(raw);
+  if(!_DATA_TIME) return '';
+  if(!d) return ' <span style="color:var(--red);font-size:11px;font-weight:700">⚠️抓不到更新時間</span>';
+  return (_DATA_TIME-d > 2*3.6e6) ? ` <span style="color:var(--red);font-size:11px;font-weight:700">⚠️資料停在 ${_fmtT(d)}</span>` : '';
+}
+
 async function loadAll(){
   try{
     const [sig, ev, rb, cs, mn, tw, ld, ag, al, kb] = await Promise.all([
@@ -1607,18 +1642,30 @@ async function loadAll(){
       if(stale.length){
         if(!sb){ sb=document.createElement('div'); sb.id='staleBanner';
           sb.style.cssText='background:#5e1f1f;border:2px solid #ff5a5a;color:#ffb4b4;border-radius:10px;padding:12px 16px;margin:14px 0;font-size:14px;font-weight:700';
-          const w=document.querySelector('.wrap'); w.insertBefore(sb, w.firstChild.nextSibling); }
+          const w=document.querySelector('body > .wrap'); w.insertBefore(sb, w.firstChild); }
         sb.innerHTML = `🔴 資料過期警告:` + stale.map(f=>
           `${f.label} ${f.raw?('最後更新 '+f.raw+'(約'+Math.round(f.ageH)+'小時前)'):'完全抓不到資料'}`).join('、') +
           `。抓價可能斷供,對應面板的標籤是舊的——別依此下單,先查 GitHub Actions 是否失敗。`;
       } else if(sb){ sb.remove(); }
     }catch(e){}
+    // ★統一更新時間:同一班排程產出的各份JSON只差幾十秒,全站只顯示一個「資料更新」時間
+    //   (取各份中最新的那班)。個別面板只有落後這班超過2小時才另外標紅,平常不重複顯示。
+    const times = [cs&&cs.last_updated, tw&&tw.last_updated, ld&&ld.last_updated, sig&&sig.last_updated,
+                   ag&&ag.last_updated, kb&&kb.generated].map(_ts).filter(Boolean);
+    _DATA_TIME = times.length ? new Date(Math.max(...times)) : null;
+    const lagging = [['核心指數',cs&&cs.last_updated],['台股',tw&&tw.last_updated],['龍頭',ld&&ld.last_updated],
+                     ['個股信號',sig&&sig.last_updated],['進取模式',ag&&ag.last_updated],['K棒',kb&&kb.generated]]
+      .filter(([,r])=>updLag(r));
+    const dot = document.getElementById('staleBanner') ? '🔴' : (lagging.length ? '🟡' : '🟢');
     $('#updated').innerHTML =
-      `🟢 指數即時資料 <b>${cs?cs.last_updated:'—'}</b>(台北時間·每天 09:00/21:00/22:30 自動)<br>`+
-      `🟢 個股信號 <b>${sig.last_updated}</b>(台北時間·每天 09:00/21:00/22:30 自動;22:30為美股盤中暫定,決策看隔天早上收盤班)<br>`+
-      `<span style="color:var(--muted)">🔒 配置/回測實證(靜態·本機 push 才更新)</span><br>`+
-      `<span style="color:var(--muted);font-size:11px">↻ 本次載入 ${new Date().toLocaleTimeString('zh-TW')}`+
-      `(按↻只是重抓伺服器現有資料,不會重跑行情;資料時間由伺服器每天 09:00/21:00/22:30 自動更新)</span>`;
+      `<details><summary>${dot} 資料更新 <b>${_DATA_TIME?_fmtT(_DATA_TIME):'—'}</b> ▾</summary>`+
+      `<div class="updmore">`+
+      (lagging.length?`<span style="color:var(--yellow)">落後本班:${lagging.map(([l,r])=>l+' '+_fmtT(_ts(r))).join('、')}</span><br>`:'')+
+      `美股收盤資料日 ${sig.data_date||'—'}(台北時間)<br>`+
+      `伺服器每天排程 09:00 / 21:00 / 22:30(GitHub 常延遲1-4小時)<br>`+
+      `22:30 班為美股盤中暫定值,決策看隔天早上收盤班<br>`+
+      `<span style="color:var(--muted)">配置/回測實證為靜態,本機 push 才更新 · 本次載入 ${new Date().toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit'})}</span>`+
+      `</div></details>`;
     renderCommandCard(cs, tw, ag);
     renderAdherence(cs, tw);
     renderLab(cs, tw);
