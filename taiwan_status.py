@@ -37,11 +37,15 @@ import core_status as C   # ★2026-08-31:借 combine() 產生台股版 combined
 #   9檔(00733/00762/00895/00935/00913/00921/00891/00892/00981A)保留在下方TW_WATCH,
 #   不是刪除——backtest本身仍支持它們(portfolio層級Sharpe/CAGR/2022都測出正面結果),
 #   只是尚未經過真正熊市考驗+用的是未個別校準的預設參數,先觀察不進live輪動。
+# ★2026-09-23「別追高」門檻統一改 +12%(research_q2b/q2c_*.py,台股5檔到場測試,與美股分開):
+#   舊門檻 +6~8%:在台股「等拉回」平均反而少賺 0.7~1.8%(台股趨勢段常一路走不回頭)。
+#   +12%:等待較好 71%、平均 +1.08%,前半(<2018)4年中3年、後半 6/6 年皆成立,5檔全正;+10% 不成立。
+#   ⚠️前半段樣本小(n=55),強度=中等。exit_buf/budget 未動。
 TW_PARAMS = {
-    '0050.TW':   {'name': '元大台灣50',  'entry_thr': 1.06, 'exit_buf': 0.98, 'budget': 0.0863, 'cap': 1.5, 'resist_warn': 0.005},
-    '0052.TW':   {'name': '富邦科技',    'entry_thr': 1.08, 'exit_buf': 0.99, 'budget': 0.0936, 'cap': 1.5},
-    '006208.TW': {'name': '富邦台50',    'entry_thr': 1.08, 'exit_buf': 0.99, 'budget': 0.0807, 'cap': 1.5, 'resist_warn': 0.005},
-    '0051.TW':   {'name': '元大中型100', 'entry_thr': 1.08, 'exit_buf': 0.99, 'budget': 0.0787, 'cap': 1.5},
+    '0050.TW':   {'name': '元大台灣50',  'entry_thr': 1.12, 'exit_buf': 0.98, 'budget': 0.0863, 'cap': 1.5, 'resist_warn': 0.005},
+    '0052.TW':   {'name': '富邦科技',    'entry_thr': 1.12, 'exit_buf': 0.99, 'budget': 0.0936, 'cap': 1.5},
+    '006208.TW': {'name': '富邦台50',    'entry_thr': 1.12, 'exit_buf': 0.99, 'budget': 0.0807, 'cap': 1.5, 'resist_warn': 0.005},
+    '0051.TW':   {'name': '元大中型100', 'entry_thr': 1.12, 'exit_buf': 0.99, 'budget': 0.0787, 'cap': 1.5},
     '00757.TW':  {'name': '統一FANG+',   'entry_thr': 1.12, 'exit_buf': 1.00, 'budget': 0.1276, 'cap': 1.5},
 }
 # live-only 候選(歷史不足,有≥200日資料才顯示、且標註不可回測)
@@ -69,9 +73,10 @@ PANIC_VIX, PANIC_DELAY = 30.0, 3
 RISK_MULT = 1.0
 RISK_MULT = min(RISK_MULT, 1.5)
 STOP_DIST_FLOOR = 0.02
+TW_FIXED_EXPO = 1.0         # 台股在場時固定曝險(見 core_signal 註解)
 MIN_HOLD_DAYS = 30          # 路線B最低持有(≈21交易日,同美股 research_rotation_manual.py)
 ANCHOR_A = '0052.TW'        # Route A 建議主力(回測Sharpe最高);也當 combine() 的「核心」輸入(見main())
-DEFAULT_PARAM = {'name': '?', 'entry_thr': 1.08, 'exit_buf': 0.99, 'budget': 0.09, 'cap': 1.5}
+DEFAULT_PARAM = {'name': '?', 'entry_thr': 1.12, 'exit_buf': 0.99, 'budget': 0.09, 'cap': 1.5}
 
 
 def clean(s: pd.Series) -> pd.Series:
@@ -121,12 +126,14 @@ def core_signal(close: pd.Series, vix_last, ticker: str, name: str) -> dict:
         vol126 = float(close.pct_change().iloc[-126:].std() * (252 ** 0.5))
         rs_score = round(r126 / vol126, 3) if vol126 > 0 else None
 
-    stop_dist_frac = max(stop_risk / 100.0, STOP_DIST_FLOOR)
-    expo_raw = round(min(budget / stop_dist_frac, cap), 2)
+    # ★2026-09-23 台股倉位改「固定1倍」(research_q3b_sizing_split.py):RiskTarget(貼近200MA押多、
+    #   遠離自動縮)在台股全期 5/5 檔、2018後 5/5 檔 Sharpe 都輸固定1倍,CAGR 少 2~5%/年,回撤沒有更小
+    #   (台股趨勢段長,「遠離就縮」系統性砍掉主升段)。budget 保留只給信用示警期間的距離門檻用。
+    expo_raw = TW_FIXED_EXPO
 
     if last >= ma:
         state = 'risk_on'
-        hold_action = f'續抱;建議曝險 {expo_raw*100:.0f}%(RiskTarget,不停利騎到跌破線)'
+        hold_action = f'續抱;建議曝險 {expo_raw*100:.0f}%(台股固定1倍,不停利騎到跌破線)'
         suggested_expo = expo_raw
     elif last < exit_price:
         if panic and days_below < PANIC_DELAY:
@@ -147,12 +154,10 @@ def core_signal(close: pd.Series, vix_last, ticker: str, name: str) -> dict:
     elif last >= entry_cap:
         entry_state = 'extended'
         entry_action = f'追高,等拉回到 NT${entry_cap:.2f} 以下(距50MA +{dist50:.0f}% > 門檻 +{(thr-1)*100:.0f}%)'
-    elif expo_raw < 0.5:
-        # ★D3(generate_kbar_annotations.py:273,20年資料驗證,美股/台股同一套):曝險<50%=停損太遠,
-        #   新倉位負期望;價格未追高但停損已太遠,空手別新進,已持有者續抱。與core_status.py同步。
-        entry_state = 'expensive'
-        entry_action = (f'空手別新進(停損距 -{stop_risk:.0f}%已太遠,曝險僅{expo_raw*100:.0f}%'
-                        f'<50%門檻,20年資料此格新倉位負期望);已持有者續抱,等回到曝險≥50%再進場')
+    # ★2026-09-23 移除原始版「曝險<50%=空手別新進」(台股=離停損 ≥16~19%):
+    #   research_q2d_incremental.py:台股未追高、離停損 12~18% 時「等待」平均少賺 3~4%、勝率<40%
+    #   =被反證;≥25% 雖轉正但僅 359 天樣本,不足以立規則 → 台股不設原始距離門檻。
+    #   (信用部分示警期間的版本有數據支撐,保留在 main() 的信用段)
     else:
         entry_state = 'can_enter'
         extra = '；VIX高=恐慌綠燈,果斷進' if panic else ''
@@ -303,13 +308,16 @@ def main():
             else:
                 d['hold_action'] += f'  🟠部分示警→減碼半倉(仍可買·量×{ch:.0%})'
                 d['action'] = d['hold_action']
-                # ★D3補檢查(2026-08-16,同步core_status.py):信用打折後若曝險掉到50%以下,
-                #   entry_state 要跟著重新檢查,否則會出現「綠燈但曝險<50%」的矛盾。
-                new_expo = d.get('suggested_expo')
-                if d.get('entry_state') == 'can_enter' and new_expo is not None and new_expo < 0.5:
+                # ★信用部分示警期間的「空手先別進」(research_q2e_credit_yellow.py,用 live 三合哨驗證):
+                #   條件=打折後曝險<50% ⟺ 離停損 > budget×健康度÷0.5。台股此時等拉近再買:
+                #   平均 +0.63%、勝64%、14年中11年較好,前半 6/6、後半 5/8 年皆成立 → 保留。
+                lim = d['budget'] * ch / 0.5 * 100      # 驗證時的條件(離停損 > budget×健康度÷0.5),與倉位算法脫鉤
+                if d.get('entry_state') == 'can_enter' and d['stop_risk_pct'] > lim:
                     d['entry_state'] = 'expensive'
-                    d['entry_action'] = (f'空手別新進(信用部分示警打折後,曝險僅{new_expo*100:.0f}%'
-                                         f'<50%門檻,20年資料此格新倉位負期望);已持有者續抱不受影響')
+                    d['entry_action'] = (f'空手先別進(信用部分示警期間,離停損線 {d["stop_risk_pct"]:.1f}% > '
+                                         f'{lim:.1f}% 門檻;台股歷史此時等拉近再買 14年中11年較好);已持有者續抱')
+                elif d.get('entry_state') == 'can_enter':
+                    d['entry_action'] += f'(信用部分示警,曝險×{ch:.0%})'
 
     # 路線B 最低持有30日鎖(讀上次json)
     path = os.path.join(DASHBOARD_DIR, 'taiwan_status.json')

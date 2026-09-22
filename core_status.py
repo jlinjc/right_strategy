@@ -96,6 +96,14 @@ DEFAULT_PARAM = {'entry_thr': 1.08, 'exit_buf': 0.98, 'budget': 0.20, 'cap': 1.5
 #   紀律上限=1.5(往上=賭牛市續命,真熊市重傷)。建議:保守0.67(MDD-18%)/標準1.0(-26%)/積極1.25(-32%)。
 RISK_MULT = 1.0
 RISK_MULT = min(RISK_MULT, 1.5)   # 硬上限:防止誤設成 Kelly 級槓桿
+
+# ★「空手先別進」= 離停損線太遠(2026-09-23 改版,research_q2b/q2d_*.py,美股5檔 1993-2026 到場測試):
+#   舊版用「RiskTarget 曝險<50%」(=離停損 ≥38~43%),美股25年一天都沒觸發過,等於沒有這條。
+#   新版直接看離停損線距離:沒追高 且 離停損 ≥20% → 等拉近再買。
+#   證據(只看未被「別追高」擋下的日子):等待比立即買平均 +0.66%、勝61%、14年中12年較好;
+#   18%/20% 相鄰門檻同向。⚠️強度=中等(前半段 −0.13%、後半 +1.12%),大部分威力來自與別追高重疊。
+#   舊版的「信用打折後曝險<50% 再檢查」:美股純信用造成的黃燈樣本僅 88 天/2 年,無法驗證 → 移除。
+STOP_TOO_FAR_PCT = 20.0
 STOP_DIST_FLOOR = 0.02   # 停損距下限(剛站上MA200時防爆槓桿,對應回測 clip(lower=0.02))
 
 # ★ vol-timing 下注縮放(research_voltiming_robust.py / research_sizing_deepen.py):
@@ -319,13 +327,10 @@ def core_signal(close: pd.Series, vix_last: float | None, ticker: str,
         else:
             entry_action = (f'追高,等拉回到 ${entry_cap:.2f} 以下'
                             f'(距50MA +{dist50:.0f}% > 門檻 +{(thr-1)*100:.0f}%)')
-    elif expo_raw < 0.5:
-        # ★D3(generate_kbar_annotations.py:273,20年資料驗證):曝險<50%=停損太遠,新倉位負期望;
-        #   價格雖未追高(未過50MA門檻),但停損已經拉太遠,空手別新進,只有已持有者續抱。
-        #   之前這條只存在K棒稽核頁,live entry_action沒接上,是漏掉的一塊,不是新規則。
+    elif stop_risk >= STOP_TOO_FAR_PCT:
         entry_state = 'expensive'
-        entry_action = (f'空手別新進(停損距 -{stop_risk:.0f}%已太遠,曝險僅{expo_raw*100:.0f}%'
-                        f'<50%門檻,20年資料此格新倉位負期望);已持有者續抱,等回到曝險≥50%再進場')
+        entry_action = (f'空手先別進(離停損線 {stop_risk:.1f}% ≥ {STOP_TOO_FAR_PCT:.0f}% 門檻;'
+                        f'美股歷史此時等拉近再買,14年中12年較好);已持有者續抱')
     else:
         entry_state = 'can_enter'
         extra = '；VIX高=恐慌綠燈,果斷進' if panic else ''
@@ -581,16 +586,9 @@ def main():
             else:
                 d['hold_action'] = d['hold_action'] + f'  ⚠️信用部分示警→曝險×{ch:.0%}'
                 d['action'] = d['hold_action']
-                # ★D3補檢查(2026-08-16):entry_state 是用信用減碼前的 expo_raw 判斷的,
-                #   但這裡才套用信用乘數——如果打完折後 suggested_expo 掉到50%以下,
-                #   entry_state 沒有跟著重新檢查,會出現「綠燈但曝險<50%」這種矛盾
-                #   (SOXX 2026-08-16 實例:expo_raw≈80%可進場,信用×50%後剩40%卻還顯示綠燈)。
-                new_expo = d.get('suggested_expo')
-                if d.get('entry_state') == 'can_enter' and new_expo is not None and new_expo < 0.5:
-                    d['entry_state'] = 'expensive'
-                    d['entry_action'] = (f'空手別新進(信用部分示警打折後,曝險僅{new_expo*100:.0f}%'
-                                         f'<50%門檻,20年資料此格新倉位負期望);已持有者續抱不受影響')
-                elif d.get('entry_state') == 'can_enter':
+                # 2026-09-23:移除「信用打折後曝險<50%→改黃燈」的再檢查(美股樣本僅88天/2年,
+                #   research_q2e_credit_yellow.py 無法驗證);信用部分示警只縮量,不改燈號。
+                if d.get('entry_state') == 'can_enter':
                     d['entry_action'] = d['entry_action'] + f'(信用部分示警,曝險×{ch:.0%})'
 
     # ★ 路線B 最低持有期(最低21交易日≈30日):讀上次 json 的換倉日,鎖滿才准換。

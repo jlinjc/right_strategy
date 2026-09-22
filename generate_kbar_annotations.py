@@ -96,7 +96,7 @@ def _kcat(label: str) -> str:
     if '頭上壓力' in label: return 'resistance'
     if '鋸齒' in label:     return 'chop'
     if '追高' in label:     return 'chase'
-    if '偏貴' in label:     return 'expensive'
+    if '偏貴' in label or '空手先別進' in label: return 'expensive'
     if '可小買' in label:   return 'buy_small'
     if '可買' in label:     return 'buy_full'
     return 'other'
@@ -165,8 +165,10 @@ def annotate(ohlc: pd.DataFrame, params: dict, vix: pd.Series, canary_closes: di
         #   +31個百分點,足以讓燈號從「偏貴」誤判成「可買足量」)。改成跟live同順序,PIT稽核頁才
         #   真的等於「那天live系統會給的建議」。
         expo = None
+        _is_tw = str(params.get('_sym', '')).endswith('.TW')
         if sr > 0:
-            expo_raw = min(budget / max(sr, C.STOP_DIST_FLOOR), cap)
+            # 台股倉位固定1倍(2026-09-23,research_q3b_sizing_split.py),美股 RiskTarget
+            expo_raw = T.TW_FIXED_EXPO if _is_tw else min(budget / max(sr, C.STOP_DIST_FLOOR), cap)
             expo = round(expo_raw * h, 2)
 
         note_bits = []
@@ -220,13 +222,15 @@ def annotate(ohlc: pd.DataFrame, params: dict, vix: pd.Series, canary_closes: di
                 tone, label = 'amber', f'頭上壓力+{room*100:.0f}%·等突破'
                 note_bits.append(f'前波高點 {r:.2f} 就在上方')
             else:
-                if expo is not None and expo >= 1.0:
+                # ★2026-09-23 與 live 同步(research_q2d/q2e):「空手先別進」美台分開
+                #   美股=離停損 ≥ C.STOP_TOO_FAR_PCT;台股=只在信用部分示警期間、打折後曝險<50%。
+                _far = (sr * 100 >= C.STOP_TOO_FAR_PCT) if not _is_tw else (0 < h < 1 and sr > budget * h / 0.5)
+                if _far:
+                    tone, label = 'amber', f'離停損遠·空手先別進(持有續抱,離停損 {sr*100:.0f}%)'
+                elif expo is not None and expo >= 1.0:
                     tone, label = 'green', f'可買(足量~{expo*100:.0f}%)'
-                elif expo is not None and expo >= 0.5:
-                    tone, label = 'green', f'可小買(~{expo*100:.0f}%)'
                 else:
-                    # D3:曝險<50%=停損太遠,負期望;空手別新進,持有者續抱(非「買少量」)
-                    tone, label = 'amber', f'偏貴·空手別追(持有續抱,曝險僅{(expo or 0)*100:.0f}%)'
+                    tone, label = 'green', f'可買(~{(expo or 0)*100:.0f}%)'
                 if quiet_bo:
                     label += '·無量緩破健康'
                 if chop and ma_up:

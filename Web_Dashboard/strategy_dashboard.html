@@ -202,7 +202,7 @@
       <div class="orb"></div>
       <div>
         <h1>趨勢擇時作戰中心</h1>
-        <div class="sub">站上200MA + 信用哨健康 → 按位階連續加減碼(RiskTarget,貼近均線多押/遠離自動taper) · 任一破 → 全現金 — 一套用數據定案的紀律系統</div>
+        <div class="sub">站上200MA + 信用哨健康 → 美股按位階加減碼(RiskTarget)/台股固定1倍 · 任一破 → 全現金 — 一套用數據定案的紀律系統</div>
       </div>
     </div>
     <div class="hctl" style="display:flex;align-items:center;gap:14px">
@@ -823,7 +823,7 @@ function twCard(title, sub, tk, d){
     buy = d.entry_state==='can_enter'
       ? `可進場：別追貴於現價 +${d.entry_cap_pct}%（停損距 ${d.exit_pct}%）`
       : (d.entry_state==='expensive'
-        ? `🟡 空手別新進(停損距太遠,曝險僅${Math.round((d.suggested_expo||0)*100)}%<50%門檻,20年資料負期望)`
+        ? `🟡 ${d.entry_action||'空手先別進(離停損線太遠)'}`
         : `🟡 追高,等拉回（距50MA ${d.dist50_pct>0?'+':''}${d.dist50_pct}% > 門檻 +${Math.round((d.entry_thr-1)*100)}%）`);
   } else if(d.state==='warning'){ verb='🟡 逼近停損'; hold='收盤跌破停損線即全出'; buy='不進場'; }
   else if(d.state==='panic_watch'){ verb='🟠 恐慌容忍'; hold='維持現倉,給3日確認別砍V底'; buy='暫不加碼'; }
@@ -907,9 +907,9 @@ function buyRows(cores, isTW, heldTk, strongestTk, aTicker){
       limit = isTW ? `等拉回:現價需回到 +${d.entry_cap_pct}% 以內` : `等拉回 ≤ $${d.entry_cap}`;
       reason = `距50MA +${d.dist50_pct}% 已超過門檻 +${Math.round((d.entry_thr-1)*100)}%＝追高區,別追` + cnote;
     } else if(d.entry_state==='expensive'){
-      bucket=2; color='#e0b46a'; action='🟡 空手別新進';
-      limit = '—(等曝險≥50%)';
-      reason = `未追高但停損距太遠(${d.stop_risk_pct}%),曝險僅${Math.round((d.suggested_expo||0)*100)}%<50%門檻＝新倉位負期望(D3,20年資料)。已持有者續抱不受影響` + cnote;
+      bucket=2; color='#e0b46a'; action='🟡 空手先別進';
+      limit = '—(等離停損線拉近)';
+      reason = (d.entry_action||'').replace(/^空手先別進/, '離停損線太遠') + cnote;
     } else if(d.entry_state==='can_enter' && actionSet.size && !actionSet.has(tk)){
       // 價位條件符合,但不是本輪路線下該持有的腿——別跟著亮綠燈
       bucket=1; color='#8a96ad'; action='⚪ 非本輪標的';
@@ -922,7 +922,7 @@ function buyRows(cores, isTW, heldTk, strongestTk, aTicker){
       bucket=0; color='#7ee0a0';
       action = '🟢 可買' + (cm<1?'·半量':'');
       limit = isTW ? `限價 ≤ 現價 +${d.entry_cap_pct}%` : `限價 ≤ $${d.entry_cap}`;
-      reason = `停損距 ${d.stop_risk_pct}%→曝險建議 ${Math.round((d.suggested_expo||0)*100)}%(RiskTarget連續計算:貼近均線越高、離均線越遠自動taper)` + cnote;
+      reason = `停損距 ${d.stop_risk_pct}%→曝險建議 ${Math.round((d.suggested_expo||0)*100)}%` + (isTW ? '(台股固定1倍:RiskTarget在台股5檔全輸固定1倍,research_q3b)' : '(RiskTarget:貼近均線多押、遠離自動縮;實測≈同平均槓桿)') + cnote;
     } else { continue; }
     const stop = isTW ? `現價 ${d.exit_pct}%` : `$${d.exit_price}`;
     rows.push({bucket,tk,name:d.name||'',tag,action,color,limit,stop,expo:d.suggested_expo||0,
@@ -1360,7 +1360,7 @@ function _kbSelect(sym){
 // ── 🎯今日唯一指令卡:狀態+RS輪動+信用+額度+換算(單一數字來源=suggested_expo,
 //    已含 RiskTarget×vol-timing×信用減碼;金額/股數=純乘法換算,不新增任何未回測規則) ──
 // ★2026-08-30:單一腿的「行動一句話+數字格」——被 _cmdBlock 呼叫1或2次(依路線 純A=1腿/A+B=2腿)。
-//   跟以前一樣的邏輯(D3門檻/一次全投/panic容忍),只是抽成可重複用在A腿跟B腿的函式。
+//   跟以前一樣的邏輯(黃燈/一次全投/panic容忍),只是抽成可重複用在A腿跟B腿的函式。
 function _legTile(status, tk, cap, lev, cur, posKey, legTag){
   const d = status.cores[tk]; if(!d) return '';
   const health = status.canary ? status.canary.health : 1;
@@ -1373,8 +1373,10 @@ function _legTile(status, tk, cap, lev, cur, posKey, legTag){
   if(health<=0 || d.state==='risk_off'){ act='存現金,等信用/趨勢回來'; tone='#ff5a5a'; }
   else if(d.state==='panic_watch'){ act='恐慌觀察:維持現倉,等3日確認'; tone='#ffcb45'; }
   else if(pos==='hold'){ act='續抱:目標%會隨位階自動taper(貼近均線→升高,離均線越遠→自動縮);每次來看就照目標調整,收盤真跌破「停損」才全出'; tone='#2ecc71'; }
-  else if(ep>=50){ act='進場:一次買到「目標」(回測證實一次全投優於分批)'; tone='#2ecc71'; }
-  else if(ep>0){ act='空手先別進:此位階停損太遠,新倉位20年資料是負期望(D3)——等回到曝險≥50%再進場'; tone='#ffcb45'; }
+  // ★2026-09-23:燈號改讀引擎的 entry_state(美台門檻不同,research_q2b~q2e),不再在前端自己用「曝險<50%」判斷
+  else if(d.entry_state==='extended'){ act=`別追高:離50MA +${d.dist50_pct}%,超過 +${Math.round((d.entry_thr-1)*100)}% 門檻——等拉回到 ≤ ${cur}${d.entry_cap} 再買`; tone='#ffcb45'; }
+  else if(d.entry_state==='expensive'){ act=`空手先別進:離停損線 ${d.stop_risk_pct}%,太遠——${d.entry_action.includes('信用')?'信用示警期間門檻降低;':''}等拉近再買`; tone='#ffcb45'; }
+  else if(ep>0){ act='進場:一次買到「目標」(回測證實一次全投優於分批)'; tone='#2ecc71'; }
   else { act='存現金'; tone='#ff5a5a'; }
   const tile=(lab,val,col)=>`<div style="flex:1;min-width:74px;background:var(--panel);border-radius:6px;padding:6px 7px;text-align:center"><div style="font-size:10px;color:#64748b;white-space:nowrap">${lab}</div><div style="font-size:15px;font-weight:800;color:${col||'var(--txt)'}">${val}</div></div>`;
   const tgtStr = ep==null?'—':(ep<=0?'現金':(shares!=null?`${shares.toLocaleString()}股`:`${ep}%`));
@@ -1491,7 +1493,7 @@ function renderLab(cs, tw){
     <div style="font-size:11.5px;color:var(--muted);margin-top:4px">標記:${T('g','🥇我們回測印證')}${T('x','⚔️與我們回測衝突,以數字為準')}${T('y','🥉未驗證經驗參數')}——這頁=看完就知道「怎麼算部位、套牢怎麼辦、每週查什麼」。</div>
   </div>
 
-  ${sec('① 部位公式計算機 — 部位 = 風險預算 ÷ 停損距離'+T('g','🥇=我們的RiskTarget,+0.06 Sharpe實測'), `
+  ${sec('① 部位公式計算機 — 部位 = 風險預算 ÷ 停損距離'+T('g','🥇=美股的RiskTarget(實測≈同平均槓桿,ΔSharpe +0.01~0.03);台股已改固定1倍'), `
     <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
       總資金 $<input id="labK" type="number" value="${_labGet('K','100000')}" style="width:100px;background:var(--panel2);border:1px solid var(--line);border-radius:4px;color:var(--txt);padding:3px 6px">
       單筆風險預算 <input id="labR" type="number" step="0.05" value="${_labGet('R','0.75')}" style="width:60px;background:var(--panel2);border:1px solid var(--line);border-radius:4px;color:var(--txt);padding:3px 6px">%
