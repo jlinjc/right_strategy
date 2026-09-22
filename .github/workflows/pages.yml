@@ -42,6 +42,26 @@ jobs:
       - name: Install deps
         run: pip install --quiet yfinance pandas numpy scipy requests lxml python-dotenv
 
+      # ★輪動30日鎖的記憶:core_status.py / taiwan_status.py 讀「上一次的 JSON」裡的 rotation_hold
+      #   (持有誰、哪天換進)。雲端每次從 repo checkout 開始,讀到的是最後一次 commit 的舊檔,
+      #   上一班的結果從沒被下一班讀到 → 鎖名存實亡(超過30天後每班都直接換成當下最強)。
+      #   修法:重算前先抓線上現有版本,比 repo 新就拿來當「上一次」。
+      - name: Restore rotation state from live site (best-effort)
+        continue-on-error: true
+        run: |
+          for f in core_status taiwan_status; do
+            curl -sf "https://jlinjc.github.io/right_strategy/$f.json?nc=$(date +%s)" -o "/tmp/live_$f.json" || continue
+            python - "$f" <<'PY'
+          import json, shutil, sys
+          f = sys.argv[1]; p = f'Web_Dashboard/{f}.json'
+          live = json.load(open(f'/tmp/live_{f}.json', encoding='utf-8'))
+          repo = json.load(open(p, encoding='utf-8'))
+          if str(live.get('last_updated', '')) > str(repo.get('last_updated', '')):
+              shutil.copy(f'/tmp/live_{f}.json', p)
+          print(f, 'prev rotation_hold =', (json.load(open(p, encoding='utf-8')).get('rotation_hold') or {}))
+          PY
+          done
+
       # 每次(9am/9pm 台灣)重算「輕量」指數核心/台股/龍頭(各下載約 5-45 檔,雲端可靠)。
       # 失敗不擋部署 → 該面板沿用 repo 內已 commit 的 baseline JSON(不會壞版)。
       - name: Regenerate live index status (best-effort)

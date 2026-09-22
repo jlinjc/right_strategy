@@ -29,3 +29,4 @@ alpha/cache/
 
 # ...but DO commit the dashboard's JSON so GitHub Pages can serve it
 !Web_Dashboard/*.json
+research_cache/
