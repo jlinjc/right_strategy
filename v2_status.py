@@ -125,9 +125,61 @@ DIFF = [
      'why': '離停損12~18%時「等」平均少賺3~4%、勝率<40% = 被反證;信用示警版本14年中11年較好(q2d/q2e)'},
     {'item': '台股倉位', 'old': 'RiskTarget:離均線越遠押越少', 'new': '在場時固定 1 倍',
      'why': 'RiskTarget 在台股全期5/5檔、2018後5/5檔 Sharpe 都輸固定1倍,年化少2~5%,回撤沒更小(q3b)'},
+    {'item': '持有方式', 'old': '單押 RS 最強一檔', 'new': '美股、台股都等權',
+     'why': '台股 +0.210(p=0.038)/長樣本 +0.229(p=0.015);美股打平,Jason 選回撤較淺的等權(rot_verify)'},
+    {'item': '台股標的', 'old': '0050/0052/006208/0051/00757', 'new': '0050/0052/006208/0051(移除 00757)',
+     'why': '00757=美股FANG+,與既有美股部位重複;9個候選沒有一檔達標(b3_tw_replace)'},
+    {'item': '台股 V底救援', 'old': '沒有(只有美股 SMH/SOXX)', 'new': '啟用',
+     'why': '+0.137、p=0.014、校正後 0.056、三段全正(b2_overlays)'},
+    {'item': '台股恐慌容忍', 'old': 'VIX>30 跌破給3日', 'new': '關閉',
+     'why': '−0.051、回撤惡化 4.3pp(b2_overlays)'},
+    {'item': '美股 vol-timing', 'old': 'QQQ/SMH 啟用', 'new': '關閉',
+     'why': '+0.008(p=0.374)但交易 70→133 筆/年(b2_overlays)'},
     {'item': '美股倉位', 'old': 'RiskTarget(平均約1.4倍槓桿)', 'new': '不變,但頁面明講這是槓桿',
      'why': '跟同平均曝險的固定槓桿比 ΔSharpe 僅 +0.01~0.03 → 多賺的是槓桿本身,不是挑時機(q13/q3b)'},
 ]
+# ── 最新發現(有價值、已落地)與研究待辦(Jason 2026-09-24:「把最新資訊有價值跟要研究的上到網站上」)──
+FINDINGS = [
+    {'date': '2026-09-24', 'title': '台股信用哨是真 edge,美股的幾乎沒用',
+     'body': '等權基礎重驗:台股 ΔSharpe +0.359(p<0.001,多重檢定後仍成立),2015/2018/2022 三個壞年份'
+             '從 −4.9/−4.9/−9.8% 翻成 +1.4/+2.8/+2.3%;美股只有 +0.080(p=0.172)。',
+     'status': '已落地:台股維持三合哨;美股保留但標示為弱', 'script': 'research_b1_credit_canary.py'},
+    {'date': '2026-09-24', 'title': '台股新增 V 底救援、關閉恐慌容忍;美股關閉 vol-timing',
+     'body': 'V底救援台股 +0.137(p=0.014、校正後 0.056、三段全正、年化 19.3→22.1%);'
+             '恐慌容忍台股 −0.051、回撤惡化 4.3pp;vol-timing 美股 +0.008(p=0.374)但交易 70→133 筆/年。',
+     'status': '已落地', 'script': 'research_b2_overlays.py'},
+    {'date': '2026-09-24', 'title': 'p 值重算:只有「台股別追高 12%」撐過整體多重檢定',
+     'body': '黃燈類改用逐年 bootstrap(重抽年份,消掉樣本重疊的假顯著):台股別追高12% p<0.001;'
+             '美股別追高 p=0.130、美股空手先別進 p=0.200 → 方向對但不顯著,已降級標示。'
+             'QQQ 跌深上2x 單看 p=0.042,但是從 300 組裡挑的,校正後 0.42 = 多重檢定陷阱。',
+     'status': '已更新各規則的證據強度', 'script': 'research_q5_pvalues.py'},
+    {'date': '2026-09-24', 'title': '台股移除 00757,不需要替代標的',
+     'body': '9 個候選當第5檔(同期比較):最好的 00692 只有 +0.014,00757 自己 +0.094(p=0.165)'
+             '→ 沒有一檔達標。0050/006208 相關 0.896,去掉一檔績效一樣但少 25 筆交易/年(見決策清單)。',
+     'status': '已落地:台股核心 4 檔', 'script': 'research_b3_tw_replace.py'},
+    {'date': '2026-09-23', 'title': '新版 vs 原版(台股):年化 13.2% → 19.3%、回撤 −33.7% → −20.3%',
+     'body': '等權+固定1倍 vs 單押輪動+RiskTarget:ΔSharpe +0.375(p=0.041);長樣本池 +0.391(p=0.011)。美股兩版相同。',
+     'status': '已落地', 'script': 'research_q4_choices.py'},
+    {'date': '2026-09-23', 'title': 'RS「挑最強」沒有可證實的選股能力',
+     'body': '四個池子的挑選 alpha t 值 1.66/0.29/0.59/0.11 全 <2;12 個候選挑選機制校正後全部沒過。'
+             '分散(等權)才是穩定的來源。',
+     'status': '已落地:兩市場都改等權', 'script': 'research_rot_verify_p1.py / p2.py'},
+]
+RESEARCH_TODO = [
+    {'item': '個股衛星整套重驗(S&P500 掃描、進出場、倉位)', 'why': 'live 在用,這一輪完全沒碰', 'status': '待辦'},
+    {'item': '進取模式(TQQQ/SOXL)', 'why': '用獨立的二元信用哨,規則和核心不一致', 'status': '待辦'},
+    {'item': '美股「池子」本身', 'why': '等權在無後見之明 14 檔池大勝(+0.264),在現用 5 檔池打平 → 換更分散的池可能比怎麼分配更重要', 'status': '待辦'},
+    {'item': '事前選池規則(流動性/費用率/類別)', 'why': '現用 5 檔是事後挑的(4368 種組合中排 147)', 'status': '待辦'},
+    {'item': '等權的實務摩擦', 'why': '月 vs 季再平衡、台股零股與手續費對小資金的影響,決定實際能不能照做', 'status': '待辦'},
+    {'item': 'XLK 的信用門檻 credit_k=0.98', 'why': '個別標的門檻未單獨驗證', 'status': '待辦'},
+    {'item': '未跑完的驗證關卡', 'why': 'Deflated Sharpe、檢查池候選層、bootstrap/種子數降過規格', 'status': '待辦'},
+    {'item': '前瞻紙上追蹤 12 個月', 'why': '2002-2026 研究時已全部看過,沒有真正樣本外;從 2026-10 起並排追蹤', 'status': '待開始'},
+    {'item': '信用哨重驗', 'why': '—', 'status': '✅ 2026-09-24 完成'},
+    {'item': 'vol-timing / 恐慌容忍 / V底救援重驗', 'why': '—', 'status': '✅ 2026-09-24 完成'},
+    {'item': '所有結論補算 p 值', 'why': '—', 'status': '✅ 2026-09-24 完成'},
+    {'item': '00757 替代標的', 'why': '—', 'status': '✅ 2026-09-24 完成(不需替代)'},
+]
+
 LIMITS = [
     '訊號全部用<b>收盤價</b>,盤中數字只是暫定;22:30 那班是美股盤中,決策看隔天早上那班。',
     '回測期間:美股 2002-2026、台股 2013-2026(0050/0052/0051 可回到 2009)。台股樣本短,結論強度本來就低於美股。',
@@ -195,7 +247,9 @@ def _trace(d, mkt, health):
                 'now': f"健康比例 {health:.0%} → 每筆量 ×{health:.0%}" if health is not None else '—',
                 'ok': (health or 0) > 0, 'verdict': ('全額' if (health or 0) >= 1 else
                                                      ('減量' if (health or 0) > 0 else '清倉不買'))})
-    ext = d.get('entry_state') == 'extended'
+    # ★直接用數字判斷(不看 entry_state):信用全示警時 entry_state 會被整批改成 no_entry,
+    #   用它回推會讓「其實已經追高」的標的誤顯示成 ✔ 沒追高(2026-09-24 SOXX 實例:+7.39% > 7%)。
+    ext = (dist50 is not None and dist50 >= thr_pct)
     out.append({'id': 'extended_' + mkt, 'name': '③ 別追高:離50MA夠近嗎?',
                 'cond': f"離50MA < +{thr_pct}%", 'now': f"離50MA {dist50:+.1f}%" if dist50 is not None else '—',
                 'ok': not ext, 'verdict': '沒追高' if not ext else f'超過門檻 → 等拉回到 {d.get("entry_cap")} 以下'})
@@ -326,6 +380,8 @@ def build():
     data['diff'] = DIFF
     data['limits'] = LIMITS
     data['decisions'] = DECISIONS
+    data['findings'] = FINDINGS
+    data['research_todo'] = RESEARCH_TODO
     data['rule_evidence'] = {k: {'rule': v[0], 'evidence': v[1]} for k, v in RULE_EVIDENCE.items()}
     path = os.path.join(DASHBOARD_DIR, 'v2_status.json')
     with open(path, 'w', encoding='utf-8') as f:

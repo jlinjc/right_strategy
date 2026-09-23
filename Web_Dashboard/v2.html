@@ -72,6 +72,7 @@
   <div class="tabbar" id="tabbar">
     <button class="tabbtn on" data-t="today">🎯 今天怎麼做</button>
     <button class="tabbtn" data-t="dec">🗳 決策清單</button>
+    <button class="tabbtn" data-t="news">🧪 最新發現與待辦</button>
     <button class="tabbtn" data-t="diff">🔍 和原版差在哪</button>
     <button class="tabbtn" data-t="ev">📐 規則與證據</button>
     <button class="tabbtn" data-t="limit">⚠️ 限制與待決</button>
@@ -90,6 +91,7 @@
   </div>
 
   <div class="pane" id="p-dec"><div id="decBox"></div></div>
+  <div class="pane" id="p-news"><div id="newsBox"></div></div>
   <div class="pane" id="p-diff"><div id="diffBox"></div></div>
   <div class="pane" id="p-ev"><div id="evBox"></div></div>
   <div class="pane" id="p-limit"><div id="limitBox"></div></div>
@@ -176,6 +178,10 @@ function mktCard(mk, m, title, cur){
     <h2>${title} ${credit}</h2>
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">${mbtn('ew','等權(每檔一份)')}${mbtn('rotation','單押最強')}</div>
     <div class="note" style="margin:0 0 6px">${(ev.options||{})[meth]||''}</div>
+    ${(m.credit_health!=null && m.credit_health<=0)?`<div style="margin:6px 0;background:#3a1414;border:1px solid #7a2a2a;color:#ffc9c9;border-radius:8px;padding:8px 10px;font-size:12.5px">
+      🔴 <b>信用哨全部跌破</b>:系統規則是「清倉、不新增」—— 已持有的也轉現金,等哨兵站回 200MA 再進。
+      ${mk==='us'?'⚠️ 美股這條規則的回測效果弱(ΔSharpe +0.08、p=0.17);而且 HYG 只低於均線一點點,可能很快站回。要不要照做由你決定。':''}
+    </div>`:''}
     ${creditBlock(mk,m)}
     <div class="note" style="margin:0 0 8px">買多少:${m.sizing}<br>
       💡 每檔都列 <b>×1.0</b>(不融資)和 <b>×1.25</b>(積極)兩種金額——
@@ -270,6 +276,17 @@ function renderDecisions(){
     }).join('');
 }
 
+function renderNews(){
+  const f=(V.findings||[]).map(x=>`<div class="card"><div class="why">${x.date} · <code>${x.script}</code></div>
+    <h2 style="font-size:14px;margin:4px 0">${x.title}</h2><div class="why" style="font-size:12.5px">${x.body}</div>
+    <div style="font-size:12px;margin-top:6px;color:#7ee0a0">▶ ${x.status}</div></div>`).join('');
+  const t=(V.research_todo||[]).map(x=>`<tr><td style="padding:6px"><b>${x.item}</b><br><span class="why">${x.why}</span></td>
+    <td style="padding:6px;white-space:nowrap;color:${x.status.startsWith('✅')?'#7ee0a0':'#ffcb45'}">${x.status}</td></tr>`).join('');
+  $('#newsBox').innerHTML = `<div class="card"><h2>🧪 最新有價值的發現(都已落地)</h2>
+    <div class="note">每條都附可重跑的腳本名;數字皆為回測結果。</div></div>${f}
+    <div class="card"><h2>📋 研究待辦</h2><div style="overflow-x:auto"><table>${t}</table></div></div>`;
+}
+
 function renderEvidence(){
   const g = {both:'美股+台股', us:'美股', tw:'台股'};
   $('#evBox').innerHTML = `<div class="card"><h2>📐 每條規則的數據依據</h2>
@@ -301,7 +318,7 @@ function renderLimit(){
     $('#updated').innerHTML = `${stale>36?'🔴 資料過期':'🟢'} 資料更新 <b>${V.generated.slice(5,16)}</b>`
       + `(台北時間;伺服器每天 09:00/21:00/22:30 自動更新,GitHub 常延遲 1-4 小時)`
       + (stale>36?` — 已經 ${Math.round(stale)} 小時沒更新,先別依這頁下單`:'');
-    render(); renderDecisions(); renderEvidence(); renderDiff(); renderLimit();
+    render(); renderDecisions(); renderNews(); renderEvidence(); renderDiff(); renderLimit();
     $('#foot').textContent = `v2 · 規則版本 ${EV.version} · 訊號皆為收盤價計算,隔日限價執行`;
   }catch(e){
     $('#updated').innerHTML = '<span style="color:var(--red)">⚠️ 資料載入失敗:'+e.message+'</span>';
