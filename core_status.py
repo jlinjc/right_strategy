@@ -111,7 +111,11 @@ STOP_DIST_FLOOR = 0.02   # 停損距下限(剛站上MA200時防爆槓桿,對應�
 #   平靜(波動<中位)→加碼、動盪(崩前兆)→自動縮。信用哨仍在 main 把關(信用壞→曝險照砍)。
 #   ★用 EWMA 波動『預測』(非事後 realized):48格掃描 QQQ 48/48、SMH 40/48(EWMA 把 SMH 從 32/48 救活)。
 #   誠實:邊際升級(+0.03~0.05 Sharpe)非普適、非最大財富(換效率/淺回撤);SPY 無效不啟用。機制=Moreira-Muir。
-VOL_TIMING = {'QQQ', 'SMH'}   # EWMA 後 QQQ+SMH 皆穩健啟用;SPY 無效不啟用
+# ★2026-09-24 關閉(VOL_TIMING = set()):research_b2_overlays.py 在「等權」(2026-09-24 起的預設持有方式)
+#   基礎上重測——ΔSharpe 僅 +0.008(p=0.374,Holm 後 1.0),但每年交易筆數從 70 → 133(全部標的版 232),
+#   等於用一倍的執行負擔換零改善。舊研究的 +0.03~0.05 是在「單押輪動」基礎上量的,基礎已經換掉。
+#   要復原:改回 {'QQQ','SMH'} 即可(下方縮放邏輯保留未刪)。
+VOL_TIMING = set()
 VOL_WIN = 20             # EWMA 波動 span
 VOL_MED = 252            # 中位波動窗(基準)
 VOL_CAP_LO_MULT = 0.667  # cap 下限 = cap×此(base cap 1.5 → 1.0)

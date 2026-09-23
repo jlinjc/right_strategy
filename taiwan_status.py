@@ -75,7 +75,10 @@ CANARY_TICKERS = ['HYG', 'LQD', 'SOXX']
 CANARY_NAME = {'HYG': '美高收益債', 'LQD': '美投資級債', 'SOXX': '費半SOXX'}
 PANIC_TICKER = '^VIX'
 MA, MA_FAST = 200, 50
-PANIC_VIX, PANIC_DELAY = 30.0, 3
+# ★2026-09-24:台股「恐慌容忍」關閉(PANIC_DELAY=0)。research_b2_overlays.py 等權基礎重測:
+#   台股 ΔSharpe −0.051、最大回撤惡化 4.3pp(2017-21 段 −0.17)→ 是負貢獻,不是保護。
+#   美股同測 ΔSharpe 0.000(p=0.44),屬無效但無害,美股維持原設定不動。
+PANIC_VIX, PANIC_DELAY = 30.0, 0
 RISK_MULT = 1.0
 RISK_MULT = min(RISK_MULT, 1.5)
 STOP_DIST_FLOOR = 0.02
@@ -324,6 +327,39 @@ def main():
                                          f'{lim:.1f}% 門檻;台股歷史此時等拉近再買 14年中11年較好);已持有者續抱')
                 elif d.get('entry_state') == 'can_enter':
                     d['entry_action'] += f'(信用部分示警,曝險×{ch:.0%})'
+
+    # ★V底救援(2026-09-24 新增到台股;research_b2_overlays.py 事前判準下唯一過關的疊加機制):
+    #   等權基礎上 ΔSharpe +0.137、p=0.014、Holm 校正後 0.056、三段全正(S1+0.12/S2+0.15/S3+0.14),
+    #   CAGR 19.3→22.1%、MDD 不變(−20.3%)。美股同測只有 +0.025(p=0.145)→ 美股維持原本 SMH/SOXX 限定。
+    #   條件與美股同源:系統空手 + 距252日高回撤 >15% + VIX 15日尖峰 ≥40 且現值 ≤尖峰×75%(恐慌退燒)。
+    #   動作:半倉、停損 −7%;收復200MA後併回正常系統。
+    VB_TRANCHE, VB_STOP = 0.5, 0.93
+    try:
+        vix_s = raw[PANIC_TICKER]['Close'].dropna()
+        for vtk in CORE_TICKERS:
+            if vtk not in out:
+                continue
+            tk_c = clean(raw[vtk]['Close'].dropna())
+            if len(vix_s) <= 15 or len(tk_c) <= 252:
+                continue
+            vspike = float(vix_s.iloc[-15:].max()); vnow = float(vix_s.iloc[-1])
+            dd252 = float(tk_c.iloc[-1] / tk_c.iloc[-252:].max() - 1)
+            flatish = out[vtk]['state'] != 'risk_on' or bool(out[vtk].get('credit_cut'))
+            active = flatish and dd252 < -0.15 and vspike >= 40 and vnow <= 0.75 * vspike
+            vb = {'active': bool(active), 'vix_peak15': round(vspike, 1),
+                  'vix_now': round(vnow, 1), 'dd252_pct': round(dd252 * 100, 1)}
+            if active:
+                stop_px = round(out[vtk]['close'] * VB_STOP, 2)
+                vb.update({'tranche': VB_TRANCHE, 'stop': stop_px})
+                out[vtk]['entry_action'] = (f'🚑 V底救援:VIX尖峰{vspike:.0f}→現{vnow:.0f}退燒+距高{dd252*100:.0f}%'
+                                            f'→半倉進場,停損 NT${stop_px}(−7%);收復200MA後併回正常系統')
+                out[vtk]['entry_state'] = 'can_enter'
+                out[vtk]['suggested_expo'] = VB_TRANCHE      # 金額/股數都讀這個欄位,必須一起改
+                out[vtk]['exit_price'] = stop_px
+                out[vtk]['entry_cap'] = out[vtk]['close']    # 救援是當下進場,不是等拉回
+            out[vtk]['vbottom'] = vb
+    except Exception:
+        pass
 
     # 路線B 最低持有30日鎖(讀上次json)
     path = os.path.join(DASHBOARD_DIR, 'taiwan_status.json')

@@ -60,10 +60,10 @@
       "id": "credit",
       "market": "both",
       "light": "🟠 信用示警",
-      "rule": "信用哨(美股 HYG+LQD、台股 HYG+LQD+SOXX)站上 200MA 的比例 = 全體曝險乘數;全部跌破 → 清倉",
-      "evidence": "沿用既有研究(research_breadth_canary.py、research_taiwan_optimize.py),本輪未重新驗證。",
-      "strength": "未重驗",
-      "script": "research_breadth_canary.py"
+      "rule": "信用哨(美股 HYG+LQD、台股 HYG+LQD+SOXX)站上200MA的比例 = 全體曝險乘數;全部跌破 → 清倉",
+      "evidence": "2026-09-24 重驗(等權基礎,research_b1_credit_canary.py):台股 ΔSharpe +0.359(p<0.001,Holm 後仍過)、CAGR 19.3→22.2%、回撤 −20.3→−17.7%,三段全正 → 台股的信用哨是真 edge,而且 live 現用的三合版就是最好的之一(2015/2018/2022 三個壞年份從 −4.9/−4.9/−9.8% 變成 +1.4/+2.8/+2.3%)。美股只有 +0.080(p=0.172,Holm 後 0.69)、回撤改善 1.6pp → 無效但無害,留著。",
+      "strength": "台股:強 / 美股:弱",
+      "script": "research_b1_credit_canary.py"
     },
     {
       "id": "sizing_us",
@@ -118,6 +118,15 @@
       "evidence": "台股主池 2013-2026:原版(單押輪動+RiskTarget)CAGR 13.2%/回撤−33.7%/Sharpe 0.89 → 新版 19.3%/−20.3%/1.26,ΔSharpe +0.375(p=0.041);長樣本池 8.4%→13.5%、ΔSharpe +0.391(p=0.011)。美股兩版完全相同(ΔSharpe 0.000)。",
       "strength": "中~強",
       "script": "research_q4_choices.py"
+    },
+    {
+      "id": "overlays",
+      "market": "both",
+      "light": "🔧 疊加機制重驗",
+      "rule": "vol-timing 關閉(美股)、恐慌容忍關閉(台股)、V底救援台股啟用",
+      "evidence": "等權基礎重測(research_b2_overlays.py):① vol-timing 美股 ΔSharpe +0.008(p=0.374),但每年交易 70→133 筆 → 關閉;② 恐慌容忍 台股 −0.051、回撤惡化 4.3pp → 台股關閉(美股 0.000 無效但無害,保留);③ V底救援 台股 +0.137(p=0.014、Holm 後 0.056、三段全正、CAGR 19.3→22.1%)→ 台股啟用(美股同測僅 +0.025,維持原本 SMH/SOXX 限定)。",
+      "strength": "V底台股:中~強 / 其餘:關閉理由充分",
+      "script": "research_b2_overlays.py"
     }
   ],
   "pvalue_note": "2026-09-24 統一補算 p 值(research_q5_pvalues.py):黃燈類用「逐年 block bootstrap」(重抽年份而非天,消掉樣本重疊造成的假顯著),策略類用 stationary block bootstrap。各問題家族內做 Holm 校正:持有方式(等權vs單押)三個池子校正後 0.060/0.072/0.076 全部撐住;黃燈類只有台股12%門檻撐住;跌深加槓桿全部不成立。"
