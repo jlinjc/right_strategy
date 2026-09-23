@@ -1470,7 +1470,7 @@ function renderCommandCard(cs, tw, ag){
     </div>
     <div style="display:flex;gap:12px;flex-wrap:wrap">${_cmdBlock('🇺🇸 美股', cs, 'us', '$', 'SMH')}${_cmdBlock('🇹🇼 台股', tw, 'tw', 'NT$', tw&&tw.anchor_a)}</div>
     ${aggOff?`<div style="font-size:12px;color:#ff9d5a;margin-top:8px">⚠️ 只影響槓桿玩家:TQQQ/SOXL(獨立二元哨,更嚴格)今日=空手。不玩槓桿ETF可無視,詳見下方收合面板。</div>`:''}
-    <div style="font-size:11.5px;color:#64748b;margin-top:8px">依據分級:🥇<b>機制=回測背書</b>(輪動最強Sharpe1.37/OOS最差1.12 · 信用哨2022 -4.5% · RiskTarget · vol-timing 48格掃描 · 一次全投優於分批 · 載具>>買點:SMH定投7.9x vs SPY2.4x)｜🥈<b>校準</b>(標籤文字/R3小額=逐根審計)｜🥉<b>介面設計</b>(金額/股數換算的顯示方式)——2026-08-16已拿掉沒被單獨驗證、且跟「一次全投優於分批」矛盾的75%/40%分批線。收盤訊號→隔日限價,不追盤中。</div>
+    <div style="font-size:11.5px;color:#64748b;margin-top:8px">依據分級:🥇<b>機制=回測背書</b>(信用哨2022 -4.5% · vol-timing 48格掃描 · 一次全投優於分批 · 載具>>買點:SMH定投7.9x vs SPY2.4x)｜⚠️<b>2026-09-23 事前登錄驗證後更正</b>:舊寫的「輪動最強Sharpe1.37」用的基準不忠於 live、沒扣無風險利率。重測結果:美股等權 vs 單押最強<b>打平</b>(+0.013,p=0.41)、台股<b>等權較好</b>(+0.210,p=0.038);四個池子的「挑選 alpha」t 值全部 <2。RiskTarget 實測≈同平均槓桿(+0.01~0.03)。詳見<a href='v2.html'>新版頁面</a>｜🥈<b>校準</b>(標籤文字/R3小額=逐根審計)｜🥉<b>介面設計</b>(金額/股數換算的顯示方式)——2026-08-16已拿掉沒被單獨驗證、且跟「一次全投優於分批」矛盾的75%/40%分批線。收盤訊號→隔日限價,不追盤中。</div>
   </div>`;
 }
 
