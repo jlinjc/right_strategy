@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>作戰中心 v2 · 實證版</title>
+<style>
+  :root{
+    --bg:#0a0e17; --panel:#121826; --panel2:#1a2233; --line:#26304a;
+    --txt:#e6ecf5; --muted:#8a96ad; --accent:#4da3ff;
+    --green:#2ecc71; --red:#ff5a5a; --yellow:#ffcb45; --grey:#6b7686;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--txt);font-family:-apple-system,"Segoe UI","Microsoft JhengHei",sans-serif;
+    line-height:1.55;padding:0 0 60px}
+  a{color:var(--accent);text-decoration:none}
+  .wrap{max-width:1100px;margin:0 auto;padding:0 16px}
+  header{background:linear-gradient(180deg,#0e1422,#0a0e17);border-bottom:1px solid var(--line);padding:12px 0;position:relative}
+  .hrow{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+  .brand h1{font-size:17px}
+  .brand .sub{font-size:11.5px;color:var(--muted)}
+  .vswitch{display:flex;gap:0;border:1px solid var(--line);border-radius:8px;overflow:hidden;margin-left:auto}
+  .vswitch a{padding:6px 12px;font-size:12.5px;color:var(--muted);background:var(--panel)}
+  .vswitch a.on{background:var(--accent);color:#04101f;font-weight:700}
+  .updated{font-size:11.5px;color:var(--muted)}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin:14px 0}
+  .card h2{font-size:15px;margin-bottom:8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .mkt{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  @media(max-width:860px){.mkt{grid-template-columns:1fr}}
+  .badge{font-size:11px;padding:2px 8px;border-radius:20px;border:1px solid var(--line);color:var(--muted);background:var(--panel2)}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th{font-size:11px;color:var(--muted);font-weight:600;text-align:left;padding:5px 6px;background:var(--panel2);white-space:nowrap}
+  td{padding:7px 6px;border-top:1px solid #1b2436;vertical-align:top}
+  .act{font-weight:800;white-space:nowrap;font-size:12.5px}
+  .buy{color:var(--green)} .wait{color:var(--yellow)} .cash{color:var(--red)} .grey{color:var(--grey)}
+  .num{font-variant-numeric:tabular-nums;white-space:nowrap}
+  .why{font-size:11px;color:var(--muted);line-height:1.5}
+  input[type=number]{background:var(--panel2);border:1px solid var(--line);border-radius:6px;color:var(--txt);
+    padding:5px 8px;font-size:13px;width:130px}
+  .tabbar{display:flex;gap:6px;margin:12px 0 4px;overflow-x:auto;scrollbar-width:none}
+  .tabbar::-webkit-scrollbar{display:none}
+  .tabbtn{padding:7px 13px;font-size:13.5px;font-weight:600;cursor:pointer;border:1px solid var(--line);
+    background:var(--panel);color:var(--muted);border-radius:9px;white-space:nowrap;flex:none}
+  .tabbtn.on{color:var(--txt);background:var(--panel2);border-color:var(--accent)}
+  .pane{display:none} .pane.on{display:block}
+  .ev{border:1px solid var(--line);border-radius:10px;margin:9px 0;overflow:hidden;background:var(--panel)}
+  .ev summary{padding:10px 13px;cursor:pointer;font-size:13.5px;font-weight:700;list-style:none;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  .ev summary::-webkit-details-marker{display:none}
+  .ev .body{padding:0 13px 12px;font-size:12.5px;color:var(--muted);line-height:1.7}
+  .st{font-size:10.5px;padding:1px 7px;border-radius:5px;border:1px solid var(--line)}
+  .st.強,.st.中~強{color:#9fe7bd;border-color:#155f3a}
+  .st.中{color:#ffe39a;border-color:#5e4d14}
+  .st.弱~中,.st.未重驗{color:#9fb0cc}
+  .diff td{font-size:12.5px}
+  .foot{color:var(--muted);font-size:11.5px;margin-top:20px;text-align:center}
+  .note{font-size:11.5px;color:var(--muted);margin-top:8px}
+  .big{font-size:19px;font-weight:800}
+</style>
+</head>
+<body>
+<header><div class="wrap hrow">
+  <div class="brand">
+    <h1>作戰中心 <span style="color:var(--accent)">v2</span></h1>
+    <div class="sub">每條規則都附得起數據的版本</div>
+  </div>
+  <div class="vswitch"><a href="strategy_dashboard.html">原版</a><a class="on" href="v2.html">新版</a></div>
+</div></header>
+
+<div class="wrap">
+  <div class="updated" id="updated" style="margin-top:10px">載入中…</div>
+
+  <div class="tabbar" id="tabbar">
+    <button class="tabbtn on" data-t="today">🎯 今天怎麼做</button>
+    <button class="tabbtn" data-t="diff">🔍 和原版差在哪</button>
+    <button class="tabbtn" data-t="ev">📐 規則與證據</button>
+    <button class="tabbtn" data-t="limit">⚠️ 限制與待決</button>
+  </div>
+
+  <div class="pane on" id="p-today">
+    <div class="card" style="border-color:var(--accent)">
+      <h2>💰 先填:這次要投入這套策略的錢</h2>
+      <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:center">
+        <label style="font-size:13px">🇺🇸 美股 $<input type="number" id="cap_us" placeholder="例 10000" oninput="setCap('us',this.value)"></label>
+        <label style="font-size:13px">🇹🇼 台股 NT$<input type="number" id="cap_tw" placeholder="例 300000" oninput="setCap('tw',this.value)"></label>
+      </div>
+      <div class="note">填了才會算出每檔要買多少錢/幾股。只存在你自己的瀏覽器,不會上傳。</div>
+    </div>
+    <div class="mkt" id="markets"></div>
+  </div>
+
+  <div class="pane" id="p-diff"><div id="diffBox"></div></div>
+  <div class="pane" id="p-ev"><div id="evBox"></div></div>
+  <div class="pane" id="p-limit"><div id="limitBox"></div></div>
+
+  <div class="foot" id="foot"></div>
+</div>
+
+<script>
+const $=s=>document.querySelector(s);
+const j=async p=>{const r=await fetch(p+'?t='+Date.now());if(!r.ok)throw new Error(p+' '+r.status);return r.json();};
+let V=null, EV=null;
+document.querySelectorAll('.tabbtn').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('.tabbtn').forEach(x=>x.classList.toggle('on',x===b));
+  document.querySelectorAll('.pane').forEach(p=>p.classList.toggle('on',p.id==='p-'+b.dataset.t));
+});
+function setCap(m,v){ v?localStorage.setItem('v2cap_'+m,v):localStorage.removeItem('v2cap_'+m); render(); }
+const cap=m=>parseFloat(localStorage.getItem('v2cap_'+m))||null;
+const fmt=n=>n==null?'—':n.toLocaleString(undefined,{maximumFractionDigits:2});
+
+const ACT={buy:['🟢 買進','buy'],hold_wait:['🟠 維持現倉','wait'],wait:['🟡 先別買','wait'],
+           cash:['🔴 這份放現金','cash']};
+
+function mktCard(mk, m, title, cur){
+  const K=cap(mk);
+  const meth = localStorage.getItem('v2m_'+mk) || m.default_method;
+  const hs = m.methods[meth] || m.positions;
+  const ev = (V.method_evidence||{})[mk] || {};
+  const hearts = m.credit_health;
+  const credit = hearts>=1 ? `<span class="badge" style="color:#9fe7bd">信用🟢 全額</span>`
+    : hearts>0 ? `<span class="badge" style="color:#ffe39a">信用🟠 每筆量×${Math.round(hearts*100)}%</span>`
+    : `<span class="badge" style="color:#ffb4b4">信用🔴 清倉不買</span>`;
+  const tile=(lab,val,col)=>`<div style="flex:1;min-width:74px;background:var(--panel2);border-radius:7px;padding:5px 7px;text-align:center">
+      <div style="font-size:10px;color:#64748b;white-space:nowrap">${lab}</div>
+      <div style="font-size:13px;font-weight:800;color:${col||'var(--txt)'};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${val}</div></div>`;
+  const rows = hs.map(p=>{
+    const [lab,cls]=ACT[p.action]||['—','grey'];
+    const slot = K!=null ? K*p.weight : null;
+    const pos  = (slot!=null && p.expo!=null) ? slot*p.expo : null;
+    const sh   = (pos!=null && p.close) ? Math.floor(pos/p.close) : null;
+    const zero = p.weight<=0;
+    const buyv = zero ? '不持有'
+      : p.action==='buy' ? (pos!=null? `${cur}${fmt(Math.round(pos))}` : `${Math.round((p.expo||0)*100)}%`)
+      : p.action==='cash' ? '現金' : '先等';
+    const buyc = zero? 'var(--grey)' : (p.action==='buy'?'var(--green)':(p.action==='cash'?'var(--red)':'var(--yellow)'));
+    return `<div style="background:#0b1727;border:1px solid #16233a;border-radius:9px;padding:9px 11px;margin-top:8px${zero?';opacity:.45':''}">
+      <div style="display:flex;align-items:baseline;gap:7px;flex-wrap:wrap">
+        <b style="font-size:15px">${p.ticker.replace('.TW','')}</b>
+        <span class="why">${p.name||''}</span>
+        <span class="act ${cls}" style="margin-left:auto">${zero?'—':lab}</span>
+      </div>
+      <div class="why" style="margin-top:2px">這份資金 ${Math.round(p.weight*100)}%${slot!=null?` = ${cur}${fmt(Math.round(slot))}`:''}
+        ${p.action==='buy'&&sh!=null?` · 約 ${fmt(sh)} 股`:''}</div>
+      <div style="display:flex;gap:5px;margin-top:7px;flex-wrap:wrap">
+        ${tile('現價', cur+fmt(p.close))}
+        ${tile('買進限價≤', p.limit!=null?cur+fmt(p.limit):'—', '#4da3ff')}
+        ${tile('停損(收盤)', p.stop!=null?cur+fmt(p.stop):'—', '#ff5a5a')}
+        ${tile('這檔買多少', buyv, buyc)}
+      </div>
+      <div class="why" style="margin-top:6px">${p.reason||''}</div>
+    </div>`;
+  }).join('');
+  const mbtn=(v,txt)=>`<button class="tabbtn ${meth===v?'on':''}" style="padding:4px 10px;font-size:12px"
+     onclick="setMethod('${mk}','${v}')">${txt}${m.default_method===v?' ·預設':''}</button>`;
+  const off = hs.filter(p=>p.weight>0 && p.action!=='buy' && p.action!=='hold_wait').length;
+  return `<div class="card">
+    <h2>${title} ${credit}</h2>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">${mbtn('ew','等權(每檔一份)')}${mbtn('rotation','單押最強')}</div>
+    <div class="note" style="margin:0 0 6px">${(ev.options||{})[meth]||''}</div>
+    <div class="note" style="margin:0 0 8px">買多少:${m.sizing}</div>
+    ${rows}
+    <div class="note">🟡/🔴 的那幾份先放現金${off?`(目前 ${off} 份)`:''};等它轉 🟢 再補,不要挪去加碼別檔。停損只看<b>收盤</b>。</div>
+    <details class="ev" style="margin-top:10px"><summary>📊 為什麼用這個持有方式 — ${ev.verdict||''}</summary>
+      <div class="body">${ev.detail||''}</div></details>
+  </div>`;
+}
+
+function setMethod(mk,v){ localStorage.setItem('v2m_'+mk, v); render(); }
+window.setMethod = setMethod; window.setCap = setCap;
+
+function render(){
+  if(!V) return;
+  $('#cap_us').value = localStorage.getItem('v2cap_us')||'';
+  $('#cap_tw').value = localStorage.getItem('v2cap_tw')||'';
+  $('#markets').innerHTML = mktCard('us', V.markets.us, '🇺🇸 美股', '$')
+                          + mktCard('tw', V.markets.tw, '🇹🇼 台股', 'NT$');
+}
+
+function renderEvidence(){
+  const g = {both:'美股+台股', us:'美股', tw:'台股'};
+  $('#evBox').innerHTML = `<div class="card"><h2>📐 每條規則的數據依據</h2>
+    <div class="note">${EV.method_note}</div></div>` +
+    EV.rules.map(r=>`<details class="ev"><summary>${r.light} ${r.rule}
+      <span class="badge">${g[r.market]}</span><span class="st ${r.strength}">證據 ${r.strength}</span></summary>
+      <div class="body"><b>數據:</b>${r.evidence}<br><b>可重跑:</b>${r.script}</div></details>`).join('');
+}
+
+function renderDiff(){
+  const rows = (V.diff||[]).map(d=>`<tr><td><b>${d.item}</b></td><td>${d.old}</td><td style="color:#9fe7bd">${d.new}</td><td class="why">${d.why}</td></tr>`).join('');
+  $('#diffBox').innerHTML = `<div class="card"><h2>🔍 新版和原版差在哪</h2>
+    <div style="overflow-x:auto"><table class="diff">
+      <tr><th>項目</th><th>原版</th><th>新版</th><th>改的理由(數據)</th></tr>${rows}</table></div>
+    <div class="note">沒列出來的部分兩版完全一樣:200MA 進出場、信用哨、恐慌容忍、停損只看收盤。</div></div>`;
+}
+
+function renderLimit(){
+  $('#limitBox').innerHTML = `<div class="card"><h2>⚠️ 這一版的限制(先講清楚)</h2>
+    <div class="why" style="font-size:12.5px;line-height:1.9">
+    ${(V.limits||[]).map(x=>'• '+x).join('<br>')}
+    </div></div>`;
+}
+
+(async ()=>{
+  try{
+    [V, EV] = await Promise.all([j('v2_status.json'), j('v2_evidence.json')]);
+    const stale = (Date.now()-new Date(String(V.generated).replace(' ','T')).getTime())/3.6e6;
+    $('#updated').innerHTML = `${stale>36?'🔴 資料過期':'🟢'} 資料更新 <b>${V.generated.slice(5,16)}</b>`
+      + `(台北時間;伺服器每天 09:00/21:00/22:30 自動更新,GitHub 常延遲 1-4 小時)`
+      + (stale>36?` — 已經 ${Math.round(stale)} 小時沒更新,先別依這頁下單`:'');
+    render(); renderEvidence(); renderDiff(); renderLimit();
+    $('#foot').textContent = `v2 · 規則版本 ${EV.version} · 訊號皆為收盤價計算,隔日限價執行`;
+  }catch(e){
+    $('#updated').innerHTML = '<span style="color:var(--red)">⚠️ 資料載入失敗:'+e.message+'</span>';
+  }
+})();
+</script>
+</body>
+</html>

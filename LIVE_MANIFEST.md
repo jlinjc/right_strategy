@@ -12,6 +12,7 @@
 | generate_kbar_annotations.py | kbar_annotations.json | 每根K棒 PIT 標籤 + 診斷 + 自適應 + review |
 | generate_signals.py | strategy_signals.json | 個股衛星進場信號(S&P500 掃描) |
 | aggressive_status.py | aggressive_status.json | 進取模式 TQQQ/SOXL(獨立二元哨;2026-07-19 補進排程) |
+| v2_status.py | v2_status.json | 新版(v2)決策資料:讀上面兩支的 JSON,套 2026-09-23 驗證後的持有方式 |
 
 ## 上述檔案的 import 依賴(間接承重)
 scanner_base.py · filter_experiments.py · exit_experiments.py · rs_selection.py · validate_universe.py
@@ -19,6 +20,7 @@ scanner_base.py · filter_experiments.py · exit_experiments.py · rs_selection.
 
 ## 前端與本機工具
 Web_Dashboard/strategy_dashboard.html(線上入口;index.html 部署時被覆蓋成轉址)
+Web_Dashboard/v2.html + v2_status.json + v2_evidence.json(新版頁面;頂端可切換原版/新版)
 Web_Dashboard/index.html + script.js(本機掃描器)· update_dashboard.py · web_server.py
 .github/workflows/pages.yml(排程與部署本身)
 

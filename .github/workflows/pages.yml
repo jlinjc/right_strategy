@@ -72,6 +72,7 @@ jobs:
           python leaders_status.py || echo "leaders_status skipped"
           python aggressive_status.py || echo "aggressive_status skipped"
           python generate_kbar_annotations.py || echo "kbar_annotations skipped"
+          python v2_status.py || echo "v2_status skipped"   # 新版(v2)決策資料,讀上面幾支的 JSON
 
       # 個股信號 = 重掃 S&P500(慢、會被限流)。依 Jason 要求「每班都跑」:所有排程班次 + 手動都跑
       #（但 push 不跑,避免每次改 dashboard 都觸發 15 分鐘重掃)。失敗→沿用 baseline,不壞版。

@@ -167,6 +167,9 @@
     background:var(--panel);color:var(--muted);border-radius:10px;transition:.15s}
   .tabbtn:hover{color:var(--txt);border-color:var(--mid)}
   .tabbtn.active{color:var(--txt);background:var(--panel2);border-color:var(--accent)}
+  .vswitch{display:flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;flex:none}
+  .vswitch a{padding:5px 11px;font-size:12.5px;color:var(--muted);background:var(--panel)}
+  .vswitch a.on{background:var(--accent);color:#04101f;font-weight:700}
   .updated details summary{cursor:pointer;list-style:none}
   .updated details summary::-webkit-details-marker{display:none}
   .updated details[open] .updmore{margin-top:4px}
@@ -206,6 +209,7 @@
       </div>
     </div>
     <div class="hctl" style="display:flex;align-items:center;gap:14px">
+      <div class="vswitch"><a class="on" href="strategy_dashboard.html">原版</a><a href="v2.html">新版</a></div>
       <div class="updated" id="updated">載入中…</div>
       <button class="btn" onclick="loadAll()" title="重新整理">↻<span class="btxt"> 重新整理</span></button>
     </div>

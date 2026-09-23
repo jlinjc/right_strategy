@@ -1,0 +1,66 @@
+{
+  "version": "2026-09-23",
+  "method_note": "所有數字來自 repo 內可重跑的 research_q*.py(獨立重寫的引擎 research_engine_2026q3.py,照 live 規則,訊號用 t 日收盤、吃 t+1 報酬)。美股、台股分開實驗、分開判定。「到場測試」= 某天處在該燈號時,比較『當天就買』和『等燈號轉綠才買』,兩者都抱到系統出場為止;看等待較好的比例與逐年一致性(樣本天數互相重疊,所以看逐年而非只看天數)。",
+  "rules": [
+    {
+      "id": "trend", "market": "both", "light": "🔴/🟢",
+      "rule": "收盤站上 200 日均線才持有;收盤跌破 200MA×緩衝(美股 0.98~1.00、台股 0.98~1.00)全部出場轉現金",
+      "evidence": "擇時 vs 買持(research_q1):SPY 回撤 −55%→−21%、SMH −68%→−31%、0050 −34%→−21%;年化報酬略低或相近。擇時的價值 = 大空頭躲開,不是多賺。",
+      "strength": "強", "script": "research_q1_rotation_audit.py"
+    },
+    {
+      "id": "extended_us", "market": "us", "light": "🟡 別追高",
+      "rule": "離 50 日均線太遠就等拉回:SMH/XLK +10%、SOXX/QQQ +7%、SPY +5%",
+      "evidence": "到場測試:等拉回較好 67% 的情況、32 年中 27 年;若改用『1 個自身 50 日波動』當門檻,前半段(<2014)18 年中 15 年、後半段 11 年中 9 年都成立。",
+      "strength": "強", "script": "research_q2_lights_audit.py / research_q2c_split_check.py"
+    },
+    {
+      "id": "extended_tw", "market": "tw", "light": "🟡 別追高",
+      "rule": "離 50 日均線 ≥ +12% 才算太遠(5 檔同一門檻)",
+      "evidence": "舊門檻 +6~8%:等拉回平均反而少賺 0.7~1.8%(台股趨勢段常一路不回頭)。+12%:等待較好 71%、平均 +1.08%,前半 4 年中 3 年、後半 6/6 年,5 檔全正;+10% 不成立。",
+      "strength": "中(前半段樣本只有 55 天)", "script": "research_q2b_thresholds.py / research_q2c_split_check.py"
+    },
+    {
+      "id": "r3_us", "market": "us", "light": "🟢 小額試單",
+      "rule": "別追高的日子裡,如果 200MA 上彎 且 VIX 低於自己 20 日均(恐慌正在退):可以小額先買",
+      "evidence": "R3 成立時等拉回和立即買幾乎一樣(平均差 −0.19%);R3 不成立時等拉回較好(+0.41%)。台股同樣現象(−0.15% vs +1.14%)但逐年不一致,未採用。",
+      "strength": "弱~中", "script": "research_q2f_r3.py"
+    },
+    {
+      "id": "far_us", "market": "us", "light": "🟡 空手先別進",
+      "rule": "沒追高,但離停損線 ≥ 20%:空手的人等拉近再買;已持有者續抱",
+      "evidence": "舊版(曝險<50% = 離停損 ≥38~43%)美股 25 年一天都沒觸發過。只看沒被『別追高』擋下的日子:離停損 ≥20% 時等待平均 +0.66%、勝 61%、14 年中 12 年較好;18% 相鄰門檻同向。",
+      "strength": "中(前半段 −0.13%、後半 +1.12%)", "script": "research_q2d_incremental.py"
+    },
+    {
+      "id": "far_tw", "market": "tw", "light": "🟡 空手先別進",
+      "rule": "只在信用部分示警期間:離停損線 > budget×信用健康度÷0.5(今天約 10~13%)就等拉近再買",
+      "evidence": "平時版(離停損 ≥16~19%)被反證:台股未追高、離停損 12~18% 時等待平均少賺 3~4%、勝率 <40% → 已移除。信用部分示警期間版本:等待平均 +0.63%、勝 64%、14 年中 11 年,前半 6/6、後半 5/8。",
+      "strength": "中", "script": "research_q2d_incremental.py / research_q2e_credit_yellow.py"
+    },
+    {
+      "id": "credit", "market": "both", "light": "🟠 信用示警",
+      "rule": "信用哨(美股 HYG+LQD、台股 HYG+LQD+SOXX)站上 200MA 的比例 = 全體曝險乘數;全部跌破 → 清倉",
+      "evidence": "沿用既有研究(research_breadth_canary.py、research_taiwan_optimize.py),本輪未重新驗證。",
+      "strength": "未重驗", "script": "research_breadth_canary.py"
+    },
+    {
+      "id": "sizing_us", "market": "us", "light": "💰 買多少",
+      "rule": "美股:曝險 = min(budget ÷ 離停損距離, 150%) × 信用乘數(RiskTarget)",
+      "evidence": "RiskTarget 實際平均曝險 1.35~1.49 倍 = 一直開著槓桿。跟『同平均曝險的固定槓桿』比 Sharpe 只差 +0.01~0.03(雜訊):它多賺的是槓桿本身,不是『貼近均線多押』的時機。想要少回撤,就等同於降低槓桿。",
+      "strength": "中(等同固定槓桿)", "script": "research_q13_supplement.py / research_q3b_sizing_split.py"
+    },
+    {
+      "id": "sizing_tw", "market": "tw", "light": "💰 買多少",
+      "rule": "台股:在場時固定 1 倍 × 信用乘數",
+      "evidence": "RiskTarget(遠離均線就縮)在台股全期 5/5 檔、2018 後 5/5 檔 Sharpe 都輸固定 1 倍,年化少賺 2~5%,回撤沒有更小 → 2026-09-23 改固定 1 倍。",
+      "strength": "中~強", "script": "research_q3b_sizing_split.py"
+    },
+    {
+      "id": "dip_leverage", "market": "both", "light": "❌ 不採用",
+      "rule": "牛市跌深時上 2 倍、漲回來換回 1 倍",
+      "evidence": "60 種規則 × 5 標的(SPY/QQQ/SMH/XLK/0050),跟同平均曝險的固定槓桿比:沒有任何一條在 5 個標的都贏,各標的中位差 −0.06~0.00。原因:回撤後報酬較高,但之後波動也同步放大;回撤 >12% 最糟。合成 2 倍已與 QLD/SSO/00631L 對帳。",
+      "strength": "強(否定)", "script": "research_q3_bull_dip_leverage.py"
+    }
+  ]
+}
