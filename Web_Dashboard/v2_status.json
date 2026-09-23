@@ -1,12 +1,12 @@
 {
-  "generated": "2026-09-23 23:27:42",
+  "generated": "2026-09-24 00:07:59",
   "source": {
     "core_status": "2026-09-23 22:47:47",
     "taiwan_status": "2026-09-23 23:26:41"
   },
   "markets": {
     "us": {
-      "default_method": "rotation",
+      "default_method": "ew",
       "methods": {
         "rotation": [
           {
@@ -383,7 +383,7 @@
         {
           "ticker": "XLK",
           "name": "",
-          "weight": 1.0,
+          "weight": 0.2,
           "conflict": false,
           "conflict_note": "",
           "in_trend": true,
@@ -406,7 +406,7 @@
         {
           "ticker": "SPY",
           "name": "",
-          "weight": 0.0,
+          "weight": 0.2,
           "conflict": false,
           "conflict_note": "",
           "in_trend": true,
@@ -429,7 +429,7 @@
         {
           "ticker": "SOXX",
           "name": "",
-          "weight": 0.0,
+          "weight": 0.2,
           "conflict": false,
           "conflict_note": "",
           "in_trend": true,
@@ -452,7 +452,7 @@
         {
           "ticker": "QQQ",
           "name": "",
-          "weight": 0.0,
+          "weight": 0.2,
           "conflict": false,
           "conflict_note": "",
           "in_trend": true,
@@ -475,7 +475,7 @@
         {
           "ticker": "SMH",
           "name": "",
-          "weight": 0.0,
+          "weight": 0.2,
           "conflict": false,
           "conflict_note": "",
           "in_trend": true,
@@ -1107,7 +1107,7 @@
   "decisions": [
     {
       "key": "method_us",
-      "title": "美股要單押最強,還是 5 檔等權?",
+      "title": "美股要單押最強,還是 5 檔等權?(你已選:等權)",
       "note": "主判定池 2002-2026 統計上打平(Δ超額Sharpe +0.013、p=0.41);無後見之明的 14 檔產業池則明顯站等權。",
       "options": [
         {
@@ -1141,7 +1141,7 @@
     },
     {
       "key": "lev_us",
-      "title": "美股要開多少槓桿?(現行 ×1.0 ≈ 平均曝險 1.15 倍)",
+      "title": "美股要開多少槓桿?(頁面同時列出 ×1.0 與 ×1.25 的金額)",
       "note": "2002-2026 單押輪動+RiskTarget。Sharpe 幾乎不隨槓桿變(0.69~0.73)=沿同一條效率線滑動,差別只有「賺多少 vs 跌多深」。$10萬起算的期末值供感受規模。",
       "options": [
         {
@@ -1168,7 +1168,7 @@
     },
     {
       "key": "lev_tw",
-      "title": "台股要開多少槓桿?(現行 ×1.0 = 在場時滿倉不融資)",
+      "title": "台股要開多少槓桿?(頁面同時列出 ×1.0 與 ×1.25 的金額)",
       "note": "2013-2026 等權+固定1倍。同樣是沿效率線滑動(Sharpe 1.21~1.26)。台股融資成本較高,×1.25 以上要自己確認券商利率。",
       "options": [
         {

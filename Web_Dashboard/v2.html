@@ -135,11 +135,16 @@ function mktCard(mk, m, title, cur){
   const rows = hs.map(p=>{
     const [lab,cls]=ACT[p.action]||['—','grey'];
     const slot = K!=null ? K*p.weight*coreShare : null;
-    const pos  = (slot!=null && p.expo!=null) ? slot*p.expo*lev : null;
+    const pos  = (slot!=null && p.expo!=null) ? slot*p.expo*1.0 : null;      // ×1.0
+    const pos125=(slot!=null && p.expo!=null) ? slot*p.expo*1.25 : null;     // ×1.25(Jason 要求兩種都列)
     const sh   = (pos!=null && p.close) ? Math.floor(pos/p.close) : null;
+    const sh125= (pos125!=null && p.close) ? Math.floor(pos125/p.close) : null;
     const zero = p.weight<=0 || coreShare<=0;
     const buyv = zero ? '不持有'
       : p.action==='buy' ? (pos!=null? `${cur}${fmt(Math.round(pos))}` : `${Math.round((p.expo||0)*100)}%`)
+      : p.action==='cash' ? '現金' : '先等';
+    const buyv125 = zero ? '—'
+      : p.action==='buy' ? (pos125!=null? `${cur}${fmt(Math.round(pos125))}` : `${Math.round((p.expo||0)*125)}%`)
       : p.action==='cash' ? '現金' : '先等';
     const buyc = zero? 'var(--grey)' : (p.action==='buy'?'var(--green)':(p.action==='cash'?'var(--red)':'var(--yellow)'));
     return `<div style="background:#0b1727;border:1px solid #16233a;border-radius:9px;padding:9px 11px;margin-top:8px${zero?';opacity:.45':''}">
@@ -148,14 +153,15 @@ function mktCard(mk, m, title, cur){
         <span class="why">${p.name||''}</span>
         <span class="act ${cls}" style="margin-left:auto">${zero?'—':lab}</span>
       </div>
-      <div class="why" style="margin-top:2px">這份資金 ${Math.round(p.weight*100)}%${slot!=null?` = ${cur}${fmt(Math.round(slot))}`:''}
-        ${p.action==='buy'&&sh!=null?` · 約 ${fmt(sh)} 股`:''}</div>
+      <div class="why" style="margin-top:2px">這份資金 ${Math.round(p.weight*100)}%${slot!=null?` = ${cur}${fmt(Math.round(slot))}`:''}</div>
       <div style="display:flex;gap:5px;margin-top:7px;flex-wrap:wrap">
         ${tile('現價', cur+fmt(p.close))}
         ${tile('買進限價≤', p.limit!=null?cur+fmt(p.limit):'—', '#4da3ff')}
         ${tile('停損(收盤)', p.stop!=null?cur+fmt(p.stop):'—', '#ff5a5a')}
-        ${tile('這檔買多少', buyv, buyc)}
+        ${tile('買多少 ×1.0', buyv, buyc)}
+        ${tile('買多少 ×1.25', buyv125, buyc)}
       </div>
+      ${(p.action==='buy'&&sh!=null)?`<div class="why" style="margin-top:4px">股數:×1.0 約 ${fmt(sh)} 股 · ×1.25 約 ${fmt(sh125)} 股</div>`:''}
       <div class="why" style="margin-top:6px">${p.reason||''}</div>
       ${p.conflict?`<div style="margin-top:6px;font-size:11.5px;background:#2a2510;border:1px solid #5e4d14;color:#ffe39a;border-radius:7px;padding:6px 8px">
         ${p.conflict_note} <b>你目前選的:${dec('conflict')==='hold'?'續抱到跌破停損線':'不在200MA之上就換掉'}</b>
@@ -169,7 +175,10 @@ function mktCard(mk, m, title, cur){
     <h2>${title} ${credit}</h2>
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">${mbtn('ew','等權(每檔一份)')}${mbtn('rotation','單押最強')}</div>
     <div class="note" style="margin:0 0 6px">${(ev.options||{})[meth]||''}</div>
-    <div class="note" style="margin:0 0 8px">買多少:${m.sizing}</div>
+    <div class="note" style="margin:0 0 8px">買多少:${m.sizing}<br>
+      💡 每檔都列 <b>×1.0</b>(不融資)和 <b>×1.25</b>(積極)兩種金額——
+      美股 ×1.0 年化 17.7%/回撤 −48.6%、×1.25 年化 20.9%/回撤 −57.2%;
+      台股 ×1.0 年化 19.3%/回撤 −20.3%、×1.25 年化 23.3%/回撤 −24.4%。挑一種、之後就一直用同一種。</div>
     ${rows}
     ${(mk==='tw'&&sat>0&&m.satellite)?(()=>{const t=m.satellite;const sl=K!=null?K*sat:null;
       const ps=(sl!=null&&t.expo!=null)?sl*t.expo*lev:null;const shs=(ps!=null&&t.close)?Math.floor(ps/t.close):null;
@@ -182,7 +191,8 @@ function mktCard(mk, m, title, cur){
         <div style="display:flex;gap:5px;margin-top:7px;flex-wrap:wrap">
           ${tile('現價', cur+fmt(t.close))}${tile('買進限價≤', t.limit!=null?cur+fmt(t.limit):'—','#4da3ff')}
           ${tile('停損(收盤)', t.stop!=null?cur+fmt(t.stop):'—','#ff5a5a')}
-          ${tile('這檔買多少', t.action==='buy'?(ps!=null?cur+fmt(Math.round(ps)):'—'):(t.action==='cash'?'現金':'先等'), t.action==='buy'?'var(--green)':'var(--yellow)')}</div>
+          ${tile('買多少 ×1.0', t.action==='buy'?(ps!=null?cur+fmt(Math.round(ps/lev)):'—'):(t.action==='cash'?'現金':'先等'), t.action==='buy'?'var(--green)':'var(--yellow)')}
+          ${tile('買多少 ×1.25', t.action==='buy'?(ps!=null?cur+fmt(Math.round(ps/lev*1.25)):'—'):(t.action==='cash'?'現金':'先等'), t.action==='buy'?'var(--green)':'var(--yellow)')}</div>
         <div class="why" style="margin-top:6px">${t.gate_0050_ok?'✅ 母股 0050 在 200MA 之上(閘門開)':'🔴 母股 0050 跌破 200MA → 正2 一律空手'} · ${t.reason||''}</div>
         <div class="why" style="margin-top:4px">⚠️ 槓桿ETF:實測加了它比純核心差(Sharpe 1.28 vs 1.36);2015 年正2擇時單年 −41%。${t.gate_note||''}</div>
       </div>`;})():''}
