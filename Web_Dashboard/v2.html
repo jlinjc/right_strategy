@@ -163,6 +163,7 @@ function mktCard(mk, m, title, cur){
       </div>
       ${(p.action==='buy'&&sh!=null)?`<div class="why" style="margin-top:4px">股數:×1.0 約 ${fmt(sh)} 股 · ×1.25 約 ${fmt(sh125)} 股</div>`:''}
       <div class="why" style="margin-top:6px">${p.reason||''}</div>
+      ${traceBlock(p)}
       ${p.conflict?`<div style="margin-top:6px;font-size:11.5px;background:#2a2510;border:1px solid #5e4d14;color:#ffe39a;border-radius:7px;padding:6px 8px">
         ${p.conflict_note} <b>你目前選的:${dec('conflict')==='hold'?'續抱到跌破停損線':'不在200MA之上就換掉'}</b>
         <a href="#" onclick="document.querySelector('.tabbtn[data-t=dec]').click();return false;">(改)</a></div>`:''}
@@ -175,6 +176,7 @@ function mktCard(mk, m, title, cur){
     <h2>${title} ${credit}</h2>
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">${mbtn('ew','等權(每檔一份)')}${mbtn('rotation','單押最強')}</div>
     <div class="note" style="margin:0 0 6px">${(ev.options||{})[meth]||''}</div>
+    ${creditBlock(mk,m)}
     <div class="note" style="margin:0 0 8px">買多少:${m.sizing}<br>
       💡 每檔都列 <b>×1.0</b>(不融資)和 <b>×1.25</b>(積極)兩種金額——
       美股 ×1.0 年化 17.7%/回撤 −48.6%、×1.25 年化 20.9%/回撤 −57.2%;
@@ -200,6 +202,42 @@ function mktCard(mk, m, title, cur){
     <details class="ev" style="margin-top:10px"><summary>📊 為什麼用這個持有方式 — ${ev.verdict||''}</summary>
       <div class="body">${ev.detail||''}</div></details>
   </div>`;
+}
+
+function traceBlock(p){
+  const tr=p.trace||[]; if(!tr.length) return '';
+  const RE=(V.rule_evidence)||{};
+  const rows=tr.map(c=>{
+    const ev=RE[c.id]||{};
+    return `<div style="border-top:1px solid #16233a;padding:6px 0">
+      <div style="font-size:12px;font-weight:700;color:${c.ok?'#7ee0a0':'#ffcb45'}">${c.ok?'✔':'✘'} ${c.name}</div>
+      <div class="why">條件:<b>${c.cond}</b><br>今天:${c.now} → <b>${c.verdict}</b></div>
+      ${ev.evidence?`<details style="margin-top:3px"><summary class="why" style="cursor:pointer;color:var(--accent)">這條門檻是怎麼定的?有回測嗎</summary>
+        <div class="why" style="padding:4px 0 0 8px;border-left:2px solid #24314a;margin-top:3px">${ev.evidence}</div></details>`:''}
+    </div>`;}).join('');
+  return `<details style="margin-top:7px"><summary style="cursor:pointer;font-size:12px;font-weight:700;color:var(--accent);list-style:none">
+      🔎 為什麼是這個燈?(逐條規則 + 今天的數字)</summary>
+    <div style="margin-top:4px">${rows}</div></details>`;
+}
+
+function creditBlock(mk,m){
+  const a=m.credit_assets||{}; const h=m.credit_health;
+  const NAME={HYG:'HYG 美高收益債',LQD:'LQD 美投資級債',SOXX:'SOXX 費半'};
+  const rows=Object.entries(a).map(([tk,v])=>`<tr>
+    <td style="padding:4px 6px"><b>${NAME[tk]||tk}</b></td>
+    <td style="padding:4px 6px" class="num">${v.close}</td>
+    <td style="padding:4px 6px" class="num">${v.ma200}</td>
+    <td style="padding:4px 6px" class="num" style="color:${v.ok?'#7ee0a0':'#ff8f8f'}">${v.dist_pct>0?'+':''}${v.dist_pct}%</td>
+    <td style="padding:4px 6px">${v.ok?'🟢 健康':'🔴 跌破'}</td></tr>`).join('');
+  const n=Object.keys(a).length, ok=Object.values(a).filter(v=>v.ok).length;
+  const ev=(V.rule_evidence||{}).credit||{};
+  return `<details style="margin-top:8px"><summary style="cursor:pointer;font-size:12.5px;font-weight:700;color:var(--accent);list-style:none">
+      🚦 信用哨明細:為什麼今天是 ×${Math.round((h||0)*100)}%?</summary>
+    <div style="overflow-x:auto;margin-top:5px"><table style="font-size:12px">
+      <tr><th>哨兵</th><th>收盤</th><th>它的200MA</th><th>距離</th><th>狀態</th></tr>${rows}</table></div>
+    <div class="why" style="margin-top:5px">健康 ${ok} / ${n} 個 → 乘數 = ${ok}÷${n} = <b>${Math.round((h||0)*100)}%</b>
+      —— 今天每一筆買進的金額都先乘上這個比例(不是叫你賣,已持有的不動)。</div>
+    <div class="why" style="margin-top:4px">${ev.evidence||''}</div></details>`;
 }
 
 function setMethod(mk,v){ localStorage.setItem('v2m_'+mk, v); render(); }

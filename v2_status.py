@@ -90,6 +90,14 @@ DECISIONS = [
          {'v': '0.2', 'label': '衛星 20%', 'nums': 'CAGR 22.0% · 回撤 −22.0% · Sharpe 1.28(正2用0050的200MA當閘門)'},
          {'v': '0.4', 'label': '衛星 40%', 'nums': 'CAGR 22.5% · 回撤 −25.5% · Sharpe 1.10 · 最差年 −18.7%'},
          {'v': '1', 'label': '全押正2+擇時(最兇)', 'nums': 'CAGR 28.5% · 回撤 −47.2% · Sharpe 0.92 · 最差年 −41.2%'}]},
+    {'key': 'pool_tw', 'title': '台股要用 4 檔還是 3 檔?(0050 和 006208 追蹤同一個指數)',
+     'note': '0050 與 006208 日報酬相關 0.896(同一個台灣50指數,只是發行商不同)。等權下兩檔合計占 50%。'
+             '實測 2013-2026(等權+信用哨):4檔 CAGR 22.2%/Sharpe 1.62/回撤 −17.7%;'
+             '去掉 006208 的 3 檔 22.0%/1.60/−17.6% → ΔSharpe −0.021(p=0.861)= 幾乎完全一樣,'
+             '但交易從 100 筆/年降到 75 筆/年。',
+     'options': [
+         {'v': '4', 'label': '4 檔(0050+0052+006208+0051)', 'nums': 'CAGR 22.2% · Sharpe 1.62 · 約100筆/年'},
+         {'v': '3', 'label': '3 檔(去掉 006208,少一半重複)', 'nums': 'CAGR 22.0% · Sharpe 1.60 · 約75筆/年(省25筆)'}]},
     {'key': 'credit_us', 'title': '美股信用哨要用哪一版?(台股那版已驗證有效,不動)',
      'note': '2026-09-24 重驗:美股信用哨整體效果很小(ΔSharpe +0.08、p=0.17,校正後不顯著)。'
              '兩個版本風險幾乎一樣,差在報酬與交易量。',
@@ -130,12 +138,100 @@ LIMITS = [
 ]
 
 
+# ── 規則依據(每條規則的門檻怎麼來、有沒有回測、效果多大)──
+#    給前端逐條顯示,不准只寫結論不寫數字。
+RULE_EVIDENCE = {
+    'trend': ('收盤 ≥ 200日均線才持有;收盤跌破 200MA×緩衝 全部轉現金',
+              '緩衝各檔不同(美股0.98~1.00、台股0.98~1.00),來自舊研究的逐檔校準。'
+              '擇時本身的價值:SPY 回撤 −55%→−21%、SMH −68%→−31%、0050 −34%→−21%(research_q1)。'),
+    'credit': ('信用哨健康比例 = 曝險乘數',
+               '2026-09-24 重驗(research_b1_credit_canary.py,等權基礎):'
+               '台股 ΔSharpe +0.359、p<0.001、Holm 校正後仍過、三段全正,回撤 −20.3→−17.7%;'
+               '美股 +0.080、p=0.172(校正後 0.69)=無效但無害。'),
+    'extended_us': ('離 50 日均線 ≥ 門檻 → 別追高(等拉回)',
+                    '門檻來自各檔逐檔校準(SMH/XLK +10%、SOXX/QQQ +7%、SPY +5%)。'
+                    '2026-09-23 到場測試驗證:等拉回較好 67%、32年中27年、平均 +0.43%;'
+                    '但 2026-09-24 用更保守的逐年 bootstrap 重算 p=0.130(不顯著)→ 方向對、強度弱。'),
+    'extended_tw': ('離 50 日均線 ≥ +12% → 別追高(等拉回)',
+                    '2026-09-23 掃 3%~15% 一整排門檻後選出的平台區中間值:+12% 等待較好 71%、平均 +1.08%,'
+                    '前半(<2018)4年中3年、後半 6/6 年、5檔全正;+10% 不成立。'
+                    'p<0.001,是所有結論中唯一撐過整體多重檢定的一條。舊門檻 +6~8% 反而有害(p=0.955)。'),
+    'far_us': ('沒追高但離停損線 ≥ 20% → 空手先別進',
+               '舊版用「曝險<50%」= 離停損 38~43%,美股 25 年一天都沒觸發過(等於沒這條)。'
+               '改用距離掃描:只看沒被別追高擋下的日子,離停損 ≥20% 時等拉近再買平均 +0.66%、14年中12年較好;'
+               '但逐年 bootstrap p=0.200(不顯著)→ 保留是因為方向一致且無害。'),
+    'far_tw': ('信用示警期間,離停損線 > budget×信用健康度÷0.5 → 空手先別進',
+               '台股平時版本被反證(離停損 12~18% 時等待平均少賺 3~4%、勝率<40%)已移除;'
+               '只有信用示警期間的版本有支撐:等待平均 +0.63%、勝64%、14年中11年,前半6/6、後半5/8。'),
+    'r3': ('別追高的日子裡,若 200MA 上彎 且 VIX 低於自己20日均(恐慌退燒)→ 可小額試單',
+           '「小額試單」= 不等拉回、先用系統算出的曝險買進(不是額外加碼)。'
+           '依據:R3 成立時「等拉回」和「立即買」幾乎沒差(平均 −0.19%),所以等待沒有價值;'
+           'R3 不成立時等拉回較好(+0.41%)。台股同現象但逐年不一致 → 台股沒有這條。'),
+    'vbottom': ('系統空手 + 距252日高回撤>15% + VIX從≥40尖峰退燒至75% → 半倉救援進場,停損 −7%',
+                '台股 2026-09-24 新增:等權基礎 ΔSharpe +0.137、p=0.014、Holm 後 0.056、三段全正,'
+                'CAGR 19.3→22.1%(research_b2_overlays.py)。美股同測僅 +0.025,維持 SMH/SOXX 限定。'),
+    'sizing_us': ('曝險 = min(budget ÷ 離停損距離, 150%) × 信用乘數',
+                  '實測 ≈ 同平均槓桿的固定倍數(ΔSharpe +0.01~0.03)→ 多賺的是槓桿本身。'
+                  'vol-timing 已於 2026-09-24 關閉(+0.008、p=0.374,但交易 70→133 筆/年)。'),
+    'sizing_tw': ('曝險 = 100% × 信用乘數(固定1倍)',
+                  'RiskTarget 在台股逐檔 5/5、2018後 5/5 都較差(組合層 p=0.367),2026-09-23 改固定1倍。'),
+}
+
+
+def _trace(d, mkt, health):
+    """回傳這一檔今天「每一條規則的檢查結果」:條件、當下數值、門檻、過不過、依據。"""
+    import core_status as C
+    close, ma = d.get('close'), d.get('ma200')
+    dist, dist50 = d.get('dist_pct'), d.get('dist50_pct')
+    thr_pct = round((d.get('entry_thr', 1) - 1) * 100, 1)
+    sr = d.get('stop_risk_pct')
+    out = []
+    ok_trend = (dist is not None and dist >= 0)
+    out.append({'id': 'trend', 'name': '① 趨勢:站上200MA?',
+                'cond': f"收盤 ≥ 200MA(={ma})", 'now': f"收盤 {close}(離200MA {dist:+.1f}%)" if dist is not None else '—',
+                'ok': ok_trend, 'verdict': '在趨勢中' if ok_trend else '跌破 → 這份放現金'})
+    out.append({'id': 'credit', 'name': '② 信用哨:今天的曝險上限',
+                'cond': '健康的哨兵數 ÷ 全部哨兵 = 曝險乘數',
+                'now': f"健康比例 {health:.0%} → 每筆量 ×{health:.0%}" if health is not None else '—',
+                'ok': (health or 0) > 0, 'verdict': ('全額' if (health or 0) >= 1 else
+                                                     ('減量' if (health or 0) > 0 else '清倉不買'))})
+    ext = d.get('entry_state') == 'extended'
+    out.append({'id': 'extended_' + mkt, 'name': '③ 別追高:離50MA夠近嗎?',
+                'cond': f"離50MA < +{thr_pct}%", 'now': f"離50MA {dist50:+.1f}%" if dist50 is not None else '—',
+                'ok': not ext, 'verdict': '沒追高' if not ext else f'超過門檻 → 等拉回到 {d.get("entry_cap")} 以下'})
+    if mkt == 'us':
+        lim = C.STOP_TOO_FAR_PCT
+        far_ok = (sr is not None and sr < lim)
+        now = f"離停損線 {sr}%" if sr is not None else '—'
+    else:
+        lim = round((d.get('budget') or 0) * (health or 1) / 0.5 * 100, 1)
+        far_ok = not (0 < (health or 1) < 1 and sr is not None and sr > lim)
+        now = f"離停損線 {sr}%" + ('' if 0 < (health or 1) < 1 else '(信用滿血時這條不啟用)')
+    out.append({'id': 'far_' + mkt, 'name': '④ 空手先別進:離停損線太遠嗎?',
+                'cond': (f"離停損線 < {lim}%" if mkt == 'us' else f"信用示警期間:離停損線 < {lim}%"),
+                'now': now, 'ok': far_ok,
+                'verdict': '距離可接受' if far_ok else '太遠 → 空手先別進(已持有者續抱)'})
+    if mkt == 'us' and ext:
+        r3 = '可小額試單' in str(d.get('entry_action', ''))
+        out.append({'id': 'r3', 'name': '⑤ 小額試單(只在追高時檢查)',
+                    'cond': '200MA上彎 且 VIX < 自己的20日均(恐慌退燒中)',
+                    'now': '成立' if r3 else '不成立', 'ok': r3,
+                    'verdict': '雖然追高,但此時「等拉回」沒有價值 → 可照系統曝險買進' if r3 else '維持等拉回'})
+    vb = d.get('vbottom') or {}
+    if vb.get('active'):
+        out.append({'id': 'vbottom', 'name': '🚑 V底救援(系統空手時才檢查)',
+                    'cond': '距252日高 <−15% 且 VIX 15日尖峰≥40 且 現值≤尖峰×75%',
+                    'now': f"距高 {vb.get('dd252_pct')}% · VIX尖峰 {vb.get('vix_peak15')} → 現 {vb.get('vix_now')}",
+                    'ok': True, 'verdict': '觸發 → 半倉進場,停損 −7%'})
+    return out
+
+
 def _load(name):
     with open(os.path.join(DASHBOARD_DIR, name), encoding='utf-8') as f:
         return json.load(f)
 
 
-def _positions(status, mkt, method):
+def _positions(status, mkt, method, health=None):
     """回傳 [{ticker, name, weight, ...}]:weight = 該檔分到的資金比例(合計 ≤1,其餘現金)。"""
     cores = {tk: d for tk, d in (status.get('cores') or {}).items() if not d.get('watch_only')}
     if not cores:
@@ -183,6 +279,8 @@ def _positions(status, mkt, method):
             'expo': d.get('suggested_expo'), 'dist200_pct': d.get('dist_pct'),
             'dist50_pct': d.get('dist50_pct'), 'stop_risk_pct': d.get('stop_risk_pct'),
             'entry_thr_pct': round((d.get('entry_thr', 1) - 1) * 100, 1), 'rs': d.get('rs_score'),
+            'budget': d.get('budget'), 'ma200': d.get('ma200'),
+            'trace': _trace(d, mkt, health),      # ★每條規則的檢查結果(條件/當下數值/門檻/依據)
         })
     out.sort(key=lambda x: (-x['weight'], -(x['rs'] or 0)))
     return out
@@ -194,8 +292,8 @@ def build():
             'source': {'core_status': cs.get('last_updated'), 'taiwan_status': tw.get('last_updated')},
             'markets': {}}
     for mkt, status, cur in (('us', cs, '$'), ('tw', tw, 'NT$')):
-        methods = {m: _positions(status, mkt, m) for m in ('rotation', 'ew', 'topn')}
         can = status.get('canary') or {}
+        methods = {m: _positions(status, mkt, m, can.get('health')) for m in ('rotation', 'ew', 'topn')}
         data['markets'][mkt] = {
             'default_method': DEFAULT_METHOD[mkt], 'methods': methods, 'topn': TOPN[mkt], 'currency': cur,
             'credit_health': can.get('health'), 'credit_note': can.get('note'),
@@ -228,6 +326,7 @@ def build():
     data['diff'] = DIFF
     data['limits'] = LIMITS
     data['decisions'] = DECISIONS
+    data['rule_evidence'] = {k: {'rule': v[0], 'evidence': v[1]} for k, v in RULE_EVIDENCE.items()}
     path = os.path.join(DASHBOARD_DIR, 'v2_status.json')
     with open(path, 'w', encoding='utf-8') as f:
         from scanner_base import json_safe
