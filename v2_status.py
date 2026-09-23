@@ -145,7 +145,8 @@ def build():
     data['limits'] = LIMITS
     path = os.path.join(DASHBOARD_DIR, 'v2_status.json')
     with open(path, 'w', encoding='utf-8') as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
+        from scanner_base import json_safe
+        json.dump(json_safe(data), f, ensure_ascii=False, indent=2, allow_nan=False)
     print(f'💾 {path}')
     for mkt in ('us', 'tw'):
         m = data['markets'][mkt]

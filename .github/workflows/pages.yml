@@ -53,8 +53,14 @@ jobs:
             curl -sf "https://jlinjc.github.io/right_strategy/$f.json?nc=$(date +%s)" -o "/tmp/live_$f.json" || continue
             python - "$f" <<'PY'
           import json, shutil, sys
+          def strict(path):   # ★NaN/Infinity 不是合法 JSON(瀏覽器讀不了)→ 視為壞檔,不採用
+              return json.load(open(path, encoding='utf-8'),
+                               parse_constant=lambda c: (_ for _ in ()).throw(ValueError('bad json const ' + c)))
           f = sys.argv[1]; p = f'Web_Dashboard/{f}.json'
-          live = json.load(open(f'/tmp/live_{f}.json', encoding='utf-8'))
+          try:
+              live = strict(f'/tmp/live_{f}.json')
+          except Exception as e:
+              print(f, 'live json 壞掉,沿用 repo 版本:', e); live = {}
           repo = json.load(open(p, encoding='utf-8'))
           if str(live.get('last_updated', '')) > str(repo.get('last_updated', '')):
               shutil.copy(f'/tmp/live_{f}.json', p)
@@ -91,7 +97,11 @@ jobs:
           curl -sf "https://jlinjc.github.io/right_strategy/strategy_signals.json?nc=$(date +%s)" -o /tmp/live_sig.json && python - <<'PY'
           import json, shutil
           p = 'Web_Dashboard/strategy_signals.json'
-          live = json.load(open('/tmp/live_sig.json', encoding='utf-8'))
+          try:                 # ★同上:線上版本若含 NaN(不合法 JSON)就別沿用,改用 repo 版
+              live = json.load(open('/tmp/live_sig.json', encoding='utf-8'),
+                               parse_constant=lambda c: (_ for _ in ()).throw(ValueError('bad json const ' + c)))
+          except Exception as e:
+              print('live signals 壞掉,沿用 repo 版本:', e); live = {}
           repo = json.load(open(p, encoding='utf-8'))
           if str(live.get('last_updated', '')) > str(repo.get('last_updated', '')):
               shutil.copy('/tmp/live_sig.json', p)

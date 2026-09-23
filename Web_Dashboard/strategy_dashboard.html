@@ -1613,9 +1613,9 @@ function updLag(raw){
 
 async function loadAll(){
   try{
-    const [sig, ev, rb, cs, mn, tw, ld, ag, al, kb] = await Promise.all([
-      getJSON('strategy_signals.json'),
-      getJSON('backtest_evidence.json'),
+    let [sig, ev, rb, cs, mn, tw, ld, ag, al, kb] = await Promise.all([
+      getJSON('strategy_signals.json').catch(e=>{console.error('signals failed',e);return null;}),
+      getJSON('backtest_evidence.json').catch(e=>{console.error('evidence failed',e);return null;}),
       getJSON('robustness.json').catch(()=>null),
       getJSON('core_status.json').catch(()=>null),
       getJSON('strategy_menu.json').catch(()=>null),
@@ -1625,6 +1625,20 @@ async function loadAll(){
       getJSON('allocation_status.json').catch(()=>null),
       getJSON('kbar_annotations.json').catch(()=>null),
     ]);
+    // ★2026-09-23:單一 JSON 壞掉(例如某班 yfinance 給 NaN,而 NaN 不是合法 JSON)不該讓整頁空白。
+    //   實際事故:strategy_signals.json 出現 "qqq_close": NaN → JSON.parse 丟 SyntaxError → 整個
+    //   loadAll 掛掉,連核心指令卡都不見。根源已修(scanner_base.dump_json 一律 allow_nan=False),
+    //   這裡是第二道防線:壞掉的那份用空殼替代 + 紅色橫幅告知,其他面板照常顯示。
+    const sigBad = !sig || !sig.config;
+    if(sigBad){
+      sig = sig || {}; sig.config = sig.config || {}; sig.signals = sig.signals || [];
+      sig.n_signals = sig.n_signals || 0; sig.watch = sig.watch || [];
+      const w=document.querySelector('body > .wrap');
+      const b2=document.createElement('div');
+      b2.style.cssText='background:#5e1f1f;border:2px solid #ff5a5a;color:#ffb4b4;border-radius:10px;padding:12px 16px;margin:14px 0;font-size:14px;font-weight:700';
+      b2.textContent='🔴 個股信號資料讀取失敗(檔案損毀或尚未產生)——個股衛星面板暫時無資料,核心/台股指令不受影響。';
+      w.insertBefore(b2, w.firstChild);
+    }
     // ★資料斷供防線:JSON 太舊(>36小時)就大字紅色警告,別依過期標籤下單
     // ★2026-08-31修:原本只檢查 cs(核心指數/美股)一份。但 pages.yml 排程對每支腳本各自
     //   continue-on-error(單支失敗不擋部署,沿用舊JSON)——如果只有其中一支(例如台股或
@@ -1678,17 +1692,17 @@ async function loadAll(){
     renderAggressive(ag);
     renderAllocation(al);
     renderBuyList(cs, tw);
-    renderCore(cs, sig);
+    renderCore(cs, sigBad?null:sig);
     renderTaiwan(tw);
     renderLeaders(ld);
     renderMenu(mn);
-    renderPlaybook(ev, sig.config);
+    if(ev) renderPlaybook(ev, sig.config);
     renderRobust(rb);
-    renderSignals(sig);
-    renderWatch(sig);
-    renderEvidence(ev);
+    if(!sigBad) renderSignals(sig);
+    if(!sigBad) renderWatch(sig);
+    if(ev) renderEvidence(ev);
     renderKbar(kb, cs, tw);
-    $('#foot').textContent = `${sig.config.universe||''}　|　進場：${sig.config.entry}　|　出場：${sig.config.exit}`;
+    $('#foot').textContent = `${(sig.config&&sig.config.universe)||''}　|　進場：${sig.config.entry}　|　出場：${sig.config.exit}`;
   }catch(e){
     // ★2026-08-31修:原本寫 $('#regime').innerHTML,但 #regime 這個容器在更早的頁面整併時已經
     //   拿掉(併進 #commandCard),留著的話資料真的載入失敗時,這段錯誤處理本身會因為對 null

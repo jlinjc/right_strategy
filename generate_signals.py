@@ -445,7 +445,8 @@ def main():
     os.makedirs(DASHBOARD_DIR, exist_ok=True)
     path = os.path.join(DASHBOARD_DIR, 'strategy_signals.json')
     with open(path, 'w', encoding='utf-8') as f:
-        json.dump(out, f, ensure_ascii=False, indent=2)
+        from scanner_base import json_safe
+        json.dump(json_safe(out), f, ensure_ascii=False, indent=2, allow_nan=False)
 
     print(f"✅ {regime['label']}")
     print(f"✅ {len(cards)} 個進場信號 / {len(watch)} 個醞釀中 / "

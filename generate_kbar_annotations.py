@@ -393,7 +393,8 @@ def main():
     os.makedirs(DASHBOARD_DIR, exist_ok=True)
     path = os.path.join(DASHBOARD_DIR, 'kbar_annotations.json')
     with open(path, 'w', encoding='utf-8') as f:
-        json.dump(out, f, ensure_ascii=False)
+        from scanner_base import json_safe
+        json.dump(json_safe(out), f, ensure_ascii=False, allow_nan=False)
     print(f"💾 {path}  ({os.path.getsize(path)//1024} KB, {len(tickers_out)} 檔)")
 
 

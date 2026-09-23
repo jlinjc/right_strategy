@@ -691,8 +691,8 @@ def main():
     }
     os.makedirs(DASHBOARD_DIR, exist_ok=True)
     path = os.path.join(DASHBOARD_DIR, 'core_status.json')
-    with open(path, 'w', encoding='utf-8') as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
+    from scanner_base import dump_json
+    dump_json(path, data)      # ★NaN 一律轉 None + allow_nan=False(見 scanner_base.dump_json)
 
     emoji = {'risk_on': '🟢', 'risk_off': '🔴', 'warning': '🟡', 'panic_watch': '🟠'}
     entry_emoji = {'can_enter': '🟢', 'extended': '🟡', 'expensive': '🟡', 'no_entry': '🔴'}

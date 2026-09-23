@@ -78,6 +78,30 @@ def send_line_notify(message, image_path=None):
 # ============================================================
 DASHBOARD_DIR = os.path.join(os.path.dirname(__file__), 'Web_Dashboard')
 
+
+def json_safe(obj):
+    """把 NaN/Infinity 換成 None。
+    ★2026-09-23:python 的 json 預設會寫出 `NaN`,但 NaN **不是合法 JSON**,瀏覽器 JSON.parse 直接丟
+    SyntaxError。實際事故:某班 yfinance 抓 QQQ 拿到 NaN → strategy_signals.json 出現 "qqq_close": NaN
+    → 整個儀表板(不只那個面板)載入失敗。所有 live JSON 一律先過這個函式,再用 allow_nan=False 寫出。"""
+    import math
+    if isinstance(obj, float):
+        return None if (math.isnan(obj) or math.isinf(obj)) else obj
+    if isinstance(obj, dict):
+        return {k: json_safe(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return [json_safe(v) for v in obj]
+    return obj
+
+
+def dump_json(path, data, indent=2):
+    """live JSON 的唯一寫出口:先清 NaN,再用 allow_nan=False 把關(有漏網就丟例外,
+    讓該班失敗、沿用上一版,而不是部署出一份瀏覽器讀不了的檔案)。"""
+    import json
+    with open(path, 'w', encoding='utf-8') as f:
+        json.dump(json_safe(data), f, ensure_ascii=False, indent=indent, allow_nan=False)
+
+
 def save_dashboard_data(filename, data):
     """將掃描結果存成 JSON，供 Web Dashboard 讀取"""
     import json
@@ -89,7 +113,7 @@ def save_dashboard_data(filename, data):
     
     try:
         with open(filepath, 'w', encoding='utf-8') as f:
-            json.dump(data, f, ensure_ascii=False, indent=2)
+            json.dump(json_safe(data), f, ensure_ascii=False, indent=2, allow_nan=False)
     except Exception as e:
         print(f"Failed to save dashboard data {filename}: {e}")
 
