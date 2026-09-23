@@ -48,6 +48,54 @@ METHOD_EVIDENCE = {
 }
 
 
+LEV_TICKER = '00631L.TW'
+
+# ── 決策清單:每條都給正反兩邊的實測數字,選了就直接影響上面的「今天怎麼做」──
+#    數字來源:research_q4_choices.py(A 槓桿階梯 / D 正2接法)、research_rot_verify_p1.py(持有方式)
+DECISIONS = [
+    {'key': 'method_us', 'title': '美股要單押最強,還是 5 檔等權?',
+     'note': '主判定池 2002-2026 統計上打平(Δ超額Sharpe +0.013、p=0.41);無後見之明的 14 檔產業池則明顯站等權。',
+     'options': [
+         {'v': 'rotation', 'label': '單押最強(現行)', 'nums': 'CAGR 14.1% · 回撤 −36.1% · 約15筆/年 · 超額Sharpe 0.69'},
+         {'v': 'ew', 'label': '5 檔等權', 'nums': 'CAGR 12.4% · 回撤 −26.0% · 約70筆/年 · 超額Sharpe 0.70(同波動後年化一樣)'}]},
+    {'key': 'method_tw', 'title': '台股要等權,還是單押最強?',
+     'note': '主池 Δ+0.210(p=0.038)、長樣本池 Δ+0.229(p=0.015);前N名曲線 1檔1.06→3檔1.23。',
+     'options': [
+         {'v': 'ew', 'label': '等權(新版預設)', 'nums': 'CAGR 19.3% · 回撤 −20.3% · 超額Sharpe 1.26'},
+         {'v': 'rotation', 'label': '單押最強(原版)', 'nums': 'CAGR 13.2% · 回撤 −33.7% · 超額Sharpe 0.89'}]},
+    {'key': 'lev_us', 'title': '美股要開多少槓桿?(現行 ×1.0 ≈ 平均曝險 1.15 倍)',
+     'note': '2002-2026 單押輪動+RiskTarget。Sharpe 幾乎不隨槓桿變(0.69~0.73)=沿同一條效率線滑動,'
+             '差別只有「賺多少 vs 跌多深」。$10萬起算的期末值供感受規模。',
+     'options': [
+         {'v': '0.5', 'label': '×0.5(保守)', 'nums': 'CAGR 10.5% · 回撤 −27.0% · 10萬→114萬'},
+         {'v': '0.75', 'label': '×0.75', 'nums': 'CAGR 14.3% · 回撤 −38.6% · 10萬→260萬'},
+         {'v': '1', 'label': '×1.0(現行)', 'nums': 'CAGR 17.7% · 回撤 −48.6% · 10萬→529萬'},
+         {'v': '1.25', 'label': '×1.25(積極)', 'nums': 'CAGR 20.9% · 回撤 −57.2% · 10萬→1017萬'}]},
+    {'key': 'lev_tw', 'title': '台股要開多少槓桿?(現行 ×1.0 = 在場時滿倉不融資)',
+     'note': '2013-2026 等權+固定1倍。同樣是沿效率線滑動(Sharpe 1.21~1.26)。台股融資成本較高,'
+             '×1.25 以上要自己確認券商利率。',
+     'options': [
+         {'v': '0.5', 'label': '×0.5(保守)', 'nums': 'CAGR 10.2% · 回撤 −11.3%'},
+         {'v': '0.75', 'label': '×0.75', 'nums': 'CAGR 15.1% · 回撤 −16.6%'},
+         {'v': '1', 'label': '×1.0(現行)', 'nums': 'CAGR 19.3% · 回撤 −20.3%'},
+         {'v': '1.25', 'label': '×1.25(積極)', 'nums': 'CAGR 23.3% · 回撤 −24.4%'}]},
+    {'key': 'sat_tw', 'title': '台股要不要配正2(00631L)當衛星?',
+     'note': '2015-08~2026-09 實測:加正2衛星比純核心差;想加報酬,直接把核心加槓桿比較划算。'
+             '⚠️2015 年正2擇時單年 −41%、純買持最差年 −36%。這條是你指定要接的,數字照實列。',
+     'options': [
+         {'v': '0', 'label': '不配(數據最佳)', 'nums': '核心等權:CAGR 21.8% · 回撤 −20.3% · Sharpe 1.36'},
+         {'v': '0.2', 'label': '衛星 20%', 'nums': 'CAGR 22.0% · 回撤 −22.0% · Sharpe 1.28(正2用0050的200MA當閘門)'},
+         {'v': '0.4', 'label': '衛星 40%', 'nums': 'CAGR 22.5% · 回撤 −25.5% · Sharpe 1.10 · 最差年 −18.7%'},
+         {'v': '1', 'label': '全押正2+擇時(最兇)', 'nums': 'CAGR 28.5% · 回撤 −47.2% · Sharpe 0.92 · 最差年 −41.2%'}]},
+    {'key': 'conflict', 'title': '價格在「停損線 ~ 200MA」之間時,要續抱還是換掉?',
+     'note': '兩套規則在這一格會給相反指示;回測顯示兩種版本差異 ≈ 0(美股 −0.029、台股 −0.043、長樣本 +0.008)。'
+             '沒有數據上正確的一方——選一個口徑,之後遇到就照選的做,頁面會在發生時標記。',
+     'options': [
+         {'v': 'hold', 'label': '續抱到跌破停損線(交易少)', 'nums': '台股長樣本 Sharpe 0.73 vs 0.72(差 +0.008)'},
+         {'v': 'switch', 'label': '不在200MA之上就換掉(嚴格)', 'nums': '美股 0.69 vs 0.66(差 −0.029);台股 1.05 vs 1.01'}]},
+]
+
+
 # ── 新版 vs 原版差異(每一條都要能指到可重跑的腳本)──
 DIFF = [
     {'item': '美股「別追高」門檻', 'old': 'SMH/XLK +10%、SOXX/QQQ +7%、SPY +5%(離50MA)', 'new': '不變',
@@ -108,8 +156,17 @@ def _positions(status, mkt, method):
             act, why = 'wait', d.get('entry_action', '')
         else:
             act, why = 'cash', d.get('entry_action', '')
+        # ★規則衝突標記(2026-09-23,Jason 指示「出現時標出來,當下自己決定」):
+        #   價格掉到「停損線 ~ 200MA」之間時,單檔規則說「續抱」(還沒跌破停損線),
+        #   但輪動的合格條件是「收盤 ≥ 200MA」→ 會判定失格、強制換掉。兩套規則對同一天給相反指示。
+        #   回測顯示兩種版本差異 ≈ 0(±0.04),所以沒有「數據上正確」的一方,由人當下決定。
+        conflict = (st == 'warning')
         out.append({
             'ticker': tk, 'name': d.get('name', ''), 'weight': round(w, 4),
+            'conflict': conflict,
+            'conflict_note': ('⚠️ 兩套規則不一致:價格在停損線與200MA之間——單檔規則說「還沒跌破停損線→續抱」,'
+                              '輪動規則說「不在200MA之上→失格換掉」。回測上兩種做法差異≈0,你自己決定:'
+                              '要嚴格(換掉)還是要少交易(續抱到真的跌破停損線)。') if conflict else '',
             'in_trend': st in ('risk_on', 'warning'), 'state': st, 'entry_state': est,
             'action': act, 'reason': why,
             'close': d.get('close'), 'limit': d.get('entry_cap'), 'stop': d.get('exit_price'),
@@ -140,9 +197,28 @@ def build():
             'rotation_hold': status.get('rotation_hold'),
             'daily_verdict': status.get('daily_verdict'),
         }
+    # ★正2(00631L)衛星:live 只提供資料與規則,配多少由決策清單選(預設 0%)
+    twc = (tw.get('cores') or {}).get(LEV_TICKER)
+    if twc:
+        # 閘門:回測中最好的接法是用母股 0050 的 200MA 當閘門(③ Sharpe 1.28 > ② 自己的 1.21)
+        g = (tw.get('cores') or {}).get('0050.TW') or {}
+        gate_ok = g.get('state') in ('risk_on', 'warning') and not g.get('credit_cut')
+        data['markets']['tw']['satellite'] = {
+            'gate_0050_ok': bool(gate_ok), 'expo': twc.get('suggested_expo'),
+            'ticker': LEV_TICKER, 'name': twc.get('name', ''), 'close': twc.get('close'),
+            'limit': twc.get('entry_cap'), 'stop': twc.get('exit_price'),
+            'limit_pct': twc.get('entry_cap_pct'), 'stop_pct': twc.get('exit_pct'),
+            'state': twc.get('state'), 'entry_state': twc.get('entry_state'),
+            'action': ('cash' if (not gate_ok or twc.get('state') == 'risk_off') else
+                       'buy' if twc.get('entry_state') == 'can_enter' else 'wait'),
+            'reason': twc.get('entry_action', ''),
+            'dist200_pct': twc.get('dist_pct'),
+            'gate_note': '正2的停損線用它自己的200MA;母股 0050 跌破自己的200MA時,核心那幾份本來就會轉現金。',
+        }
     data['method_evidence'] = METHOD_EVIDENCE
     data['diff'] = DIFF
     data['limits'] = LIMITS
+    data['decisions'] = DECISIONS
     path = os.path.join(DASHBOARD_DIR, 'v2_status.json')
     with open(path, 'w', encoding='utf-8') as f:
         from scanner_base import json_safe

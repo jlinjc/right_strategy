@@ -71,6 +71,7 @@
 
   <div class="tabbar" id="tabbar">
     <button class="tabbtn on" data-t="today">🎯 今天怎麼做</button>
+    <button class="tabbtn" data-t="dec">🗳 決策清單</button>
     <button class="tabbtn" data-t="diff">🔍 和原版差在哪</button>
     <button class="tabbtn" data-t="ev">📐 規則與證據</button>
     <button class="tabbtn" data-t="limit">⚠️ 限制與待決</button>
@@ -88,6 +89,7 @@
     <div class="mkt" id="markets"></div>
   </div>
 
+  <div class="pane" id="p-dec"><div id="decBox"></div></div>
   <div class="pane" id="p-diff"><div id="diffBox"></div></div>
   <div class="pane" id="p-ev"><div id="evBox"></div></div>
   <div class="pane" id="p-limit"><div id="limitBox"></div></div>
@@ -105,6 +107,10 @@ document.querySelectorAll('.tabbtn').forEach(b=>b.onclick=()=>{
 });
 function setCap(m,v){ v?localStorage.setItem('v2cap_'+m,v):localStorage.removeItem('v2cap_'+m); render(); }
 const cap=m=>parseFloat(localStorage.getItem('v2cap_'+m))||null;
+const DEC_DEF={method_us:null,method_tw:null,lev_us:'1',lev_tw:'1',sat_tw:'0',conflict:'hold'};
+function dec(k){ const v=localStorage.getItem('v2d_'+k); return v!==null?v:DEC_DEF[k]; }
+function setDec(k,v){ localStorage.setItem('v2d_'+k,v); render(); renderDecisions(); }
+window.setDec=setDec;
 const fmt=n=>n==null?'—':n.toLocaleString(undefined,{maximumFractionDigits:2});
 
 const ACT={buy:['🟢 買進','buy'],hold_wait:['🟠 維持現倉','wait'],wait:['🟡 先別買','wait'],
@@ -112,7 +118,11 @@ const ACT={buy:['🟢 買進','buy'],hold_wait:['🟠 維持現倉','wait'],wait
 
 function mktCard(mk, m, title, cur){
   const K=cap(mk);
-  const meth = localStorage.getItem('v2m_'+mk) || m.default_method;
+  const meth = dec('method_'+mk) || localStorage.getItem('v2m_'+mk) || m.default_method;
+  const lev = parseFloat(dec('lev_'+mk))||1;
+  const sat = (mk==='tw') ? (parseFloat(dec('sat_tw'))||0) : 0;
+  const satAll = sat>=1;                       // 全押正2
+  const coreShare = satAll ? 0 : (1-sat);
   const hs = m.methods[meth] || m.positions;
   const ev = (V.method_evidence||{})[mk] || {};
   const hearts = m.credit_health;
@@ -124,10 +134,10 @@ function mktCard(mk, m, title, cur){
       <div style="font-size:13px;font-weight:800;color:${col||'var(--txt)'};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${val}</div></div>`;
   const rows = hs.map(p=>{
     const [lab,cls]=ACT[p.action]||['—','grey'];
-    const slot = K!=null ? K*p.weight : null;
-    const pos  = (slot!=null && p.expo!=null) ? slot*p.expo : null;
+    const slot = K!=null ? K*p.weight*coreShare : null;
+    const pos  = (slot!=null && p.expo!=null) ? slot*p.expo*lev : null;
     const sh   = (pos!=null && p.close) ? Math.floor(pos/p.close) : null;
-    const zero = p.weight<=0;
+    const zero = p.weight<=0 || coreShare<=0;
     const buyv = zero ? '不持有'
       : p.action==='buy' ? (pos!=null? `${cur}${fmt(Math.round(pos))}` : `${Math.round((p.expo||0)*100)}%`)
       : p.action==='cash' ? '現金' : '先等';
@@ -147,6 +157,9 @@ function mktCard(mk, m, title, cur){
         ${tile('這檔買多少', buyv, buyc)}
       </div>
       <div class="why" style="margin-top:6px">${p.reason||''}</div>
+      ${p.conflict?`<div style="margin-top:6px;font-size:11.5px;background:#2a2510;border:1px solid #5e4d14;color:#ffe39a;border-radius:7px;padding:6px 8px">
+        ${p.conflict_note} <b>你目前選的:${dec('conflict')==='hold'?'續抱到跌破停損線':'不在200MA之上就換掉'}</b>
+        <a href="#" onclick="document.querySelector('.tabbtn[data-t=dec]').click();return false;">(改)</a></div>`:''}
     </div>`;
   }).join('');
   const mbtn=(v,txt)=>`<button class="tabbtn ${meth===v?'on':''}" style="padding:4px 10px;font-size:12px"
@@ -158,6 +171,21 @@ function mktCard(mk, m, title, cur){
     <div class="note" style="margin:0 0 6px">${(ev.options||{})[meth]||''}</div>
     <div class="note" style="margin:0 0 8px">買多少:${m.sizing}</div>
     ${rows}
+    ${(mk==='tw'&&sat>0&&m.satellite)?(()=>{const t=m.satellite;const sl=K!=null?K*sat:null;
+      const ps=(sl!=null&&t.expo!=null)?sl*t.expo*lev:null;const shs=(ps!=null&&t.close)?Math.floor(ps/t.close):null;
+      const [l2,c2]=ACT[t.action]||['—','grey'];
+      return `<div style="background:#160f1f;border:1px solid #3a2a50;border-radius:9px;padding:9px 11px;margin-top:10px">
+        <div style="display:flex;align-items:baseline;gap:7px;flex-wrap:wrap"><b style="font-size:15px">00631L</b>
+          <span class="why">${t.name||'正2'} · 衛星 ${Math.round(sat*100)}%</span>
+          <span class="act ${c2}" style="margin-left:auto">${l2}</span></div>
+        <div class="why" style="margin-top:2px">這份資金 ${Math.round(sat*100)}%${sl!=null?` = ${cur}${fmt(Math.round(sl))}`:''}${t.action==='buy'&&shs!=null?` · 約 ${fmt(shs)} 股`:''}</div>
+        <div style="display:flex;gap:5px;margin-top:7px;flex-wrap:wrap">
+          ${tile('現價', cur+fmt(t.close))}${tile('買進限價≤', t.limit!=null?cur+fmt(t.limit):'—','#4da3ff')}
+          ${tile('停損(收盤)', t.stop!=null?cur+fmt(t.stop):'—','#ff5a5a')}
+          ${tile('這檔買多少', t.action==='buy'?(ps!=null?cur+fmt(Math.round(ps)):'—'):(t.action==='cash'?'現金':'先等'), t.action==='buy'?'var(--green)':'var(--yellow)')}</div>
+        <div class="why" style="margin-top:6px">${t.gate_0050_ok?'✅ 母股 0050 在 200MA 之上(閘門開)':'🔴 母股 0050 跌破 200MA → 正2 一律空手'} · ${t.reason||''}</div>
+        <div class="why" style="margin-top:4px">⚠️ 槓桿ETF:實測加了它比純核心差(Sharpe 1.28 vs 1.36);2015 年正2擇時單年 −41%。${t.gate_note||''}</div>
+      </div>`;})():''}
     <div class="note">🟡/🔴 的那幾份先放現金${off?`(目前 ${off} 份)`:''};等它轉 🟢 再補,不要挪去加碼別檔。停損只看<b>收盤</b>。</div>
     <details class="ev" style="margin-top:10px"><summary>📊 為什麼用這個持有方式 — ${ev.verdict||''}</summary>
       <div class="body">${ev.detail||''}</div></details>
@@ -173,6 +201,25 @@ function render(){
   $('#cap_tw').value = localStorage.getItem('v2cap_tw')||'';
   $('#markets').innerHTML = mktCard('us', V.markets.us, '🇺🇸 美股', '$')
                           + mktCard('tw', V.markets.tw, '🇹🇼 台股', 'NT$');
+}
+
+function renderDecisions(){
+  const box=$('#decBox'); if(!box||!V) return;
+  const ds=V.decisions||[];
+  box.innerHTML = `<div class="card"><h2>🗳 六個要你決定的事</h2>
+    <div class="note">每條都附兩邊的實測數字。選了就直接套用到「今天怎麼做」那頁(只存在你的瀏覽器)。
+    沒有「數據上唯一正確」的答案才會放進這裡——數據能決定的部分我已經直接改好了。</div></div>`
+    + ds.map(d=>{
+      const cur=dec(d.key);
+      const opts=d.options.map(o=>`<div onclick="setDec('${d.key}','${o.v}')"
+        style="cursor:pointer;border:1px solid ${String(cur)===String(o.v)?'var(--accent)':'var(--line)'};
+        background:${String(cur)===String(o.v)?'rgba(77,163,255,0.12)':'var(--panel2)'};
+        border-radius:9px;padding:9px 11px;margin-top:7px">
+        <div style="font-weight:700;font-size:13.5px">${String(cur)===String(o.v)?'✅ ':'　'}${o.label}</div>
+        <div class="why" style="margin-top:3px">${o.nums}</div></div>`).join('');
+      return `<div class="card"><h2 style="font-size:14px">${d.title}</h2>
+        <div class="why">${d.note}</div>${opts}</div>`;
+    }).join('');
 }
 
 function renderEvidence(){
@@ -206,7 +253,7 @@ function renderLimit(){
     $('#updated').innerHTML = `${stale>36?'🔴 資料過期':'🟢'} 資料更新 <b>${V.generated.slice(5,16)}</b>`
       + `(台北時間;伺服器每天 09:00/21:00/22:30 自動更新,GitHub 常延遲 1-4 小時)`
       + (stale>36?` — 已經 ${Math.round(stale)} 小時沒更新,先別依這頁下單`:'');
-    render(); renderEvidence(); renderDiff(); renderLimit();
+    render(); renderDecisions(); renderEvidence(); renderDiff(); renderLimit();
     $('#foot').textContent = `v2 · 規則版本 ${EV.version} · 訊號皆為收盤價計算,隔日限價執行`;
   }catch(e){
     $('#updated').innerHTML = '<span style="color:var(--red)">⚠️ 資料載入失敗:'+e.message+'</span>';
