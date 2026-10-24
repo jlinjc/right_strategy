@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-24 14:22:09",
+  "generated": "2026-10-24 14:26:36",
   "source": {
     "core_status": "2026-09-24 07:34:05",
     "taiwan_status": "2026-09-24 07:34:06"
@@ -562,6 +562,616 @@
             "ticker": "SMH",
             "name": "",
             "weight": 0.2,
+            "conflict": false,
+            "conflict_note": "",
+            "in_trend": true,
+            "state": "risk_on",
+            "entry_state": "no_entry",
+            "action": "cash",
+            "reason": "跌破200MA或信用全示警 → 這份放現金",
+            "close": 601.41,
+            "limit": 621.44,
+            "stop": 481.03,
+            "limit_pct": null,
+            "stop_pct": null,
+            "expo": 0.0,
+            "dist200_pct": 22.52,
+            "dist50_pct": 6.46,
+            "stop_risk_pct": 20.0,
+            "entry_thr_pct": 10.0,
+            "rs": 1.123,
+            "budget": 0.213,
+            "ma200": 490.85,
+            "trace": [
+              {
+                "id": "trend",
+                "name": "① 趨勢:站上200MA?",
+                "cond": "收盤 ≥ 200MA(=490.85)",
+                "now": "收盤 601.41(離200MA +22.5%)",
+                "ok": true,
+                "verdict": "在趨勢中"
+              },
+              {
+                "id": "credit",
+                "name": "② 信用哨:今天的曝險上限",
+                "cond": "健康的哨兵數 ÷ 全部哨兵 = 曝險乘數",
+                "now": "健康比例 0% → 每筆量 ×0%",
+                "ok": false,
+                "verdict": "清倉不買"
+              },
+              {
+                "id": "extended_us",
+                "name": "③ 別追高:離50MA夠近嗎?",
+                "cond": "離50MA < +10.0%",
+                "now": "離50MA +6.5%",
+                "ok": true,
+                "verdict": "沒追高"
+              },
+              {
+                "id": "far_us",
+                "name": "④ 空手先別進:離停損線太遠嗎?",
+                "cond": "離停損線 < 20.0%",
+                "now": "離停損線 20.0%",
+                "ok": false,
+                "verdict": "太遠 → 空手先別進(已持有者續抱)"
+              }
+            ]
+          }
+        ],
+        "ew3": [
+          {
+            "ticker": "XLK",
+            "name": "",
+            "weight": 0.2,
+            "conflict": false,
+            "conflict_note": "",
+            "in_trend": true,
+            "state": "risk_on",
+            "entry_state": "no_entry",
+            "action": "cash",
+            "reason": "跌破200MA或信用全示警 → 這份放現金",
+            "close": 195.34,
+            "limit": 201.71,
+            "stop": 159.31,
+            "limit_pct": null,
+            "stop_pct": null,
+            "expo": 0.0,
+            "dist200_pct": 20.17,
+            "dist50_pct": 6.53,
+            "stop_risk_pct": 18.4,
+            "entry_thr_pct": 10.0,
+            "rs": 1.414,
+            "budget": 0.213,
+            "ma200": 162.56,
+            "trace": [
+              {
+                "id": "trend",
+                "name": "① 趨勢:站上200MA?",
+                "cond": "收盤 ≥ 200MA(=162.56)",
+                "now": "收盤 195.34(離200MA +20.2%)",
+                "ok": true,
+                "verdict": "在趨勢中"
+              },
+              {
+                "id": "credit",
+                "name": "② 信用哨:今天的曝險上限",
+                "cond": "健康的哨兵數 ÷ 全部哨兵 = 曝險乘數",
+                "now": "健康比例 0% → 每筆量 ×0%",
+                "ok": false,
+                "verdict": "清倉不買"
+              },
+              {
+                "id": "extended_us",
+                "name": "③ 別追高:離50MA夠近嗎?",
+                "cond": "離50MA < +10.0%",
+                "now": "離50MA +6.5%",
+                "ok": true,
+                "verdict": "沒追高"
+              },
+              {
+                "id": "far_us",
+                "name": "④ 空手先別進:離停損線太遠嗎?",
+                "cond": "離停損線 < 20.0%",
+                "now": "離停損線 18.4%",
+                "ok": true,
+                "verdict": "距離可接受"
+              }
+            ]
+          },
+          {
+            "ticker": "SPY",
+            "name": "",
+            "weight": 0.2,
+            "conflict": false,
+            "conflict_note": "",
+            "in_trend": true,
+            "state": "risk_on",
+            "entry_state": "no_entry",
+            "action": "cash",
+            "reason": "跌破200MA或信用全示警 → 這份放現金",
+            "close": 767.81,
+            "limit": 797.13,
+            "stop": 713.92,
+            "limit_pct": null,
+            "stop_pct": null,
+            "expo": 0.0,
+            "dist200_pct": 7.55,
+            "dist50_pct": 1.14,
+            "stop_risk_pct": 7.0,
+            "entry_thr_pct": 5.0,
+            "rs": 1.336,
+            "budget": 0.19,
+            "ma200": 713.92,
+            "trace": [
+              {
+                "id": "trend",
+                "name": "① 趨勢:站上200MA?",
+                "cond": "收盤 ≥ 200MA(=713.92)",
+                "now": "收盤 767.81(離200MA +7.5%)",
+                "ok": true,
+                "verdict": "在趨勢中"
+              },
+              {
+                "id": "credit",
+                "name": "② 信用哨:今天的曝險上限",
+                "cond": "健康的哨兵數 ÷ 全部哨兵 = 曝險乘數",
+                "now": "健康比例 0% → 每筆量 ×0%",
+                "ok": false,
+                "verdict": "清倉不買"
+              },
+              {
+                "id": "extended_us",
+                "name": "③ 別追高:離50MA夠近嗎?",
+                "cond": "離50MA < +5.0%",
+                "now": "離50MA +1.1%",
+                "ok": true,
+                "verdict": "沒追高"
+              },
+              {
+                "id": "far_us",
+                "name": "④ 空手先別進:離停損線太遠嗎?",
+                "cond": "離停損線 < 20.0%",
+                "now": "離停損線 7.0%",
+                "ok": true,
+                "verdict": "距離可接受"
+              }
+            ]
+          },
+          {
+            "ticker": "QQQ",
+            "name": "",
+            "weight": 0.2,
+            "conflict": false,
+            "conflict_note": "",
+            "in_trend": true,
+            "state": "risk_on",
+            "entry_state": "no_entry",
+            "action": "cash",
+            "reason": "跌破200MA或信用全示警 → 這份放現金",
+            "close": 741.21,
+            "limit": 760.47,
+            "stop": 662.94,
+            "limit_pct": null,
+            "stop_pct": null,
+            "expo": 0.0,
+            "dist200_pct": 11.81,
+            "dist50_pct": 4.29,
+            "stop_risk_pct": 10.6,
+            "entry_thr_pct": 7.0,
+            "rs": 1.208,
+            "budget": 0.199,
+            "ma200": 662.94,
+            "trace": [
+              {
+                "id": "trend",
+                "name": "① 趨勢:站上200MA?",
+                "cond": "收盤 ≥ 200MA(=662.94)",
+                "now": "收盤 741.21(離200MA +11.8%)",
+                "ok": true,
+                "verdict": "在趨勢中"
+              },
+              {
+                "id": "credit",
+                "name": "② 信用哨:今天的曝險上限",
+                "cond": "健康的哨兵數 ÷ 全部哨兵 = 曝險乘數",
+                "now": "健康比例 0% → 每筆量 ×0%",
+                "ok": false,
+                "verdict": "清倉不買"
+              },
+              {
+                "id": "extended_us",
+                "name": "③ 別追高:離50MA夠近嗎?",
+                "cond": "離50MA < +7.0%",
+                "now": "離50MA +4.3%",
+                "ok": true,
+                "verdict": "沒追高"
+              },
+              {
+                "id": "far_us",
+                "name": "④ 空手先別進:離停損線太遠嗎?",
+                "cond": "離停損線 < 20.0%",
+                "now": "離停損線 10.6%",
+                "ok": true,
+                "verdict": "距離可接受"
+              }
+            ]
+          },
+          {
+            "ticker": "SOXX",
+            "name": "",
+            "weight": 0.2,
+            "conflict": false,
+            "conflict_note": "",
+            "in_trend": true,
+            "state": "risk_on",
+            "entry_state": "no_entry",
+            "action": "cash",
+            "reason": "跌破200MA或信用全示警 → 這份放現金",
+            "close": 565.72,
+            "limit": 562.04,
+            "stop": 441.02,
+            "limit_pct": null,
+            "stop_pct": null,
+            "expo": 0.0,
+            "dist200_pct": 26.99,
+            "dist50_pct": 7.7,
+            "stop_risk_pct": 22.0,
+            "entry_thr_pct": 7.0,
+            "rs": 1.192,
+            "budget": 0.201,
+            "ma200": 445.48,
+            "trace": [
+              {
+                "id": "trend",
+                "name": "① 趨勢:站上200MA?",
+                "cond": "收盤 ≥ 200MA(=445.48)",
+                "now": "收盤 565.72(離200MA +27.0%)",
+                "ok": true,
+                "verdict": "在趨勢中"
+              },
+              {
+                "id": "credit",
+                "name": "② 信用哨:今天的曝險上限",
+                "cond": "健康的哨兵數 ÷ 全部哨兵 = 曝險乘數",
+                "now": "健康比例 0% → 每筆量 ×0%",
+                "ok": false,
+                "verdict": "清倉不買"
+              },
+              {
+                "id": "extended_us",
+                "name": "③ 別追高:離50MA夠近嗎?",
+                "cond": "離50MA < +7.0%",
+                "now": "離50MA +7.7%",
+                "ok": false,
+                "verdict": "超過門檻 → 等拉回到 562.04 以下"
+              },
+              {
+                "id": "far_us",
+                "name": "④ 空手先別進:離停損線太遠嗎?",
+                "cond": "離停損線 < 20.0%",
+                "now": "離停損線 22.0%",
+                "ok": false,
+                "verdict": "太遠 → 空手先別進(已持有者續抱)"
+              },
+              {
+                "id": "r3",
+                "name": "⑤ 小額試單(只在追高時檢查)",
+                "cond": "200MA上彎 且 VIX < 自己的20日均(恐慌退燒中)",
+                "now": "不成立",
+                "ok": false,
+                "verdict": "維持等拉回"
+              }
+            ]
+          },
+          {
+            "ticker": "SMH",
+            "name": "",
+            "weight": 0.2,
+            "conflict": false,
+            "conflict_note": "",
+            "in_trend": true,
+            "state": "risk_on",
+            "entry_state": "no_entry",
+            "action": "cash",
+            "reason": "跌破200MA或信用全示警 → 這份放現金",
+            "close": 601.41,
+            "limit": 621.44,
+            "stop": 481.03,
+            "limit_pct": null,
+            "stop_pct": null,
+            "expo": 0.0,
+            "dist200_pct": 22.52,
+            "dist50_pct": 6.46,
+            "stop_risk_pct": 20.0,
+            "entry_thr_pct": 10.0,
+            "rs": 1.123,
+            "budget": 0.213,
+            "ma200": 490.85,
+            "trace": [
+              {
+                "id": "trend",
+                "name": "① 趨勢:站上200MA?",
+                "cond": "收盤 ≥ 200MA(=490.85)",
+                "now": "收盤 601.41(離200MA +22.5%)",
+                "ok": true,
+                "verdict": "在趨勢中"
+              },
+              {
+                "id": "credit",
+                "name": "② 信用哨:今天的曝險上限",
+                "cond": "健康的哨兵數 ÷ 全部哨兵 = 曝險乘數",
+                "now": "健康比例 0% → 每筆量 ×0%",
+                "ok": false,
+                "verdict": "清倉不買"
+              },
+              {
+                "id": "extended_us",
+                "name": "③ 別追高:離50MA夠近嗎?",
+                "cond": "離50MA < +10.0%",
+                "now": "離50MA +6.5%",
+                "ok": true,
+                "verdict": "沒追高"
+              },
+              {
+                "id": "far_us",
+                "name": "④ 空手先別進:離停損線太遠嗎?",
+                "cond": "離停損線 < 20.0%",
+                "now": "離停損線 20.0%",
+                "ok": false,
+                "verdict": "太遠 → 空手先別進(已持有者續抱)"
+              }
+            ]
+          }
+        ],
+        "single": [
+          {
+            "ticker": "QQQ",
+            "name": "",
+            "weight": 1.0,
+            "conflict": false,
+            "conflict_note": "",
+            "in_trend": true,
+            "state": "risk_on",
+            "entry_state": "no_entry",
+            "action": "cash",
+            "reason": "跌破200MA或信用全示警 → 這份放現金",
+            "close": 741.21,
+            "limit": 760.47,
+            "stop": 662.94,
+            "limit_pct": null,
+            "stop_pct": null,
+            "expo": 0.0,
+            "dist200_pct": 11.81,
+            "dist50_pct": 4.29,
+            "stop_risk_pct": 10.6,
+            "entry_thr_pct": 7.0,
+            "rs": 1.208,
+            "budget": 0.199,
+            "ma200": 662.94,
+            "trace": [
+              {
+                "id": "trend",
+                "name": "① 趨勢:站上200MA?",
+                "cond": "收盤 ≥ 200MA(=662.94)",
+                "now": "收盤 741.21(離200MA +11.8%)",
+                "ok": true,
+                "verdict": "在趨勢中"
+              },
+              {
+                "id": "credit",
+                "name": "② 信用哨:今天的曝險上限",
+                "cond": "健康的哨兵數 ÷ 全部哨兵 = 曝險乘數",
+                "now": "健康比例 0% → 每筆量 ×0%",
+                "ok": false,
+                "verdict": "清倉不買"
+              },
+              {
+                "id": "extended_us",
+                "name": "③ 別追高:離50MA夠近嗎?",
+                "cond": "離50MA < +7.0%",
+                "now": "離50MA +4.3%",
+                "ok": true,
+                "verdict": "沒追高"
+              },
+              {
+                "id": "far_us",
+                "name": "④ 空手先別進:離停損線太遠嗎?",
+                "cond": "離停損線 < 20.0%",
+                "now": "離停損線 10.6%",
+                "ok": true,
+                "verdict": "距離可接受"
+              }
+            ]
+          },
+          {
+            "ticker": "XLK",
+            "name": "",
+            "weight": 0.0,
+            "conflict": false,
+            "conflict_note": "",
+            "in_trend": true,
+            "state": "risk_on",
+            "entry_state": "no_entry",
+            "action": "cash",
+            "reason": "跌破200MA或信用全示警 → 這份放現金",
+            "close": 195.34,
+            "limit": 201.71,
+            "stop": 159.31,
+            "limit_pct": null,
+            "stop_pct": null,
+            "expo": 0.0,
+            "dist200_pct": 20.17,
+            "dist50_pct": 6.53,
+            "stop_risk_pct": 18.4,
+            "entry_thr_pct": 10.0,
+            "rs": 1.414,
+            "budget": 0.213,
+            "ma200": 162.56,
+            "trace": [
+              {
+                "id": "trend",
+                "name": "① 趨勢:站上200MA?",
+                "cond": "收盤 ≥ 200MA(=162.56)",
+                "now": "收盤 195.34(離200MA +20.2%)",
+                "ok": true,
+                "verdict": "在趨勢中"
+              },
+              {
+                "id": "credit",
+                "name": "② 信用哨:今天的曝險上限",
+                "cond": "健康的哨兵數 ÷ 全部哨兵 = 曝險乘數",
+                "now": "健康比例 0% → 每筆量 ×0%",
+                "ok": false,
+                "verdict": "清倉不買"
+              },
+              {
+                "id": "extended_us",
+                "name": "③ 別追高:離50MA夠近嗎?",
+                "cond": "離50MA < +10.0%",
+                "now": "離50MA +6.5%",
+                "ok": true,
+                "verdict": "沒追高"
+              },
+              {
+                "id": "far_us",
+                "name": "④ 空手先別進:離停損線太遠嗎?",
+                "cond": "離停損線 < 20.0%",
+                "now": "離停損線 18.4%",
+                "ok": true,
+                "verdict": "距離可接受"
+              }
+            ]
+          },
+          {
+            "ticker": "SPY",
+            "name": "",
+            "weight": 0.0,
+            "conflict": false,
+            "conflict_note": "",
+            "in_trend": true,
+            "state": "risk_on",
+            "entry_state": "no_entry",
+            "action": "cash",
+            "reason": "跌破200MA或信用全示警 → 這份放現金",
+            "close": 767.81,
+            "limit": 797.13,
+            "stop": 713.92,
+            "limit_pct": null,
+            "stop_pct": null,
+            "expo": 0.0,
+            "dist200_pct": 7.55,
+            "dist50_pct": 1.14,
+            "stop_risk_pct": 7.0,
+            "entry_thr_pct": 5.0,
+            "rs": 1.336,
+            "budget": 0.19,
+            "ma200": 713.92,
+            "trace": [
+              {
+                "id": "trend",
+                "name": "① 趨勢:站上200MA?",
+                "cond": "收盤 ≥ 200MA(=713.92)",
+                "now": "收盤 767.81(離200MA +7.5%)",
+                "ok": true,
+                "verdict": "在趨勢中"
+              },
+              {
+                "id": "credit",
+                "name": "② 信用哨:今天的曝險上限",
+                "cond": "健康的哨兵數 ÷ 全部哨兵 = 曝險乘數",
+                "now": "健康比例 0% → 每筆量 ×0%",
+                "ok": false,
+                "verdict": "清倉不買"
+              },
+              {
+                "id": "extended_us",
+                "name": "③ 別追高:離50MA夠近嗎?",
+                "cond": "離50MA < +5.0%",
+                "now": "離50MA +1.1%",
+                "ok": true,
+                "verdict": "沒追高"
+              },
+              {
+                "id": "far_us",
+                "name": "④ 空手先別進:離停損線太遠嗎?",
+                "cond": "離停損線 < 20.0%",
+                "now": "離停損線 7.0%",
+                "ok": true,
+                "verdict": "距離可接受"
+              }
+            ]
+          },
+          {
+            "ticker": "SOXX",
+            "name": "",
+            "weight": 0.0,
+            "conflict": false,
+            "conflict_note": "",
+            "in_trend": true,
+            "state": "risk_on",
+            "entry_state": "no_entry",
+            "action": "cash",
+            "reason": "跌破200MA或信用全示警 → 這份放現金",
+            "close": 565.72,
+            "limit": 562.04,
+            "stop": 441.02,
+            "limit_pct": null,
+            "stop_pct": null,
+            "expo": 0.0,
+            "dist200_pct": 26.99,
+            "dist50_pct": 7.7,
+            "stop_risk_pct": 22.0,
+            "entry_thr_pct": 7.0,
+            "rs": 1.192,
+            "budget": 0.201,
+            "ma200": 445.48,
+            "trace": [
+              {
+                "id": "trend",
+                "name": "① 趨勢:站上200MA?",
+                "cond": "收盤 ≥ 200MA(=445.48)",
+                "now": "收盤 565.72(離200MA +27.0%)",
+                "ok": true,
+                "verdict": "在趨勢中"
+              },
+              {
+                "id": "credit",
+                "name": "② 信用哨:今天的曝險上限",
+                "cond": "健康的哨兵數 ÷ 全部哨兵 = 曝險乘數",
+                "now": "健康比例 0% → 每筆量 ×0%",
+                "ok": false,
+                "verdict": "清倉不買"
+              },
+              {
+                "id": "extended_us",
+                "name": "③ 別追高:離50MA夠近嗎?",
+                "cond": "離50MA < +7.0%",
+                "now": "離50MA +7.7%",
+                "ok": false,
+                "verdict": "超過門檻 → 等拉回到 562.04 以下"
+              },
+              {
+                "id": "far_us",
+                "name": "④ 空手先別進:離停損線太遠嗎?",
+                "cond": "離停損線 < 20.0%",
+                "now": "離停損線 22.0%",
+                "ok": false,
+                "verdict": "太遠 → 空手先別進(已持有者續抱)"
+              },
+              {
+                "id": "r3",
+                "name": "⑤ 小額試單(只在追高時檢查)",
+                "cond": "200MA上彎 且 VIX < 自己的20日均(恐慌退燒中)",
+                "now": "不成立",
+                "ok": false,
+                "verdict": "維持等拉回"
+              }
+            ]
+          },
+          {
+            "ticker": "SMH",
+            "name": "",
+            "weight": 0.0,
             "conflict": false,
             "conflict_note": "",
             "in_trend": true,
@@ -1739,6 +2349,482 @@
             ]
           }
         ],
+        "ew3": [
+          {
+            "ticker": "0050.TW",
+            "name": "元大台灣50",
+            "weight": 0.3333,
+            "conflict": false,
+            "conflict_note": "",
+            "in_trend": true,
+            "state": "risk_on",
+            "entry_state": "expensive",
+            "action": "wait",
+            "reason": "空手先別進(信用部分示警期間,離停損線 22.8% > 5.7% 門檻;台股歷史此時等拉近再買 14年中11年較好);已持有者續抱",
+            "close": 111.85,
+            "limit": 117.44,
+            "stop": 86.38,
+            "limit_pct": 5.0,
+            "stop_pct": -22.8,
+            "expo": 0.33,
+            "dist200_pct": 26.89,
+            "dist50_pct": 6.67,
+            "stop_risk_pct": 22.8,
+            "entry_thr_pct": 12.0,
+            "rs": 1.542,
+            "budget": 0.0863,
+            "ma200": 88.14,
+            "trace": [
+              {
+                "id": "trend",
+                "name": "① 趨勢:站上200MA?",
+                "cond": "收盤 ≥ 200MA(=88.14)",
+                "now": "收盤 111.85(離200MA +26.9%)",
+                "ok": true,
+                "verdict": "在趨勢中"
+              },
+              {
+                "id": "credit",
+                "name": "② 信用哨:今天的曝險上限",
+                "cond": "健康的哨兵數 ÷ 全部哨兵 = 曝險乘數",
+                "now": "健康比例 33% → 每筆量 ×33%",
+                "ok": true,
+                "verdict": "減量"
+              },
+              {
+                "id": "extended_tw",
+                "name": "③ 別追高:離50MA夠近嗎?",
+                "cond": "離50MA < +12.0%",
+                "now": "離50MA +6.7%",
+                "ok": true,
+                "verdict": "沒追高"
+              },
+              {
+                "id": "far_tw",
+                "name": "④ 空手先別進:離停損線太遠嗎?",
+                "cond": "信用示警期間:離停損線 < 5.7%",
+                "now": "離停損線 22.8%",
+                "ok": false,
+                "verdict": "太遠 → 空手先別進(已持有者續抱)"
+              }
+            ]
+          },
+          {
+            "ticker": "0052.TW",
+            "name": "富邦科技",
+            "weight": 0.3333,
+            "conflict": false,
+            "conflict_note": "",
+            "in_trend": true,
+            "state": "risk_on",
+            "entry_state": "expensive",
+            "action": "wait",
+            "reason": "空手先別進(信用部分示警期間,離停損線 21.2% > 6.2% 門檻;台股歷史此時等拉近再買 14年中11年較好);已持有者續抱",
+            "close": 452.34,
+            "limit": 477.94,
+            "stop": 356.29,
+            "limit_pct": 5.7,
+            "stop_pct": -21.2,
+            "expo": 0.33,
+            "dist200_pct": 25.69,
+            "dist50_pct": 6.0,
+            "stop_risk_pct": 21.2,
+            "entry_thr_pct": 12.0,
+            "rs": 1.451,
+            "budget": 0.0936,
+            "ma200": 359.89,
+            "trace": [
+              {
+                "id": "trend",
+                "name": "① 趨勢:站上200MA?",
+                "cond": "收盤 ≥ 200MA(=359.89)",
+                "now": "收盤 452.34(離200MA +25.7%)",
+                "ok": true,
+                "verdict": "在趨勢中"
+              },
+              {
+                "id": "credit",
+                "name": "② 信用哨:今天的曝險上限",
+                "cond": "健康的哨兵數 ÷ 全部哨兵 = 曝險乘數",
+                "now": "健康比例 33% → 每筆量 ×33%",
+                "ok": true,
+                "verdict": "減量"
+              },
+              {
+                "id": "extended_tw",
+                "name": "③ 別追高:離50MA夠近嗎?",
+                "cond": "離50MA < +12.0%",
+                "now": "離50MA +6.0%",
+                "ok": true,
+                "verdict": "沒追高"
+              },
+              {
+                "id": "far_tw",
+                "name": "④ 空手先別進:離停損線太遠嗎?",
+                "cond": "信用示警期間:離停損線 < 6.2%",
+                "now": "離停損線 21.2%",
+                "ok": false,
+                "verdict": "太遠 → 空手先別進(已持有者續抱)"
+              }
+            ]
+          },
+          {
+            "ticker": "0051.TW",
+            "name": "元大中型100",
+            "weight": 0.3333,
+            "conflict": false,
+            "conflict_note": "",
+            "in_trend": true,
+            "state": "risk_on",
+            "entry_state": "expensive",
+            "action": "wait",
+            "reason": "空手先別進(信用部分示警期間,離停損線 17.4% > 5.2% 門檻;台股歷史此時等拉近再買 14年中11年較好);已持有者續抱",
+            "close": 147.2,
+            "limit": 158.54,
+            "stop": 121.61,
+            "limit_pct": 7.7,
+            "stop_pct": -17.4,
+            "expo": 0.33,
+            "dist200_pct": 19.84,
+            "dist50_pct": 3.99,
+            "stop_risk_pct": 17.4,
+            "entry_thr_pct": 12.0,
+            "rs": 1.213,
+            "budget": 0.0787,
+            "ma200": 122.83,
+            "trace": [
+              {
+                "id": "trend",
+                "name": "① 趨勢:站上200MA?",
+                "cond": "收盤 ≥ 200MA(=122.83)",
+                "now": "收盤 147.2(離200MA +19.8%)",
+                "ok": true,
+                "verdict": "在趨勢中"
+              },
+              {
+                "id": "credit",
+                "name": "② 信用哨:今天的曝險上限",
+                "cond": "健康的哨兵數 ÷ 全部哨兵 = 曝險乘數",
+                "now": "健康比例 33% → 每筆量 ×33%",
+                "ok": true,
+                "verdict": "減量"
+              },
+              {
+                "id": "extended_tw",
+                "name": "③ 別追高:離50MA夠近嗎?",
+                "cond": "離50MA < +12.0%",
+                "now": "離50MA +4.0%",
+                "ok": true,
+                "verdict": "沒追高"
+              },
+              {
+                "id": "far_tw",
+                "name": "④ 空手先別進:離停損線太遠嗎?",
+                "cond": "信用示警期間:離停損線 < 5.2%",
+                "now": "離停損線 17.4%",
+                "ok": false,
+                "verdict": "太遠 → 空手先別進(已持有者續抱)"
+              }
+            ]
+          },
+          {
+            "ticker": "006208.TW",
+            "name": "富邦台50",
+            "weight": 0.0,
+            "conflict": false,
+            "conflict_note": "",
+            "in_trend": true,
+            "state": "risk_on",
+            "entry_state": "expensive",
+            "action": "wait",
+            "reason": "空手先別進(信用部分示警期間,離停損線 21.9% > 5.4% 門檻;台股歷史此時等拉近再買 14年中11年較好);已持有者續抱",
+            "close": 255.7,
+            "limit": 268.88,
+            "stop": 199.61,
+            "limit_pct": 5.2,
+            "stop_pct": -21.9,
+            "expo": 0.33,
+            "dist200_pct": 26.82,
+            "dist50_pct": 6.51,
+            "stop_risk_pct": 21.9,
+            "entry_thr_pct": 12.0,
+            "rs": 1.558,
+            "budget": 0.0807,
+            "ma200": 201.63,
+            "trace": [
+              {
+                "id": "trend",
+                "name": "① 趨勢:站上200MA?",
+                "cond": "收盤 ≥ 200MA(=201.63)",
+                "now": "收盤 255.7(離200MA +26.8%)",
+                "ok": true,
+                "verdict": "在趨勢中"
+              },
+              {
+                "id": "credit",
+                "name": "② 信用哨:今天的曝險上限",
+                "cond": "健康的哨兵數 ÷ 全部哨兵 = 曝險乘數",
+                "now": "健康比例 33% → 每筆量 ×33%",
+                "ok": true,
+                "verdict": "減量"
+              },
+              {
+                "id": "extended_tw",
+                "name": "③ 別追高:離50MA夠近嗎?",
+                "cond": "離50MA < +12.0%",
+                "now": "離50MA +6.5%",
+                "ok": true,
+                "verdict": "沒追高"
+              },
+              {
+                "id": "far_tw",
+                "name": "④ 空手先別進:離停損線太遠嗎?",
+                "cond": "信用示警期間:離停損線 < 5.4%",
+                "now": "離停損線 21.9%",
+                "ok": false,
+                "verdict": "太遠 → 空手先別進(已持有者續抱)"
+              }
+            ]
+          }
+        ],
+        "single": [
+          {
+            "ticker": "0050.TW",
+            "name": "元大台灣50",
+            "weight": 1.0,
+            "conflict": false,
+            "conflict_note": "",
+            "in_trend": true,
+            "state": "risk_on",
+            "entry_state": "expensive",
+            "action": "wait",
+            "reason": "空手先別進(信用部分示警期間,離停損線 22.8% > 5.7% 門檻;台股歷史此時等拉近再買 14年中11年較好);已持有者續抱",
+            "close": 111.85,
+            "limit": 117.44,
+            "stop": 86.38,
+            "limit_pct": 5.0,
+            "stop_pct": -22.8,
+            "expo": 0.33,
+            "dist200_pct": 26.89,
+            "dist50_pct": 6.67,
+            "stop_risk_pct": 22.8,
+            "entry_thr_pct": 12.0,
+            "rs": 1.542,
+            "budget": 0.0863,
+            "ma200": 88.14,
+            "trace": [
+              {
+                "id": "trend",
+                "name": "① 趨勢:站上200MA?",
+                "cond": "收盤 ≥ 200MA(=88.14)",
+                "now": "收盤 111.85(離200MA +26.9%)",
+                "ok": true,
+                "verdict": "在趨勢中"
+              },
+              {
+                "id": "credit",
+                "name": "② 信用哨:今天的曝險上限",
+                "cond": "健康的哨兵數 ÷ 全部哨兵 = 曝險乘數",
+                "now": "健康比例 33% → 每筆量 ×33%",
+                "ok": true,
+                "verdict": "減量"
+              },
+              {
+                "id": "extended_tw",
+                "name": "③ 別追高:離50MA夠近嗎?",
+                "cond": "離50MA < +12.0%",
+                "now": "離50MA +6.7%",
+                "ok": true,
+                "verdict": "沒追高"
+              },
+              {
+                "id": "far_tw",
+                "name": "④ 空手先別進:離停損線太遠嗎?",
+                "cond": "信用示警期間:離停損線 < 5.7%",
+                "now": "離停損線 22.8%",
+                "ok": false,
+                "verdict": "太遠 → 空手先別進(已持有者續抱)"
+              }
+            ]
+          },
+          {
+            "ticker": "006208.TW",
+            "name": "富邦台50",
+            "weight": 0.0,
+            "conflict": false,
+            "conflict_note": "",
+            "in_trend": true,
+            "state": "risk_on",
+            "entry_state": "expensive",
+            "action": "wait",
+            "reason": "空手先別進(信用部分示警期間,離停損線 21.9% > 5.4% 門檻;台股歷史此時等拉近再買 14年中11年較好);已持有者續抱",
+            "close": 255.7,
+            "limit": 268.88,
+            "stop": 199.61,
+            "limit_pct": 5.2,
+            "stop_pct": -21.9,
+            "expo": 0.33,
+            "dist200_pct": 26.82,
+            "dist50_pct": 6.51,
+            "stop_risk_pct": 21.9,
+            "entry_thr_pct": 12.0,
+            "rs": 1.558,
+            "budget": 0.0807,
+            "ma200": 201.63,
+            "trace": [
+              {
+                "id": "trend",
+                "name": "① 趨勢:站上200MA?",
+                "cond": "收盤 ≥ 200MA(=201.63)",
+                "now": "收盤 255.7(離200MA +26.8%)",
+                "ok": true,
+                "verdict": "在趨勢中"
+              },
+              {
+                "id": "credit",
+                "name": "② 信用哨:今天的曝險上限",
+                "cond": "健康的哨兵數 ÷ 全部哨兵 = 曝險乘數",
+                "now": "健康比例 33% → 每筆量 ×33%",
+                "ok": true,
+                "verdict": "減量"
+              },
+              {
+                "id": "extended_tw",
+                "name": "③ 別追高:離50MA夠近嗎?",
+                "cond": "離50MA < +12.0%",
+                "now": "離50MA +6.5%",
+                "ok": true,
+                "verdict": "沒追高"
+              },
+              {
+                "id": "far_tw",
+                "name": "④ 空手先別進:離停損線太遠嗎?",
+                "cond": "信用示警期間:離停損線 < 5.4%",
+                "now": "離停損線 21.9%",
+                "ok": false,
+                "verdict": "太遠 → 空手先別進(已持有者續抱)"
+              }
+            ]
+          },
+          {
+            "ticker": "0052.TW",
+            "name": "富邦科技",
+            "weight": 0.0,
+            "conflict": false,
+            "conflict_note": "",
+            "in_trend": true,
+            "state": "risk_on",
+            "entry_state": "expensive",
+            "action": "wait",
+            "reason": "空手先別進(信用部分示警期間,離停損線 21.2% > 6.2% 門檻;台股歷史此時等拉近再買 14年中11年較好);已持有者續抱",
+            "close": 452.34,
+            "limit": 477.94,
+            "stop": 356.29,
+            "limit_pct": 5.7,
+            "stop_pct": -21.2,
+            "expo": 0.33,
+            "dist200_pct": 25.69,
+            "dist50_pct": 6.0,
+            "stop_risk_pct": 21.2,
+            "entry_thr_pct": 12.0,
+            "rs": 1.451,
+            "budget": 0.0936,
+            "ma200": 359.89,
+            "trace": [
+              {
+                "id": "trend",
+                "name": "① 趨勢:站上200MA?",
+                "cond": "收盤 ≥ 200MA(=359.89)",
+                "now": "收盤 452.34(離200MA +25.7%)",
+                "ok": true,
+                "verdict": "在趨勢中"
+              },
+              {
+                "id": "credit",
+                "name": "② 信用哨:今天的曝險上限",
+                "cond": "健康的哨兵數 ÷ 全部哨兵 = 曝險乘數",
+                "now": "健康比例 33% → 每筆量 ×33%",
+                "ok": true,
+                "verdict": "減量"
+              },
+              {
+                "id": "extended_tw",
+                "name": "③ 別追高:離50MA夠近嗎?",
+                "cond": "離50MA < +12.0%",
+                "now": "離50MA +6.0%",
+                "ok": true,
+                "verdict": "沒追高"
+              },
+              {
+                "id": "far_tw",
+                "name": "④ 空手先別進:離停損線太遠嗎?",
+                "cond": "信用示警期間:離停損線 < 6.2%",
+                "now": "離停損線 21.2%",
+                "ok": false,
+                "verdict": "太遠 → 空手先別進(已持有者續抱)"
+              }
+            ]
+          },
+          {
+            "ticker": "0051.TW",
+            "name": "元大中型100",
+            "weight": 0.0,
+            "conflict": false,
+            "conflict_note": "",
+            "in_trend": true,
+            "state": "risk_on",
+            "entry_state": "expensive",
+            "action": "wait",
+            "reason": "空手先別進(信用部分示警期間,離停損線 17.4% > 5.2% 門檻;台股歷史此時等拉近再買 14年中11年較好);已持有者續抱",
+            "close": 147.2,
+            "limit": 158.54,
+            "stop": 121.61,
+            "limit_pct": 7.7,
+            "stop_pct": -17.4,
+            "expo": 0.33,
+            "dist200_pct": 19.84,
+            "dist50_pct": 3.99,
+            "stop_risk_pct": 17.4,
+            "entry_thr_pct": 12.0,
+            "rs": 1.213,
+            "budget": 0.0787,
+            "ma200": 122.83,
+            "trace": [
+              {
+                "id": "trend",
+                "name": "① 趨勢:站上200MA?",
+                "cond": "收盤 ≥ 200MA(=122.83)",
+                "now": "收盤 147.2(離200MA +19.8%)",
+                "ok": true,
+                "verdict": "在趨勢中"
+              },
+              {
+                "id": "credit",
+                "name": "② 信用哨:今天的曝險上限",
+                "cond": "健康的哨兵數 ÷ 全部哨兵 = 曝險乘數",
+                "now": "健康比例 33% → 每筆量 ×33%",
+                "ok": true,
+                "verdict": "減量"
+              },
+              {
+                "id": "extended_tw",
+                "name": "③ 別追高:離50MA夠近嗎?",
+                "cond": "離50MA < +12.0%",
+                "now": "離50MA +4.0%",
+                "ok": true,
+                "verdict": "沒追高"
+              },
+              {
+                "id": "far_tw",
+                "name": "④ 空手先別進:離停損線太遠嗎?",
+                "cond": "信用示警期間:離停損線 < 5.2%",
+                "now": "離停損線 17.4%",
+                "ok": false,
+                "verdict": "太遠 → 空手先別進(已持有者續抱)"
+              }
+            ]
+          }
+        ],
         "topn": [
           {
             "ticker": "006208.TW",
@@ -2373,35 +3459,50 @@
   "decisions": [
     {
       "key": "method_us",
-      "title": "美股要單押最強,還是 5 檔等權?(你已選:等權)",
-      "note": "主判定池 2002-2026 統計上打平(Δ超額Sharpe +0.013、p=0.41);無後見之明的 14 檔產業池則明顯站等權。",
+      "title": "美股持有方式(你已選:等權)",
+      "note": "統一基準重算(research_b6_options_table.py,2002-2026,含信用哨、RiskTarget、不再平衡):三者 Sharpe 0.75~0.84,統計上都分不出高下(等權 vs 單押 p=0.41)。差別在交易量與集中度。⚠️美股回測有後見之明:5 檔是 2026 年回頭挑的,站在每年當下挑只有年化 10.6%(research_b4),未來期望值請往下調約 3 個百分點。",
       "options": [
-        {
-          "v": "rotation",
-          "label": "單押最強(現行)",
-          "nums": "CAGR 14.1% · 回撤 −36.1% · 約15筆/年 · 超額Sharpe 0.69"
-        },
         {
           "v": "ew",
           "label": "5 檔等權",
-          "nums": "CAGR 12.4% · 回撤 −26.0% · 約70筆/年 · 超額Sharpe 0.70(同波動後年化一樣)"
+          "nums": "CAGR 17.3% · 回撤 −34.2% · Sharpe 0.83 · 約102筆/年"
+        },
+        {
+          "v": "rotation",
+          "label": "單押最強(原版輪動)",
+          "nums": "CAGR 18.9% · 回撤 −33.4% · Sharpe 0.84 · 約32筆/年"
+        },
+        {
+          "v": "single",
+          "label": "只持有 QQQ(最省事)",
+          "nums": "CAGR 15.5% · 回撤 −33.5% · Sharpe 0.75 · 約19筆/年"
         }
       ]
     },
     {
       "key": "method_tw",
-      "title": "台股要等權,還是單押最強?",
-      "note": "主池 Δ+0.210(p=0.038)、長樣本池 Δ+0.229(p=0.015);前N名曲線 1檔1.06→3檔1.23。",
+      "title": "台股持有方式(你已選:4 檔等權)",
+      "note": "統一基準重算(2013-2026,含信用哨、固定1倍、不再平衡)。只持有 0050 和等權打平(Sharpe 1.58 vs 1.60),交易只有 1/4;長樣本(2009起)0050 甚至略好(年化 18.2% vs 16.1%,p=0.22 不顯著)。小資金請注意手續費:最低 NT$20/筆,資金 10 萬、每年 64 筆 ≈ 每年拖累 1.3%(research_b5)。",
       "options": [
         {
           "v": "ew",
-          "label": "等權(新版預設)",
-          "nums": "CAGR 19.3% · 回撤 −20.3% · 超額Sharpe 1.26"
+          "label": "4 檔等權",
+          "nums": "CAGR 22.4% · 回撤 −18.2% · Sharpe 1.60 · 約64筆/年"
+        },
+        {
+          "v": "ew3",
+          "label": "3 檔等權(去掉重複的 006208)",
+          "nums": "CAGR 22.3% · 回撤 −18.2% · Sharpe 1.58 · 約48筆/年"
+        },
+        {
+          "v": "single",
+          "label": "只持有 0050(最省事)",
+          "nums": "CAGR 23.4% · 回撤 −18.7% · Sharpe 1.58 · 約16筆/年"
         },
         {
           "v": "rotation",
-          "label": "單押最強(原版)",
-          "nums": "CAGR 13.2% · 回撤 −33.7% · 超額Sharpe 0.89"
+          "label": "單押最強(原版輪動)",
+          "nums": "CAGR 22.9% · 回撤 −18.2% · Sharpe 1.43 · 約27筆/年"
         }
       ]
     },
@@ -2487,23 +3588,6 @@
       ]
     },
     {
-      "key": "pool_tw",
-      "title": "台股要用 4 檔還是 3 檔?(0050 和 006208 追蹤同一個指數)",
-      "note": "0050 與 006208 日報酬相關 0.896(同一個台灣50指數,只是發行商不同)。等權下兩檔合計占 50%。實測 2013-2026(等權+信用哨):4檔 CAGR 22.2%/Sharpe 1.62/回撤 −17.7%;去掉 006208 的 3 檔 22.0%/1.60/−17.6% → ΔSharpe −0.021(p=0.861)= 幾乎完全一樣,但交易從 100 筆/年降到 75 筆/年。",
-      "options": [
-        {
-          "v": "4",
-          "label": "4 檔(0050+0052+006208+0051)",
-          "nums": "CAGR 22.2% · Sharpe 1.62 · 約100筆/年"
-        },
-        {
-          "v": "3",
-          "label": "3 檔(去掉 006208,少一半重複)",
-          "nums": "CAGR 22.0% · Sharpe 1.60 · 約75筆/年(省25筆)"
-        }
-      ]
-    },
-    {
       "key": "credit_us",
       "title": "美股信用哨要用哪一版?(台股那版已驗證有效,不動)",
       "note": "2026-09-24 重驗:美股信用哨整體效果很小(ΔSharpe +0.08、p=0.17,校正後不顯著)。兩個版本風險幾乎一樣,差在報酬與交易量。",
@@ -2539,6 +3623,27 @@
     }
   ],
   "findings": [
+    {
+      "date": "2026-10-24",
+      "title": "美股回測被後見之明灌水約每年 3 個百分點",
+      "body": "現用 5 檔是回頭挑的:事後挑年化 13.5%;站在每年當下用「過去 36 個月報酬前 5」挑只有 10.6%,差 0.12 Sharpe(p=0.045)。零挑選的 14 檔產業池只有 7.6%。→ 美股未來期望值應往 10~11% 調。好消息:事前法在 2017 年後自己也會選到 QQQ/SMH/SOXX/XLK,差距主要集中在 2009、2023、2025。",
+      "status": "已標示在決策清單",
+      "script": "research_b4_pool_hindsight.py"
+    },
+    {
+      "date": "2026-10-24",
+      "title": "等權不需要再平衡;只持有一檔寬基指數和等權打平",
+      "body": "每月/每季/每年/從不再平衡,Sharpe 差距都 ≤0.02(全不顯著),「從不」少下 27~36% 的單。只持有 0050:台股 Sharpe 1.58 vs 等權 1.60,交易 16 vs 64 筆/年;只持有 QQQ:0.75 vs 0.83(不顯著)。→ 真正傷績效的是「輪動換來換去」,不是「只持有一檔」。",
+      "status": "已落地:頁面改成不再平衡;持有方式新增「只持有一檔」選項",
+      "script": "research_b5_friction.py / research_b6_options_table.py"
+    },
+    {
+      "date": "2026-10-24",
+      "title": "台股小資金被手續費吃掉不少",
+      "body": "最低手續費 NT$20/筆:資金 10 萬、每年 100 筆 ≈ 每年拖累 2.0%;30 萬 ≈ 0.67%;100 萬以上 ≈ 0.4~0.5%。",
+      "status": "已標示在決策清單",
+      "script": "research_b5_friction.py"
+    },
     {
       "date": "2026-09-24",
       "title": "台股信用哨是真 edge,美股的幾乎沒用",
@@ -2595,18 +3700,18 @@
     },
     {
       "item": "美股「池子」本身",
-      "why": "等權在無後見之明 14 檔池大勝(+0.264),在現用 5 檔池打平 → 換更分散的池可能比怎麼分配更重要",
-      "status": "待辦"
+      "why": "後見之明約每年 3 個百分點;事前挑法 2017 後會自己選到同樣標的 → 不換池,但調低期望",
+      "status": "✅ 2026-10-24 完成"
     },
     {
-      "item": "事前選池規則(流動性/費用率/類別)",
-      "why": "現用 5 檔是事後挑的(4368 種組合中排 147)",
-      "status": "待辦"
+      "item": "事前選池規則",
+      "why": "已用「過去36月報酬前5」測過(年化 10.6%,輸事後挑 3pp);流動性/費用率規則未測",
+      "status": "部分完成"
     },
     {
       "item": "等權的實務摩擦",
-      "why": "月 vs 季再平衡、台股零股與手續費對小資金的影響,決定實際能不能照做",
-      "status": "待辦"
+      "why": "再平衡不用做;只持有一檔指數與等權打平;小資金手續費拖累 0.4~2%/年",
+      "status": "✅ 2026-10-24 完成"
     },
     {
       "item": "XLK 的信用門檻 credit_k=0.98",

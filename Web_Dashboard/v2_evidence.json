@@ -127,6 +127,33 @@
       "evidence": "等權基礎重測(research_b2_overlays.py):① vol-timing 美股 ΔSharpe +0.008(p=0.374),但每年交易 70→133 筆 → 關閉;② 恐慌容忍 台股 −0.051、回撤惡化 4.3pp → 台股關閉(美股 0.000 無效但無害,保留);③ V底救援 台股 +0.137(p=0.014、Holm 後 0.056、三段全正、CAGR 19.3→22.1%)→ 台股啟用(美股同測僅 +0.025,維持原本 SMH/SOXX 限定)。",
       "strength": "V底台股:中~強 / 其餘:關閉理由充分",
       "script": "research_b2_overlays.py"
+    },
+    {
+      "id": "hindsight_us",
+      "market": "us",
+      "light": "⚠️ 期望值校正",
+      "rule": "美股回測數字有後見之明,未來期望值應往下調約 3 個百分點",
+      "evidence": "現用 5 檔事後挑:年化 13.5%/Sharpe 0.76;每年當下用過去 36 個月報酬挑前 5:10.6%/0.64(差 0.12,p=0.045);用過去 36 個月 Sharpe 挑:9.0%/0.58;零挑選 14 檔產業池:7.6%/0.59。比較期 2005-05~2026-09。",
+      "strength": "中~強",
+      "script": "research_b4_pool_hindsight.py"
+    },
+    {
+      "id": "rebalance",
+      "market": "both",
+      "light": "🔁 再平衡",
+      "rule": "等權不需要定期再平衡,只在單一標的進出場時調整那一份",
+      "evidence": "美股:每月 0.82/每季 0.82/每年 0.82/從不 0.83,交易 140→102 筆/年;台股:1.62/1.62/1.62/1.60,交易 100→64 筆/年。所有差距 p>0.3。",
+      "strength": "強(無差別)",
+      "script": "research_b5_friction.py"
+    },
+    {
+      "id": "single_index",
+      "market": "both",
+      "light": "🎯 只持有一檔",
+      "rule": "只持有一檔寬基指數(美股 QQQ / 台股 0050)+ 200MA 擇時 + 信用哨,和等權打平",
+      "evidence": "統一基準(含信用哨、不再平衡):台股 0050 單一 23.4%/1.58/16筆 vs 4檔等權 22.4%/1.60/64筆;美股 QQQ 單一 15.5%/0.75/19筆 vs 5檔等權 17.3%/0.83/102筆(差距不顯著)。長樣本台股(2009起)0050 單一 18.2% vs 3檔等權 16.1%(p=0.22)。",
+      "strength": "中(打平)",
+      "script": "research_b6_options_table.py / research_b5_friction.py"
     }
   ],
   "pvalue_note": "2026-09-24 統一補算 p 值(research_q5_pvalues.py):黃燈類用「逐年 block bootstrap」(重抽年份而非天,消掉樣本重疊造成的假顯著),策略類用 stationary block bootstrap。各問題家族內做 Holm 校正:持有方式(等權vs單押)三個池子校正後 0.060/0.072/0.076 全部撐住;黃燈類只有台股12%門檻撐住;跌深加槓桿全部不成立。"

@@ -111,7 +111,7 @@ document.querySelectorAll('.tabbtn').forEach(b=>b.onclick=()=>{
 });
 function setCap(m,v){ v?localStorage.setItem('v2cap_'+m,v):localStorage.removeItem('v2cap_'+m); render(); }
 const cap=m=>parseFloat(localStorage.getItem('v2cap_'+m))||null;
-const DEC_DEF={method_us:null,method_tw:null,lev_us:'1',lev_tw:'1',sat_tw:'0',conflict:'hold'};
+const DEC_DEF={method_us:null,method_tw:null,lev_us:'1',lev_tw:'1',sat_tw:'0',conflict:'hold',credit_us:'smooth'};
 function dec(k){ const v=localStorage.getItem('v2d_'+k); return v!==null?v:DEC_DEF[k]; }
 function setDec(k,v){ localStorage.setItem('v2d_'+k,v); render(); renderDecisions(); }
 window.setDec=setDec;
@@ -139,8 +139,9 @@ function mktCard(mk, m, title, cur){
   const rows = hs.map(p=>{
     const [lab,cls]=ACT[p.action]||['—','grey'];
     const slot = K!=null ? K*p.weight*coreShare : null;
-    const pos  = (slot!=null && p.expo!=null) ? slot*p.expo*1.0 : null;      // ×1.0
-    const pos125=(slot!=null && p.expo!=null) ? slot*p.expo*1.25 : null;     // ×1.25(Jason 要求兩種都列)
+    const cadj = (mk==='us' && dec('credit_us')==='wealth' && hearts>0 && hearts<1) ? 1/hearts : 1;  // 美股信用哨「皆壞才清倉」版:部分示警不打折
+    const pos  = (slot!=null && p.expo!=null) ? slot*p.expo*cadj*1.0 : null;      // ×1.0
+    const pos125=(slot!=null && p.expo!=null) ? slot*p.expo*cadj*1.25 : null;     // ×1.25(Jason 要求兩種都列)
     const sh   = (pos!=null && p.close) ? Math.floor(pos/p.close) : null;
     const sh125= (pos125!=null && p.close) ? Math.floor(pos125/p.close) : null;
     const zero = p.weight<=0 || coreShare<=0;
@@ -178,7 +179,9 @@ function mktCard(mk, m, title, cur){
   const off = hs.filter(p=>p.weight>0 && p.action!=='buy' && p.action!=='hold_wait').length;
   return `<div class="card">
     <h2>${title} ${credit}</h2>
-    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">${mbtn('ew','等權(每檔一份)')}${mbtn('rotation','單押最強')}</div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">${mk==='us'
+      ? mbtn('ew','5檔等權')+mbtn('single','只持有QQQ')+mbtn('rotation','單押最強')
+      : mbtn('ew','4檔等權')+mbtn('ew3','3檔等權')+mbtn('single','只持有0050')+mbtn('rotation','單押最強')}</div>
     <div class="note" style="margin:0 0 6px">${(ev.options||{})[meth]||''}</div>
     ${(m.credit_health!=null && m.credit_health<=0)?`<div style="margin:6px 0;background:#3a1414;border:1px solid #7a2a2a;color:#ffc9c9;border-radius:8px;padding:8px 10px;font-size:12.5px">
       🔴 <b>信用哨全部跌破</b>:系統規則是「清倉、不新增」—— 已持有的也轉現金,等哨兵站回 200MA 再進。
@@ -206,6 +209,7 @@ function mktCard(mk, m, title, cur){
         <div class="why" style="margin-top:6px">${t.gate_0050_ok?'✅ 母股 0050 在 200MA 之上(閘門開)':'🔴 母股 0050 跌破 200MA → 正2 一律空手'} · ${t.reason||''}</div>
         <div class="why" style="margin-top:4px">⚠️ 槓桿ETF:實測加了它比純核心差(Sharpe 1.28 vs 1.36);2015 年正2擇時單年 −41%。${t.gate_note||''}</div>
       </div>`;})():''}
+    <div class="note">🔁 <b>不用定期再平衡</b>:只在某一檔進場或出場時動它那一份就好。每月/每季/每年/從不再平衡,績效差距都 ≤0.02(全不顯著),「從不」少下 27~36% 的單(research_b5)。</div>
     <div class="note">🟡/🔴 的那幾份先放現金${off?`(目前 ${off} 份)`:''};等它轉 🟢 再補,不要挪去加碼別檔。停損只看<b>收盤</b>。</div>
     <details class="ev" style="margin-top:10px"><summary>📊 為什麼用這個持有方式 — ${ev.verdict||''}</summary>
       <div class="body">${ev.detail||''}</div></details>
@@ -248,7 +252,7 @@ function creditBlock(mk,m){
     <div class="why" style="margin-top:4px">${ev.evidence||''}</div></details>`;
 }
 
-function setMethod(mk,v){ localStorage.setItem('v2m_'+mk, v); render(); }
+function setMethod(mk,v){ localStorage.setItem('v2d_method_'+mk, v); render(); renderDecisions(); }
 window.setMethod = setMethod; window.setCap = setCap;
 
 function render(){
@@ -266,7 +270,7 @@ function renderDecisions(){
     <div class="note">每條都附兩邊的實測數字。選了就直接套用到「今天怎麼做」那頁(只存在你的瀏覽器)。
     沒有「數據上唯一正確」的答案才會放進這裡——數據能決定的部分我已經直接改好了。</div></div>`
     + ds.map(d=>{
-      const cur=dec(d.key);
+      const cur=dec(d.key) ?? (d.key.startsWith('method_') ? V.markets[d.key.slice(7)].default_method : null);
       const opts=d.options.map(o=>`<div onclick="setDec('${d.key}','${o.v}')"
         style="cursor:pointer;border:1px solid ${String(cur)===String(o.v)?'var(--accent)':'var(--line)'};
         background:${String(cur)===String(o.v)?'rgba(77,163,255,0.12)':'var(--panel2)'};

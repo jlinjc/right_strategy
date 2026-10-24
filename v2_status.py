@@ -52,20 +52,29 @@ METHOD_EVIDENCE = {
 
 
 LEV_TICKER = '00631L.TW'
+SINGLE_ANCHOR = {'us': 'QQQ', 'tw': '0050.TW'}
 
 # ── 決策清單:每條都給正反兩邊的實測數字,選了就直接影響上面的「今天怎麼做」──
 #    數字來源:research_q4_choices.py(A 槓桿階梯 / D 正2接法)、research_rot_verify_p1.py(持有方式)
 DECISIONS = [
-    {'key': 'method_us', 'title': '美股要單押最強,還是 5 檔等權?(你已選:等權)',
-     'note': '主判定池 2002-2026 統計上打平(Δ超額Sharpe +0.013、p=0.41);無後見之明的 14 檔產業池則明顯站等權。',
+    {'key': 'method_us', 'title': '美股持有方式(你已選:等權)',
+     'note': '統一基準重算(research_b6_options_table.py,2002-2026,含信用哨、RiskTarget、不再平衡):'
+             '三者 Sharpe 0.75~0.84,統計上都分不出高下(等權 vs 單押 p=0.41)。差別在交易量與集中度。'
+             '⚠️美股回測有後見之明:5 檔是 2026 年回頭挑的,站在每年當下挑只有年化 10.6%(research_b4),'
+             '未來期望值請往下調約 3 個百分點。',
      'options': [
-         {'v': 'rotation', 'label': '單押最強(現行)', 'nums': 'CAGR 14.1% · 回撤 −36.1% · 約15筆/年 · 超額Sharpe 0.69'},
-         {'v': 'ew', 'label': '5 檔等權', 'nums': 'CAGR 12.4% · 回撤 −26.0% · 約70筆/年 · 超額Sharpe 0.70(同波動後年化一樣)'}]},
-    {'key': 'method_tw', 'title': '台股要等權,還是單押最強?',
-     'note': '主池 Δ+0.210(p=0.038)、長樣本池 Δ+0.229(p=0.015);前N名曲線 1檔1.06→3檔1.23。',
+         {'v': 'ew', 'label': '5 檔等權', 'nums': 'CAGR 17.3% · 回撤 −34.2% · Sharpe 0.83 · 約102筆/年'},
+         {'v': 'rotation', 'label': '單押最強(原版輪動)', 'nums': 'CAGR 18.9% · 回撤 −33.4% · Sharpe 0.84 · 約32筆/年'},
+         {'v': 'single', 'label': '只持有 QQQ(最省事)', 'nums': 'CAGR 15.5% · 回撤 −33.5% · Sharpe 0.75 · 約19筆/年'}]},
+    {'key': 'method_tw', 'title': '台股持有方式(你已選:4 檔等權)',
+     'note': '統一基準重算(2013-2026,含信用哨、固定1倍、不再平衡)。只持有 0050 和等權打平(Sharpe 1.58 vs 1.60),'
+             '交易只有 1/4;長樣本(2009起)0050 甚至略好(年化 18.2% vs 16.1%,p=0.22 不顯著)。'
+             '小資金請注意手續費:最低 NT$20/筆,資金 10 萬、每年 64 筆 ≈ 每年拖累 1.3%(research_b5)。',
      'options': [
-         {'v': 'ew', 'label': '等權(新版預設)', 'nums': 'CAGR 19.3% · 回撤 −20.3% · 超額Sharpe 1.26'},
-         {'v': 'rotation', 'label': '單押最強(原版)', 'nums': 'CAGR 13.2% · 回撤 −33.7% · 超額Sharpe 0.89'}]},
+         {'v': 'ew', 'label': '4 檔等權', 'nums': 'CAGR 22.4% · 回撤 −18.2% · Sharpe 1.60 · 約64筆/年'},
+         {'v': 'ew3', 'label': '3 檔等權(去掉重複的 006208)', 'nums': 'CAGR 22.3% · 回撤 −18.2% · Sharpe 1.58 · 約48筆/年'},
+         {'v': 'single', 'label': '只持有 0050(最省事)', 'nums': 'CAGR 23.4% · 回撤 −18.7% · Sharpe 1.58 · 約16筆/年'},
+         {'v': 'rotation', 'label': '單押最強(原版輪動)', 'nums': 'CAGR 22.9% · 回撤 −18.2% · Sharpe 1.43 · 約27筆/年'}]},
     {'key': 'lev_us', 'title': '美股要開多少槓桿?(頁面同時列出 ×1.0 與 ×1.25 的金額)',
      'note': '2002-2026 單押輪動+RiskTarget。Sharpe 幾乎不隨槓桿變(0.69~0.73)=沿同一條效率線滑動,'
              '差別只有「賺多少 vs 跌多深」。$10萬起算的期末值供感受規模。',
@@ -90,14 +99,6 @@ DECISIONS = [
          {'v': '0.2', 'label': '衛星 20%', 'nums': 'CAGR 22.0% · 回撤 −22.0% · Sharpe 1.28(正2用0050的200MA當閘門)'},
          {'v': '0.4', 'label': '衛星 40%', 'nums': 'CAGR 22.5% · 回撤 −25.5% · Sharpe 1.10 · 最差年 −18.7%'},
          {'v': '1', 'label': '全押正2+擇時(最兇)', 'nums': 'CAGR 28.5% · 回撤 −47.2% · Sharpe 0.92 · 最差年 −41.2%'}]},
-    {'key': 'pool_tw', 'title': '台股要用 4 檔還是 3 檔?(0050 和 006208 追蹤同一個指數)',
-     'note': '0050 與 006208 日報酬相關 0.896(同一個台灣50指數,只是發行商不同)。等權下兩檔合計占 50%。'
-             '實測 2013-2026(等權+信用哨):4檔 CAGR 22.2%/Sharpe 1.62/回撤 −17.7%;'
-             '去掉 006208 的 3 檔 22.0%/1.60/−17.6% → ΔSharpe −0.021(p=0.861)= 幾乎完全一樣,'
-             '但交易從 100 筆/年降到 75 筆/年。',
-     'options': [
-         {'v': '4', 'label': '4 檔(0050+0052+006208+0051)', 'nums': 'CAGR 22.2% · Sharpe 1.62 · 約100筆/年'},
-         {'v': '3', 'label': '3 檔(去掉 006208,少一半重複)', 'nums': 'CAGR 22.0% · Sharpe 1.60 · 約75筆/年(省25筆)'}]},
     {'key': 'credit_us', 'title': '美股信用哨要用哪一版?(台股那版已驗證有效,不動)',
      'note': '2026-09-24 重驗:美股信用哨整體效果很小(ΔSharpe +0.08、p=0.17,校正後不顯著)。'
              '兩個版本風險幾乎一樣,差在報酬與交易量。',
@@ -140,6 +141,19 @@ DIFF = [
 ]
 # ── 最新發現(有價值、已落地)與研究待辦(Jason 2026-09-24:「把最新資訊有價值跟要研究的上到網站上」)──
 FINDINGS = [
+    {'date': '2026-10-24', 'title': '美股回測被後見之明灌水約每年 3 個百分點',
+     'body': '現用 5 檔是回頭挑的:事後挑年化 13.5%;站在每年當下用「過去 36 個月報酬前 5」挑只有 10.6%,'
+             '差 0.12 Sharpe(p=0.045)。零挑選的 14 檔產業池只有 7.6%。→ 美股未來期望值應往 10~11% 調。'
+             '好消息:事前法在 2017 年後自己也會選到 QQQ/SMH/SOXX/XLK,差距主要集中在 2009、2023、2025。',
+     'status': '已標示在決策清單', 'script': 'research_b4_pool_hindsight.py'},
+    {'date': '2026-10-24', 'title': '等權不需要再平衡;只持有一檔寬基指數和等權打平',
+     'body': '每月/每季/每年/從不再平衡,Sharpe 差距都 ≤0.02(全不顯著),「從不」少下 27~36% 的單。'
+             '只持有 0050:台股 Sharpe 1.58 vs 等權 1.60,交易 16 vs 64 筆/年;只持有 QQQ:0.75 vs 0.83(不顯著)。'
+             '→ 真正傷績效的是「輪動換來換去」,不是「只持有一檔」。',
+     'status': '已落地:頁面改成不再平衡;持有方式新增「只持有一檔」選項', 'script': 'research_b5_friction.py / research_b6_options_table.py'},
+    {'date': '2026-10-24', 'title': '台股小資金被手續費吃掉不少',
+     'body': '最低手續費 NT$20/筆:資金 10 萬、每年 100 筆 ≈ 每年拖累 2.0%;30 萬 ≈ 0.67%;100 萬以上 ≈ 0.4~0.5%。',
+     'status': '已標示在決策清單', 'script': 'research_b5_friction.py'},
     {'date': '2026-09-24', 'title': '台股信用哨是真 edge,美股的幾乎沒用',
      'body': '等權基礎重驗:台股 ΔSharpe +0.359(p<0.001,多重檢定後仍成立),2015/2018/2022 三個壞年份'
              '從 −4.9/−4.9/−9.8% 翻成 +1.4/+2.8/+2.3%;美股只有 +0.080(p=0.172)。',
@@ -168,9 +182,9 @@ FINDINGS = [
 RESEARCH_TODO = [
     {'item': '個股衛星整套重驗(S&P500 掃描、進出場、倉位)', 'why': 'live 在用,這一輪完全沒碰', 'status': '待辦'},
     {'item': '進取模式(TQQQ/SOXL)', 'why': '用獨立的二元信用哨,規則和核心不一致', 'status': '待辦'},
-    {'item': '美股「池子」本身', 'why': '等權在無後見之明 14 檔池大勝(+0.264),在現用 5 檔池打平 → 換更分散的池可能比怎麼分配更重要', 'status': '待辦'},
-    {'item': '事前選池規則(流動性/費用率/類別)', 'why': '現用 5 檔是事後挑的(4368 種組合中排 147)', 'status': '待辦'},
-    {'item': '等權的實務摩擦', 'why': '月 vs 季再平衡、台股零股與手續費對小資金的影響,決定實際能不能照做', 'status': '待辦'},
+    {'item': '美股「池子」本身', 'why': '後見之明約每年 3 個百分點;事前挑法 2017 後會自己選到同樣標的 → 不換池,但調低期望', 'status': '✅ 2026-10-24 完成'},
+    {'item': '事前選池規則', 'why': '已用「過去36月報酬前5」測過(年化 10.6%,輸事後挑 3pp);流動性/費用率規則未測', 'status': '部分完成'},
+    {'item': '等權的實務摩擦', 'why': '再平衡不用做;只持有一檔指數與等權打平;小資金手續費拖累 0.4~2%/年', 'status': '✅ 2026-10-24 完成'},
     {'item': 'XLK 的信用門檻 credit_k=0.98', 'why': '個別標的門檻未單獨驗證', 'status': '待辦'},
     {'item': '未跑完的驗證關卡', 'why': 'Deflated Sharpe、檢查池候選層、bootstrap/種子數降過規格', 'status': '待辦'},
     {'item': '前瞻紙上追蹤 12 個月', 'why': '2002-2026 研究時已全部看過;凍結日 2026-09-24 之後的新資料才是真考驗', 'status': '✅ 2026-10-24 上線(每天自動,見「前瞻追蹤」分頁)'},
@@ -298,6 +312,12 @@ def _positions(status, mkt, method, health=None):
         rank = sorted([tk for tk in cores if cores[tk].get('rs_score') is not None],
                       key=lambda tk: -cores[tk]['rs_score'])[:n]
         chosen = {tk: 1.0 / n for tk in rank}
+    elif method == 'single':                # 只持有一檔寬基指數(research_b5/b6:與等權打平、交易少 4~6 倍)
+        anchor = SINGLE_ANCHOR[mkt]
+        chosen = {anchor: 1.0} if anchor in cores else {}
+    elif method == 'ew3':                   # 台股去重:0050/006208 同一指數(相關0.896)只留 0050
+        keep = [tk for tk in cores if tk != '006208.TW']
+        chosen = {tk: 1.0 / len(keep) for tk in keep}
     else:                                   # 'ew':每檔固定 1/N 槽位
         n = len(cores)
         chosen = {tk: 1.0 / n for tk in cores}
@@ -347,7 +367,7 @@ def build():
             'markets': {}}
     for mkt, status, cur in (('us', cs, '$'), ('tw', tw, 'NT$')):
         can = status.get('canary') or {}
-        methods = {m: _positions(status, mkt, m, can.get('health')) for m in ('rotation', 'ew', 'topn')}
+        methods = {m: _positions(status, mkt, m, can.get('health')) for m in ('rotation', 'ew', 'ew3', 'single', 'topn')}
         data['markets'][mkt] = {
             'default_method': DEFAULT_METHOD[mkt], 'methods': methods, 'topn': TOPN[mkt], 'currency': cur,
             'credit_health': can.get('health'), 'credit_note': can.get('note'),
