@@ -72,6 +72,7 @@
   <div class="tabbar" id="tabbar">
     <button class="tabbtn on" data-t="today">🎯 今天怎麼做</button>
     <button class="tabbtn" data-t="dec">🗳 決策清單</button>
+    <button class="tabbtn" data-t="fwd">📈 前瞻追蹤</button>
     <button class="tabbtn" data-t="news">🧪 最新發現與待辦</button>
     <button class="tabbtn" data-t="diff">🔍 和原版差在哪</button>
     <button class="tabbtn" data-t="ev">📐 規則與證據</button>
@@ -91,6 +92,7 @@
   </div>
 
   <div class="pane" id="p-dec"><div id="decBox"></div></div>
+  <div class="pane" id="p-fwd"><div id="fwdBox"></div></div>
   <div class="pane" id="p-news"><div id="newsBox"></div></div>
   <div class="pane" id="p-diff"><div id="diffBox"></div></div>
   <div class="pane" id="p-ev"><div id="evBox"></div></div>
@@ -276,6 +278,31 @@ function renderDecisions(){
     }).join('');
 }
 
+let FW=null;
+function renderForward(){
+  const box=$('#fwdBox'); if(!box) return;
+  if(!FW){ box.innerHTML='<div class="card">前瞻追蹤資料尚未產生</div>'; return; }
+  const W=340,H=150,col=['#ff9d5a','#4da3ff','#8a96ad'];
+  const card=(mk,title)=>{
+    const rows=FW.markets[mk]||[]; if(!rows.length) return '';
+    const all=rows.flatMap(r=>r.curve.map(c=>c[1])); const lo=Math.min(0,...all), hi=Math.max(0,...all);
+    const n=Math.max(...rows.map(r=>r.curve.length));
+    const y=v=>H-8-(v-lo)/((hi-lo)||1)*(H-16), x=i=>8+i/Math.max(n-1,1)*(W-16);
+    const lines=rows.map((r,k)=>`<polyline fill="none" stroke="${col[k]}" stroke-width="2" points="${r.curve.map((c,i)=>x(i)+','+y(c[1])).join(' ')}"/>`).join('');
+    const zero=`<line x1="8" x2="${W-8}" y1="${y(0)}" y2="${y(0)}" stroke="#26304a" stroke-dasharray="3 3"/>`;
+    const tbl=rows.map((r,k)=>`<tr><td style="padding:5px"><span style="color:${col[k]}">●</span> ${r.name}</td>
+      <td class="num" style="padding:5px;color:${r.ret_pct>=0?'#7ee0a0':'#ff8f8f'}">${r.ret_pct>0?'+':''}${r.ret_pct}%</td>
+      <td class="num" style="padding:5px">${r.mdd_pct}%</td><td class="num" style="padding:5px">${Math.round(r.expo_now*100)}%</td></tr>`).join('');
+    return `<div class="card"><h2>${title}</h2>
+      <svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;background:var(--panel2);border-radius:8px">${zero}${lines}</svg>
+      <div style="overflow-x:auto"><table style="margin-top:6px"><tr><th>版本</th><th>凍結後報酬</th><th>最大回撤</th><th>目前曝險</th></tr>${tbl}</table></div>
+      <div class="why">已經過 ${rows[0].days} 個交易日。</div></div>`;
+  };
+  box.innerHTML=`<div class="card"><h2>📈 前瞻追蹤(真正的樣本外)</h2>
+    <div class="why" style="font-size:12.5px">研究凍結日 <b>${FW.freeze}</b> 之前的資料,研究時全部看過;只有之後的資料才是真考驗。${FW.note}</div>
+    <div class="why" style="margin-top:4px">更新:${FW.generated}</div></div>`+card('us','🇺🇸 美股')+card('tw','🇹🇼 台股');
+}
+
 function renderNews(){
   const f=(V.findings||[]).map(x=>`<div class="card"><div class="why">${x.date} · <code>${x.script}</code></div>
     <h2 style="font-size:14px;margin:4px 0">${x.title}</h2><div class="why" style="font-size:12.5px">${x.body}</div>
@@ -314,11 +341,12 @@ function renderLimit(){
 (async ()=>{
   try{
     [V, EV] = await Promise.all([j('v2_status.json'), j('v2_evidence.json')]);
+    try{ FW = await j('paper_forward.json'); }catch(e){ FW=null; }
     const stale = (Date.now()-new Date(String(V.generated).replace(' ','T')).getTime())/3.6e6;
     $('#updated').innerHTML = `${stale>36?'🔴 資料過期':'🟢'} 資料更新 <b>${V.generated.slice(5,16)}</b>`
       + `(台北時間;伺服器每天 09:00/21:00/22:30 自動更新,GitHub 常延遲 1-4 小時)`
       + (stale>36?` — 已經 ${Math.round(stale)} 小時沒更新,先別依這頁下單`:'');
-    render(); renderDecisions(); renderNews(); renderEvidence(); renderDiff(); renderLimit();
+    render(); renderDecisions(); renderForward(); renderNews(); renderEvidence(); renderDiff(); renderLimit();
     $('#foot').textContent = `v2 · 規則版本 ${EV.version} · 訊號皆為收盤價計算,隔日限價執行`;
   }catch(e){
     $('#updated').innerHTML = '<span style="color:var(--red)">⚠️ 資料載入失敗:'+e.message+'</span>';
