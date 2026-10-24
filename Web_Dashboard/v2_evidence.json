@@ -154,6 +154,24 @@
       "evidence": "統一基準(含信用哨、不再平衡):台股 0050 單一 23.4%/1.58/16筆 vs 4檔等權 22.4%/1.60/64筆;美股 QQQ 單一 15.5%/0.75/19筆 vs 5檔等權 17.3%/0.83/102筆(差距不顯著)。長樣本台股(2009起)0050 單一 18.2% vs 3檔等權 16.1%(p=0.22)。",
       "strength": "中(打平)",
       "script": "research_b6_options_table.py / research_b5_friction.py"
+    },
+    {
+      "id": "satellite",
+      "market": "us",
+      "light": "❌ 個股衛星",
+      "rule": "個股衛星(RS前20%+拉回進場+跌破50MA出場)不納入 v2",
+      "evidence": "上限測試(今天的S&P500 500檔、2007-2026、有生存者偏差):+大盤濾網 15.8%/Sharpe 0.73/回撤 −30.8%,與 QQQ 200MA 擇時(0.73)打平;對 SPY 擇時 Δ+0.086、p=0.35。舊證據(Sharpe 1.9~2.2)只測 2023-2026。",
+      "strength": "中(否定;有利偏差下仍無 edge)",
+      "script": "research_b8_satellite.py"
+    },
+    {
+      "id": "aggressive",
+      "market": "us",
+      "light": "⚠️ 進取模式",
+      "rule": "TQQQ/SOXL:母指數200MA + 三哨全健康才持有(維持現行)",
+      "evidence": "三哨二元 vs 平滑:Sharpe 0.84 vs 0.84(TQQQ)、0.77 vs 0.76(SOXL);沒信用哨 0.72/0.64,2022 年 −43%/−73%。全保護下最大回撤 TQQQ −59%、SOXL −85%。",
+      "strength": "中",
+      "script": "research_b7_aggressive.py"
     }
   ],
   "pvalue_note": "2026-09-24 統一補算 p 值(research_q5_pvalues.py):黃燈類用「逐年 block bootstrap」(重抽年份而非天,消掉樣本重疊造成的假顯著),策略類用 stationary block bootstrap。各問題家族內做 Holm 校正:持有方式(等權vs單押)三個池子校正後 0.060/0.072/0.076 全部撐住;黃燈類只有台股12%門檻撐住;跌深加槓桿全部不成立。"
