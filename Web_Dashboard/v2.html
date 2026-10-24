@@ -266,7 +266,7 @@ function render(){
 function renderDecisions(){
   const box=$('#decBox'); if(!box||!V) return;
   const ds=V.decisions||[];
-  box.innerHTML = `<div class="card"><h2>🗳 六個要你決定的事</h2>
+  box.innerHTML = `<div class="card"><h2>🗳 要你決定的事(每項附證據判斷)</h2>
     <div class="note">每條都附兩邊的實測數字。選了就直接套用到「今天怎麼做」那頁(只存在你的瀏覽器)。
     沒有「數據上唯一正確」的答案才會放進這裡——數據能決定的部分我已經直接改好了。</div></div>`
     + ds.map(d=>{
@@ -278,7 +278,7 @@ function renderDecisions(){
         <div style="font-weight:700;font-size:13.5px">${String(cur)===String(o.v)?'✅ ':'　'}${o.label}</div>
         <div class="why" style="margin-top:3px">${o.nums}</div></div>`).join('');
       return `<div class="card"><h2 style="font-size:14px">${d.title}</h2>
-        <div class="why">${d.note}</div>${opts}</div>`;
+        <div class="why">${d.note}</div>${d.verdict?`<div style="margin-top:7px;font-size:12.5px;background:#0e1b2e;border:1px solid #2a4a72;border-radius:8px;padding:8px 10px"><b>📊 證據判斷:</b>${d.verdict}</div>`:''}${opts}</div>`;
     }).join('');
 }
 

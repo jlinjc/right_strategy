@@ -73,9 +73,9 @@ PANIC_BASE_RATE = {'fwd21_median': 3.3, 'fwd21_up_pct': 67, 'fwd63_median': 8.3,
 #     budget 由 optimize_risk_sizing_per_index.py 校準(平均曝險對齊原 VolTarget cap1.5)
 #     高波動動能股(SMH/SOXX/XLK)budget 較大、停損距也較寬→曝險隨拉回起伏明顯;
 #     廣基(QQQ/SPY)較平滑→sizing 影響小(驗證 ΔSharpe≈0,但報酬仍升、無害)。
-# credit_k = 該指數的信用門檻(HYG<200MA×credit_k 才砍曝險)。research_xlk_credit.py:
-#   半導體/成長(SMH/SOXX/QQQ/SPY)對信用真敏感→k=1.00(跌破就砍,2022保護最佳);
-#   XLK含蘋果微軟巨頭=利率/品質驅動,淺信用波動是假警報→k=0.98(只認深破),救回報酬+保住風險。
+# ★2026-10-24 移除 credit_k:這個參數過去定義在 PARAMS 裡,但程式從來沒有用到(信用哨對 5 檔一律套同一個
+#   健康比例),註解宣稱的「XLK 只認深破 0.98」從未生效。實作出來測(research_b9_final.py B 段,等權基礎):
+#   k=0.99/0.98/0.97 對 k=1.00 的 ΔSharpe −0.007/−0.009/−0.009(p≈0.75)→ 沒效果,不實作,直接移除。
 #   resist_warn = 「頭上壓力」黃燈門檻(剩餘空間≤此才警示;2026-07-17 逐根全史審計,五指數+台股全解剖):
 #     QQQ/XLK/SPY=-1(永不警示,改純資訊):全史「壓」各距離事後皆≥「買」(QQQ壓+0% 63日+6.5%/86% vs 買+4.2%;
 #       SPY壓全格+4.0~5.2% vs 買+2.3%)=廣基/巨頭指數動能直接碾過前高,「等突破」系統性錯誤。
@@ -83,13 +83,13 @@ PANIC_BASE_RATE = {'fwd21_median': 3.3, 'fwd21_up_pct': 67, 'fwd63_median': 8.3,
 #     SOXX=0.015(≤1%警示):唯一真的會被壓的——壓≤1% 63日+7.1~7.4% vs 買+12.2%,差距大。
 #     台股006208/0050=0.005(只+0%弱,見taiwan_status)。⚠️僅改建議文字,不動進出場/倉位機制。
 PARAMS = {
-    'SMH':  {'entry_thr': 1.10, 'exit_buf': 0.98, 'budget': 0.213, 'cap': 1.5, 'credit_k': 1.00, 'resist_warn': 0.005},
-    'SOXX': {'entry_thr': 1.07, 'exit_buf': 0.99, 'budget': 0.201, 'cap': 1.5, 'credit_k': 1.00, 'resist_warn': 0.015},
-    'QQQ':  {'entry_thr': 1.07, 'exit_buf': 1.00, 'budget': 0.199, 'cap': 1.5, 'credit_k': 1.00, 'resist_warn': -1},
-    'XLK':  {'entry_thr': 1.10, 'exit_buf': 0.98, 'budget': 0.213, 'cap': 1.5, 'credit_k': 0.98, 'resist_warn': -1},
-    'SPY':  {'entry_thr': 1.05, 'exit_buf': 1.00, 'budget': 0.190, 'cap': 1.5, 'credit_k': 1.00, 'resist_warn': -1},
+    'SMH':  {'entry_thr': 1.10, 'exit_buf': 0.98, 'budget': 0.213, 'cap': 1.5, 'resist_warn': 0.005},
+    'SOXX': {'entry_thr': 1.07, 'exit_buf': 0.99, 'budget': 0.201, 'cap': 1.5, 'resist_warn': 0.015},
+    'QQQ':  {'entry_thr': 1.07, 'exit_buf': 1.00, 'budget': 0.199, 'cap': 1.5, 'resist_warn': -1},
+    'XLK':  {'entry_thr': 1.10, 'exit_buf': 0.98, 'budget': 0.213, 'cap': 1.5, 'resist_warn': -1},
+    'SPY':  {'entry_thr': 1.05, 'exit_buf': 1.00, 'budget': 0.190, 'cap': 1.5, 'resist_warn': -1},
 }
-DEFAULT_PARAM = {'entry_thr': 1.08, 'exit_buf': 0.98, 'budget': 0.20, 'cap': 1.5, 'credit_k': 1.00}
+DEFAULT_PARAM = {'entry_thr': 1.08, 'exit_buf': 0.98, 'budget': 0.20, 'cap': 1.5}
 
 # 風險旋鈕(資本配置線):同時縮放 budget 與 cap,沿同一效率線滑動,不改 Sharpe。
 #   ★Kelly實證(research_costs_kelly.py):數學說可加到2-4x,但那是『樣本無真熊市』的幻覺,別信。
@@ -677,7 +677,7 @@ def main():
         'credit_leadtime_note': ('★信用哨領先性實證(research_credit_leadtime.py):HYG領先SPY中位+7交易日、'
                                  '顯著回撤7/10被±10日內預警(真領先);但單一HYG跌破88%是假警報(很吵)'
                                  '→正是為何用HYG+LQD平滑(breadth確認過濾假警報),非單一HYG一刀砍0。'
-                                 '2018Q4/2025關稅信用落後=利率驅動回撤信用非主因(對照XLK credit_k=0.98只認深破)。'),
+                                 '2018Q4/2025關稅信用落後=利率驅動回撤信用非主因。'),
         'leverage_note': ('槓桿RISK_MULT上限1.5:Kelly說2-4x是『樣本無真熊市』的幻覺別信。'
                           '保守0.67(MDD-18%)/標準1.0(-26%)/積極1.25(-32%)。'),
         'discipline_note': ('真edge=熊市躲現金+不手賤砍底(擇時相對買持alpha僅+0.08)。'

@@ -115,7 +115,7 @@
       "market": "both",
       "light": "📈 新版 vs 原版",
       "rule": "新版改的是台股(等權+固定1倍);美股規則未動",
-      "evidence": "台股主池 2013-2026:原版(單押輪動+RiskTarget)CAGR 13.2%/回撤−33.7%/Sharpe 0.89 → 新版 19.3%/−20.3%/1.26,ΔSharpe +0.375(p=0.041);長樣本池 8.4%→13.5%、ΔSharpe +0.391(p=0.011)。美股兩版完全相同(ΔSharpe 0.000)。",
+      "evidence": "台股主池 2013-2026:原版(單押輪動+RiskTarget)CAGR 13.2%/回撤−33.7%/Sharpe 0.89 → 新版 19.3%/−20.3%/1.26,ΔSharpe +0.375(p=0.041);長樣本池 8.4%→13.5%、ΔSharpe +0.391(p=0.011)。美股兩版完全相同(ΔSharpe 0.000)。 2026-10-24 最嚴格的 Deflated Sharpe(扣掉試了十幾種方法的運氣):台股 0.75/0.85,未達 0.90 門檻 → 證據中等。",
       "strength": "中~強",
       "script": "research_q4_choices.py"
     },
@@ -172,6 +172,15 @@
       "evidence": "三哨二元 vs 平滑:Sharpe 0.84 vs 0.84(TQQQ)、0.77 vs 0.76(SOXL);沒信用哨 0.72/0.64,2022 年 −43%/−73%。全保護下最大回撤 TQQQ −59%、SOXL −85%。",
       "strength": "中",
       "script": "research_b7_aggressive.py"
+    },
+    {
+      "id": "sat_p",
+      "market": "tw",
+      "light": "✅ 正2衛星 0%",
+      "rule": "正2衛星配 0% 最站得住",
+      "evidence": "統一基準(含信用哨、每月拉回目標比例):20% 衛星 ΔSharpe −0.059 [−0.10,−0.01](顯著較差)、年化 +5.5pp、回撤 −14.4%→−18.7%;40% 衛星 −0.106。想加報酬,核心開 ×1.25 效率較好。",
+      "strength": "中~強",
+      "script": "research_b10_satellite_p.py"
     }
   ],
   "pvalue_note": "2026-09-24 統一補算 p 值(research_q5_pvalues.py):黃燈類用「逐年 block bootstrap」(重抽年份而非天,消掉樣本重疊造成的假顯著),策略類用 stationary block bootstrap。各問題家族內做 Holm 校正:持有方式(等權vs單押)三個池子校正後 0.060/0.072/0.076 全部撐住;黃燈類只有台股12%門檻撐住;跌深加槓桿全部不成立。"
