@@ -185,7 +185,7 @@ function mktCard(mk, m, title, cur){
     <div class="note" style="margin:0 0 6px">${(ev.options||{})[meth]||''}</div>
     ${(m.credit_health!=null && m.credit_health<=0)?`<div style="margin:6px 0;background:#3a1414;border:1px solid #7a2a2a;color:#ffc9c9;border-radius:8px;padding:8px 10px;font-size:12.5px">
       🔴 <b>信用哨全部跌破</b>:系統規則是「清倉、不新增」—— 已持有的也轉現金,等哨兵站回 200MA 再進。
-      ${mk==='us'?'⚠️ 美股這條規則的回測效果弱(ΔSharpe +0.08、p=0.17);而且 HYG 只低於均線一點點,可能很快站回。要不要照做由你決定。':''}
+      ${mk==='us'?'美股這條規則整體不顯著(ΔSharpe +0.08、p=0.17,危機樣本太少),但 2022 年升息空頭時少跌 21 個百分點。要不要照做由你決定。':''}
     </div>`:''}
     ${creditBlock(mk,m)}
     <div class="note" style="margin:0 0 8px">買多少:${m.sizing}<br>
