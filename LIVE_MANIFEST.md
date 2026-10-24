@@ -20,7 +20,7 @@ scanner_base.py · filter_experiments.py · exit_experiments.py · rs_selection.
 (taiwan_status 被 generate_kbar_annotations import:TW_PARAMS/clean)
 
 ## 前端與本機工具
-Web_Dashboard/strategy_dashboard.html(線上入口;index.html 部署時被覆蓋成轉址)
+Web_Dashboard/strategy_dashboard.html(原版;index.html 部署時被覆蓋成轉址到 v2.html)
 Web_Dashboard/v2.html + v2_status.json + v2_evidence.json(新版頁面;頂端可切換原版/新版)
 Web_Dashboard/index.html + script.js(本機掃描器)· update_dashboard.py · web_server.py
 .github/workflows/pages.yml(排程與部署本身)

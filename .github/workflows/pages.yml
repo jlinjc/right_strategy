@@ -111,14 +111,14 @@ jobs:
               print('keep repo signals', repo.get('last_updated'))
           PY
 
-      # 讓網站根網址直接導到策略儀表板
-      - name: Root redirect -> strategy_dashboard.html
+      # 讓網站根網址直接導到新版(v2);原版仍可從頁面頂端的「原版」切換鈕進入(2026-10-24 Jason 指示)
+      - name: Root redirect -> v2.html
         run: |
           cat > Web_Dashboard/index.html <<'HTML'
           <!doctype html><html><head><meta charset="utf-8">
-          <meta http-equiv="refresh" content="0; url=strategy_dashboard.html">
-          <title>策略儀表板</title></head>
-          <body><a href="strategy_dashboard.html">前往策略儀表板 →</a></body></html>
+          <meta http-equiv="refresh" content="0; url=v2.html">
+          <title>作戰中心 v2</title></head>
+          <body><a href="v2.html">前往作戰中心(新版)→</a></body></html>
           HTML
 
       - uses: actions/configure-pages@v5
