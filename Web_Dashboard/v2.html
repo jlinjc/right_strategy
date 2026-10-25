@@ -447,7 +447,9 @@ function renderDecisions(){
   box.innerHTML = `<div class="card"><h2>⚙️ 我的設定</h2>
     <div class="note">每一項都附兩邊的實測數字;選了會直接套用到「今天怎麼做」。
     沒有「數據上唯一正確」的答案才會放進這裡,數據能決定的部分已經直接改好了。
-    <b>選擇只存在這個瀏覽器</b>,換手機/電腦或清除瀏覽器資料要重選。</div></div>`
+    <b>選擇只存在這個瀏覽器</b>,換手機/電腦或清除瀏覽器資料要重選。</div>
+    <div class="warnbox orange" style="margin-top:8px">⚠️ 下面各選項的數字,除了槓桿 ×1.0/×1.25 以外,都還是舊的回測假設「訊號當天收盤就成交」:
+    美股約偏高 0.6pp,<b>台股約偏高 3pp</b>(台股的信用哨用到比台股收盤晚 14 小時的美股收盤)。選項之間的比較待用「隔天開盤成交」重跑。</div></div>`
     + main.map(card).join('')
     + (conflict ? (anyRot ? card(conflict)
         : `<details class="ev"><summary>停損線~200MA 之間要續抱還是換掉?(只在選「單押最強」時才需要)</summary><div class="body">${card(conflict)}</div></details>`) : '')
