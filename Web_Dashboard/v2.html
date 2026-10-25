@@ -160,8 +160,8 @@ document.querySelectorAll('.tabbtn').forEach(b=>b.onclick=()=>goTab(b.dataset.t)
 document.querySelectorAll('.subbtn').forEach(b=>b.onclick=()=>goSub(b.dataset.s));
 function setCap(m,v){ v?ls.set('v2cap_'+m,v):ls.del('v2cap_'+m); render(); }
 const cap=m=>parseFloat(ls.get('v2cap_'+m))||null;
-const DEC_DEF={method_us:null,method_tw:null,lev_us:'1',lev_tw:'1',sat_tw:'0',conflict:'hold',credit_us:'smooth'};
-const UNTESTED={lev_us:['0.5','0.75'],lev_tw:['0.5','0.75']};   // 現行設定下未回測 → 暫不開放
+const DEC_DEF={method_us:null,method_tw:null,sat_tw:'0',conflict:'hold',credit_us:'smooth'};
+const UNTESTED={};
 function dec(k){ const v=ls.get('v2d_'+k); return (v!==null && !(UNTESTED[k]||[]).includes(v))?v:DEC_DEF[k]; }
 function resetDec(){ Object.keys(DEC_DEF).forEach(k=>ls.del('v2d_'+k)); render(); renderDecisions(); }
 window.resetDec=resetDec;
@@ -206,7 +206,7 @@ function mktCard(mk, m, title, cur){
   }
   const K=cap(mk);
   const meth = methOf(mk,m);
-  const lev = parseFloat(dec('lev_'+mk))||1;
+  const lev = 1;   // 2026-10-25 起不融資,不再有槓桿倍數選項
   const sat = (mk==='tw') ? (parseFloat(dec('sat_tw'))||0) : 0;
   const satAll = sat>=1;
   const coreShare = satAll ? 0 : (1-sat);
@@ -249,7 +249,7 @@ function mktCard(mk, m, title, cur){
       <div class="rowline"><span class="who">如果你空手</span><span class="act ${ec}">${el}</span><span class="why">${clean(p.reason)}</span></div>
       ${rescue}
       <div class="tiles">
-        ${tile(`目標部位(槓桿 ×${lev})`, tgtv, p.expo===0?'var(--grey)':'var(--txt)')}
+        ${tile('目標部位', tgtv, p.expo===0?'var(--grey)':'var(--txt)')}
         ${tile('現價', cur+fmt(p.close))}
         ${tile('追高上限(超過先別買)', p.limit!=null?cur+fmt(p.limit):'—', '#4da3ff')}
         ${tile('停損線(看收盤)', p.stop!=null?cur+fmt(p.stop):'—', stopRed?'#ff5a5a':null)}
@@ -299,9 +299,8 @@ function mktCard(mk, m, title, cur){
   const mdec = (V.decisions||[]).find(d=>d.key==='method_'+mk);
   const mopt = mdec ? mdec.options.find(o=>o.v===meth) : null;
   const levNote = sat>0 ? `你目前配了 <b>正2衛星 ${Math.round(sat*100)}%</b>:這個組合的數字見設定頁的進階選項`
-    : meth!==m.default_method ? (lev===1 && mopt ? `你目前用 <b>${mopt.label} ×1</b>:${mopt.nums}` : `你目前用 <b>${METH_NAME[meth]||meth} ×${lev}</b>:這個組合<b>還沒回測</b>`)
-    : (lev===1||lev===1.25) ? `你目前用 <b>×${lev}</b>:年化 ${OF['x'+(lev===1?'1':'125')].cagr}% / 最大回撤 ${OF['x'+(lev===1?'1':'125')].mdd}%`
-    : `你目前用 <b>×${lev}</b>:這個倍數在現行設定下<b>還沒回測</b>`;
+    : meth!==m.default_method ? (mopt ? `你目前用 <b>${mopt.label}</b>:${mopt.nums}` : `你目前用 <b>${METH_NAME[meth]||meth}</b>:這個選項<b>還沒回測</b>`)
+    : '你目前用預設設定';
   return `<div class="card">
     <h2>${title} ${credit}</h2>
     ${miss}
@@ -318,7 +317,7 @@ function mktCard(mk, m, title, cur){
     ${otherBox}
     ${satCard(mk,m,K,sat,lev,cur,tile)}
     <div class="note">📊 <b>預設設定的回測績效</b>(${OF.setup||''},${OF.period||''}${meth!==m.default_method?`;你選的「${METH_NAME[meth]||meth}」數字見 <a href="#" onclick="goTab('dec');return false;">我的設定</a>`:''}):
-      ×1.0 年化 ${OF.x1?OF.x1.cagr:''}% / 最大回撤 ${OF.x1?OF.x1.mdd:''}%;×1.25 年化 ${OF.x125?OF.x125.cagr:''}% / 最大回撤 ${OF.x125?OF.x125.mdd:''}%。
+      年化 ${OF.x1?OF.x1.cagr:''}% / 最大回撤 ${OF.x1?OF.x1.mdd:''}% / 超額Sharpe ${OF.x1?OF.x1.sharpe:''}。
       ${levNote}(<a href="#" onclick="goTab('dec');return false;">在設定改</a>)。<br>
       ${OF.margin_note||''} ${OF.hindsight_note||''}
       這個數字只含 200MA + 信用哨${mk==='us'?' + RiskTarget':''};③ 別追高、④ 空手先別進、V底救援、R3、隔日執行都沒算進去。</div>
@@ -346,7 +345,7 @@ function satCard(mk,m,K,sat,lev,cur,tile){
     <div style="display:flex;gap:5px;margin-top:7px;flex-wrap:wrap">
       ${tile('現價', cur+fmt(t.close))}${tile('追高上限', t.limit!=null?cur+fmt(t.limit):'—','#4da3ff')}
       ${tile('停損線(看收盤)', t.stop!=null?cur+fmt(t.stop):'—')}
-      ${tile(`目標部位(槓桿 ×${lev})`, ps!=null?cur+fmt(Math.round(ps)):(t.action==='cash'?'現金':'—'))}</div>
+      ${tile('目標部位', ps!=null?cur+fmt(Math.round(ps)):(t.action==='cash'?'現金':'—'))}</div>
     ${(t.action==='buy'&&shs!=null)?`<div class="why" style="margin-top:4px">約 ${fmt(shs)} 股(零股)</div>`:''}
     <div class="why" style="margin-top:6px">${t.gate_0050_ok?'✅ 母股 0050 在 200MA 之上(閘門開)':'🔴 母股 0050 跌破 200MA → 正2 一律空手'} · ${clean(t.reason)}</div>
     <div class="why" style="margin-top:4px">如果你持有:0050 跌破 200MA 或正2 收盤跌破停損線 → 賣;信用示警時照乘數減。</div>
@@ -407,10 +406,9 @@ function render(){
   if(!V) return;
   $('#cap_us').value = ls.get('v2cap_us')||'';
   $('#cap_tw').value = ls.get('v2cap_tw')||'';
-  const LEVN={'1':'×1.0','1.25':'×1.25'};
-  const nonDef=['method_us','method_tw','lev_us','lev_tw','sat_tw','credit_us'].some(k=>ls.get('v2d_'+k)!==null);
+  const nonDef=['method_us','method_tw','sat_tw','credit_us'].some(k=>ls.get('v2d_'+k)!==null);
   const mN=mk=>{const d=(V.decisions||[]).find(x=>x.key==='method_'+mk);const o=d&&d.options.find(o=>o.v===methOf(mk,V.markets[mk]));return o?o.label:'';};
-  $('#applied').innerHTML = `目前套用:美股 ${mN('us')} ${LEVN[dec('lev_us')]||dec('lev_us')}|台股 ${mN('tw')} ${LEVN[dec('lev_tw')]||dec('lev_tw')}`
+  $('#applied').innerHTML = `目前套用:美股 ${mN('us')}|台股 ${mN('tw')}(都不融資)`
     + (parseFloat(dec('sat_tw'))>0?` + 正2 ${Math.round(parseFloat(dec('sat_tw'))*100)}%`:'')
     + (nonDef?` <span style="color:var(--orange)">(和預設不同)</span> <a href="#" onclick="resetDec();return false;">重設為預設</a>`:' (預設)');
   const sel = ls.get('v2mkt')||'all';
@@ -448,7 +446,7 @@ function renderDecisions(){
     <div class="note">每一項都附兩邊的實測數字;選了會直接套用到「今天怎麼做」。
     沒有「數據上唯一正確」的答案才會放進這裡,數據能決定的部分已經直接改好了。
     <b>選擇只存在這個瀏覽器</b>,換手機/電腦或清除瀏覽器資料要重選。</div>
-    <div class="note">台股各選項和槓桿 ×1.0/×1.25 的數字都是「隔天開盤成交」;美股持有方式和信用哨版本兩題還是舊假設「訊號當天收盤就成交」,約偏高 0.6pp,選項之間的比較不受影響。</div></div>`
+    <div class="note">持有方式和正2衛星的數字都是「不融資、隔天開盤成交」;美股信用哨版本那題還是舊假設(1 倍、訊號當天收盤成交),只能拿來比兩個版本之間的差別。</div></div>`
     + main.map(card).join('')
     + (conflict ? (anyRot ? card(conflict)
         : `<details class="ev"><summary>停損線~200MA 之間要續抱還是換掉?(只在選「單押最強」時才需要)</summary><div class="body">${card(conflict)}</div></details>`) : '')

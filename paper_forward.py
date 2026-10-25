@@ -57,14 +57,23 @@ def scaled(plan, h):
 
 
 def series(pool, tickers, kind, sizing, credit_tks):
+    """sizing='rt1' = RiskTarget 上限 100%(2026-10-25 起美股不融資)。
+    執行:隔天開盤成交(research_b14_execution_lag.py;舊版用當天收盤,台股等於偷看一天)。"""
+    import research_b14_execution_lag as B14
     P = R.build_panel(pool, tickers=tickers, tw_rf=0.0)
+    sz = 'rt' if sizing == 'rt1' else sizing
     if kind == 'rot':
-        pl = R.rotation_plan(P, elig='above', N=1, lock=21, switch='lock', sizing=sizing)
+        pl = R.rotation_plan(P, elig='above', N=1, lock=21, switch='lock', sizing=sz)
     else:
-        pl = R.ew_plan(P, reb=R.reb_days(P.idx, 0), sizing=sizing)
-    r = R.run_plan(P, scaled(pl, health(P.idx, credit_tks)))
-    expo = pd.Series(r.W.sum(1), index=P.idx)
-    return r.r, expo
+        pl = R.ew_plan(P, reb=R.reb_days(P.idx, 0), sizing=sz)
+    if sizing == 'rt1':
+        pl = R.Plan(S=pl.S, E=np.minimum(pl.E, 1.0), reb=pl.reb)
+    pl = scaled(pl, health(P.idx, credit_tks))
+    r1 = R.run_plan(P, R.Plan(S=B14.shift(pl.S, 1, -1), E=B14.shift(pl.E, 1, 0.0), reb=B14.shift(pl.reb, 1, False)))
+    W = r1.W; dW = np.vstack([np.zeros((1, W.shape[1])), np.diff(W, axis=0)])
+    r = pd.Series(r1.r.values + (dW * B14.intraday(P)).sum(axis=1), index=P.idx)
+    expo = pd.Series(W.sum(1), index=P.idx)
+    return r, expo
 
 
 def summarize(r, expo=None):
@@ -82,11 +91,12 @@ def main():
     d = load()
     out = {'generated': datetime.now().strftime('%Y-%m-%d %H:%M:%S'), 'freeze': FREEZE,
            'note': ('研究凍結日之後才開始算的「真正樣本外」成績。模擬持有層(與驗證同一引擎);'
-                    '黃燈進場時機、V底救援、R3 未模擬。天數少時差距多半是雜訊,至少累積 12 個月再下結論。'),
+                    '黃燈進場時機、V底救援、R3 未模擬。全部用隔天開盤成交;美股新版 2026-10-25 起改不融資,整段曲線用新規則重算。'
+                    '天數少時差距多半是雜訊,至少累積 12 個月再下結論。'),
            'markets': {}}
     specs = {
         'us': [('原版:單押最強', 'US5', US, 'rot', 'rt', ['HYG', 'LQD']),
-               ('新版:等權', 'US5', US, 'ew', 'rt', ['HYG', 'LQD'])],
+               ('新版:等權(不融資)', 'US5', US, 'ew', 'rt1', ['HYG', 'LQD'])],
         'tw': [('原版:單押最強(當時的 5 檔,含已移除的 00757 統一FANG+)', 'TW5', TW_OLD, 'rot', 'rt', ['HYG', 'LQD', 'SOXX']),
                ('新版:4檔等權', 'TW4', TW_NEW, 'ew', 'binary', ['HYG', 'LQD', 'SOXX'])],
     }

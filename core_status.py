@@ -82,14 +82,16 @@ PANIC_BASE_RATE = {'fwd21_median': 3.3, 'fwd21_up_pct': 67, 'fwd63_median': 8.3,
 #     SMH=0.005(只正頂前高+0%才警示):該格21日+1.7%/勝60%=全場最弱;+1~3%≈買。
 #     SOXX=0.015(≤1%警示):唯一真的會被壓的——壓≤1% 63日+7.1~7.4% vs 買+12.2%,差距大。
 #     台股006208/0050=0.005(只+0%弱,見taiwan_status)。⚠️僅改建議文字,不動進出場/倉位機制。
+# ★2026-10-25 Jason:不融資 → cap 1.5 → 1.0(每一份最多 100%,總部位不超過資金)。
+#   research_b16_us_no_margin.py(隔天開盤成交):13.1%/−25.0%/超額Sharpe 0.81;固定 1 倍 13.1%/−25.0%/0.79。
 PARAMS = {
-    'SMH':  {'entry_thr': 1.10, 'exit_buf': 0.98, 'budget': 0.213, 'cap': 1.5, 'resist_warn': 0.005},
-    'SOXX': {'entry_thr': 1.07, 'exit_buf': 0.99, 'budget': 0.201, 'cap': 1.5, 'resist_warn': 0.015},
-    'QQQ':  {'entry_thr': 1.07, 'exit_buf': 1.00, 'budget': 0.199, 'cap': 1.5, 'resist_warn': -1},
-    'XLK':  {'entry_thr': 1.10, 'exit_buf': 0.98, 'budget': 0.213, 'cap': 1.5, 'resist_warn': -1},
-    'SPY':  {'entry_thr': 1.05, 'exit_buf': 1.00, 'budget': 0.190, 'cap': 1.5, 'resist_warn': -1},
+    'SMH':  {'entry_thr': 1.10, 'exit_buf': 0.98, 'budget': 0.213, 'cap': 1.0, 'resist_warn': 0.005},
+    'SOXX': {'entry_thr': 1.07, 'exit_buf': 0.99, 'budget': 0.201, 'cap': 1.0, 'resist_warn': 0.015},
+    'QQQ':  {'entry_thr': 1.07, 'exit_buf': 1.00, 'budget': 0.199, 'cap': 1.0, 'resist_warn': -1},
+    'XLK':  {'entry_thr': 1.10, 'exit_buf': 0.98, 'budget': 0.213, 'cap': 1.0, 'resist_warn': -1},
+    'SPY':  {'entry_thr': 1.05, 'exit_buf': 1.00, 'budget': 0.190, 'cap': 1.0, 'resist_warn': -1},
 }
-DEFAULT_PARAM = {'entry_thr': 1.08, 'exit_buf': 0.98, 'budget': 0.20, 'cap': 1.5}
+DEFAULT_PARAM = {'entry_thr': 1.08, 'exit_buf': 0.98, 'budget': 0.20, 'cap': 1.0}
 
 # 風險旋鈕(資本配置線):同時縮放 budget 與 cap,沿同一效率線滑動,不改 Sharpe。
 #   ★Kelly實證(research_costs_kelly.py):數學說可加到2-4x,但那是『樣本無真熊市』的幻覺,別信。

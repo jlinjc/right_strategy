@@ -69,10 +69,10 @@
       "id": "sizing_us",
       "market": "us",
       "light": "💰 買多少",
-      "rule": "美股:曝險 = min(budget ÷ 離停損距離, 150%) × 信用乘數(RiskTarget)",
-      "evidence": "RiskTarget 實際平均曝險 1.35~1.49 倍 = 一直開著槓桿。跟『同平均曝險的固定槓桿』比 Sharpe 只差 +0.01~0.03(雜訊):它多賺的是槓桿本身,不是『貼近均線多押』的時機。想要少回撤,就等同於降低槓桿。",
-      "strength": "中(等同固定槓桿)",
-      "script": "research_q13_supplement.py / research_q3b_sizing_split.py"
+      "rule": "美股:曝險 = min(budget ÷ 離停損距離, 100%) × 信用乘數(RiskTarget,不融資)",
+      "evidence": "2026-10-25 改不融資(research_b16_us_no_margin.py,隔天開盤成交):上限 100% CAGR 13.1%/回撤 −25.0%/超額Sharpe 0.81;固定 1 倍 13.1%/−25.0%/0.79;舊的上限 150%(會融資)16.7%/−35.4%/0.80 → 多賺的是槓桿本身,風險調整後沒有更好。",
+      "strength": "中(和固定 1 倍幾乎一樣)",
+      "script": "research_b16_us_no_margin.py"
     },
     {
       "id": "sizing_tw",
@@ -97,7 +97,7 @@
       "market": "tw",
       "light": "⚠️ 可選(進階)",
       "rule": "正2(00631L)當衛星:母股 0050 站上 200MA 且正2 自己沒跌破停損線才持有,也乘信用乘數;配多少在設定選(預設 0%)",
-      "evidence": "2015-08~2026-09,現行設定(核心等權+信用哨,每月拉回目標比例,research_b13_satellite_fix.py):純核心 CAGR 24.7%/回撤 −17.7%/超額Sharpe 1.71;配 20% 正2 28.4%/−20.8%/1.64;40% 32.1%/−23.8%/1.58;全押正2 43.4%/−32.4%/1.46 → 報酬較高但風險調整後較差。無信用哨時:純核心 21.8%/−20.3%/1.36、配 20% 24.5%/−23.9%/1.29;同條件下核心開 ×1.2 融資 25.2%/−22.9%/1.35(research_q4_choices.py ⑤),略好於配正2;含信用哨的這組比較還沒跑。⚠️2026-10-25 更正:舊版數字(research_q4_choices.py ②③④、research_b10_satellite_p.py)的核心比例算錯(核心只放了 64%/48%),已由 b13 修正重算,結論方向不變。",
+      "evidence": "2015-08~2026-09,現行設定(核心等權+信用哨,每月拉回目標比例,research_b13_satellite_fix.py):純核心 CAGR 24.7%/回撤 −17.7%/超額Sharpe 1.71;配 20% 正2 28.4%/−20.8%/1.64;40% 32.1%/−23.8%/1.58;全押正2 43.4%/−32.4%/1.46 → 報酬較高但風險調整後較差。無信用哨時:純核心 21.8%/−20.3%/1.36、配 20% 24.5%/−23.9%/1.29;⚠️2026-10-25 更正:舊版數字(research_q4_choices.py ②③④、research_b10_satellite_p.py)的核心比例算錯(核心只放了 64%/48%),已由 b13 修正重算,結論方向不變。",
       "strength": "中(不利)",
       "script": "research_b13_satellite_fix.py(取代 research_q4_choices.py ②③④ / research_b10_satellite_p.py)"
     },
