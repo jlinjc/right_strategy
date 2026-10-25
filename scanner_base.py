@@ -449,3 +449,21 @@ def download_retry(tickers, must, min_len, tries=3, **kw):
         if i < tries - 1:
             time.sleep(5)
     return raw, miss
+
+
+def canary_since(credit_closes, ma=200):
+    """信用哨目前的健康比例是從哪一天開始的(連續幾個交易日)。回傳 (日期字串, 交易日數);算不出來回 (None, None)。
+    只讀歷史收盤:每天各哨兵是否站上自己的 200MA → 健康比例,往回找第一個不同的日子。"""
+    import pandas as pd
+    try:
+        df = pd.DataFrame({tk: s for tk, s in credit_closes.items()}).ffill().dropna()
+        ok = (df >= df.rolling(ma).mean()).where(df.rolling(ma).mean().notna())
+        frac = ok.dropna().mean(axis=1)
+        if frac.empty:
+            return None, None
+        cur = frac.iloc[-1]
+        diff = frac[frac != cur]
+        start = frac.index[0] if diff.empty else frac.index[frac.index > diff.index[-1]][0]
+        return start.strftime('%Y-%m-%d'), int((frac.index >= start).sum())
+    except Exception:
+        return None, None

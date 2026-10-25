@@ -13,6 +13,7 @@ for i, c in enumerate(core):
 S[:, 4] = np.where(P.intrend[:, c50], j, -1)
 IDX = R.sb_indices(n, B=2000, mean_block=63, seed=0)
 res = {}
+# ⚠️2026-10-25 已知 bug:核心只乘 (1-sat)、沒乘 5/4 → 0% 對照組其實是 80% 核心+20% 現金。修正重算見 research_b13_satellite_fix.py。
 for sat in (0.0, 0.2, 0.4):
     E = E0 * (1 - sat); E[:, 4] = np.where(P.intrend[:, c50], 1.0, 0.0) * sat * 5   # 5 槽位 → 乘 5 還原
     res[sat] = R.run_plan(P, R.Plan(S=S, E=E * h, reb=nore)).r

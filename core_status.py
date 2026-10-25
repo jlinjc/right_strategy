@@ -388,7 +388,10 @@ def canary_signal(credit_closes: dict) -> dict:
     else:
         note = '信用全示警(HYG+LQD 皆跌破200MA) → 曝險×0(全出)'
     hyg = assets.get('HYG', next(iter(assets.values())))
+    from scanner_base import canary_since
+    since, since_days = canary_since(credit_closes, MA)
     return {'health': round(frac, 3), 'n_healthy': healthy, 'n_total': n, 'assets': assets,
+            'since': since, 'since_days': since_days,
             'credit_ok': frac >= 1.0,
             'state': 'credit_on' if frac >= 1.0 else ('credit_half' if frac > 0 else 'credit_off'),
             'note': note,
@@ -458,6 +461,16 @@ def compute_rotation_hold(out: dict, today_strongest, prev: dict | None, today_s
     return {'ticker': held, 'since': since, 'days_held': days, 'locked': locked,
             'lock_days_left': lock_left, 'today_strongest': today_strongest,
             'min_hold_days': MIN_HOLD_DAYS, 'forced_out_prev': forced_out}
+
+
+def _price_date(raw, tickers):
+    ds = []
+    for tk in tickers:
+        try:
+            ds.append(raw[tk]['Close'].dropna().index[-1])
+        except Exception:
+            pass
+    return max(ds).strftime('%Y-%m-%d') if ds else None
 
 
 def _intraday_tentative() -> tuple[bool, str]:
@@ -661,6 +674,8 @@ def main():
         'intraday_tentative': intraday_flag, 'intraday_note': intraday_note,
         # 缺資料一定要標出來:缺核心 → 等權份數會錯;缺信用哨 → 乘數會錯(v2 頁面據此示警)
         'missing_cores': [tk for tk in CORE_TICKERS if tk not in out],
+        # 價格日期 = 核心標的最新一根日K的日期(last_updated 只是腳本執行時間)
+        'price_date': _price_date(raw, CORE_TICKERS),
         'missing_canary': [tk for tk in CREDIT_TICKERS if tk in missing],
         'daily_verdict': verdict, 'panic_base_rate': PANIC_BASE_RATE,
         'ma_window': MA, 'panic_vix': PANIC_VIX, 'panic_delay': PANIC_DELAY,

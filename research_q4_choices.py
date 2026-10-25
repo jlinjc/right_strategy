@@ -151,6 +151,8 @@ def leveraged_tw():
     for i, c in enumerate(core):
         S[:, i] = np.where(P.intrend[:, c], c, -1); E[:, i] = np.where(P.intrend[:, c], 1.0, 0.0)
     sim(E, S, '① 4檔等權(新版現況)')
+    # ⚠️2026-10-25 已知 bug:5 槽位引擎下核心只乘 (1-sat)、沒乘 5/4 → 核心實際只放 64%/48%。
+    #   修正重算見 research_b13_satellite_fix.py;本段數字不再使用。
     # 2 4檔等權 + 20% 正2 衛星(正2 用自己的200MA)
     S2 = np.full((n, 5), -1); E2 = np.zeros((n, 5))
     S2[:, :4] = S; E2[:, :4] = E * 0.8

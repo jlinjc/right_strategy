@@ -87,7 +87,7 @@ def main():
     specs = {
         'us': [('原版:單押最強', 'US5', US, 'rot', 'rt', ['HYG', 'LQD']),
                ('新版:等權', 'US5', US, 'ew', 'rt', ['HYG', 'LQD'])],
-        'tw': [('原版:單押最強(當時的 5 檔,含 00757)', 'TW5', TW_OLD, 'rot', 'rt', ['HYG', 'LQD', 'SOXX']),
+        'tw': [('原版:單押最強(當時的 5 檔,含已移除的 00757 統一FANG+)', 'TW5', TW_OLD, 'rot', 'rt', ['HYG', 'LQD', 'SOXX']),
                ('新版:4檔等權', 'TW4', TW_NEW, 'ew', 'binary', ['HYG', 'LQD', 'SOXX'])],
     }
     for mk, lst in specs.items():

@@ -207,7 +207,10 @@ def canary_signal(credit_closes: dict) -> dict:
         note = f'部分示警({"/".join(bad)} 跌破200MA) → 曝險×{frac:.0%}(平滑減碼)'
     else:
         note = '全示警(HYG+LQD+SOXX 皆跌破200MA) → 曝險×0(全出)'
+    from scanner_base import canary_since
+    since, since_days = canary_since(credit_closes, MA)
     return {'health': round(frac, 3), 'n_healthy': healthy, 'n_total': n, 'assets': assets,
+            'since': since, 'since_days': since_days,
             'credit_ok': frac >= 1.0,
             'state': 'credit_on' if frac >= 1.0 else ('credit_half' if frac > 0 else 'credit_off'),
             'note': note}
@@ -330,7 +333,8 @@ def main():
                 # ★2026-10-25 Jason 決定(v2 UX 稽核 D1):只在驗證涵蓋的範圍內啟用。q2e 只測了 raw_ok
                 #   (原始曝險 ≥50% ⟺ 離停損 ≤ 2×budget)的日子;更遠的距離沒驗證過 → 不亮黃燈。
                 lim_hi = d['budget'] / 0.5 * 100
-                if d.get('entry_state') == 'can_enter' and lim < d['stop_risk_pct'] <= lim_hi:
+                # ★2026-10-25(UX 稽核):這條只在 4 檔核心上驗證過;正2/觀察名單用的是沒驗證的預設 budget → 不套用
+                if tk in CORE_TICKERS and d.get('entry_state') == 'can_enter' and lim < d['stop_risk_pct'] <= lim_hi:
                     d['entry_state'] = 'expensive'
                     d['entry_action'] = (f'空手先別進(信用部分示警期間,離停損線 {d["stop_risk_pct"]:.1f}% > '
                                          f'{lim:.1f}% 門檻;台股歷史此時等拉近再買 14年中11年較好)')
@@ -396,6 +400,10 @@ def main():
         'last_updated': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
         # 缺資料一定要標出來:缺核心 → 等權份數會錯;缺信用哨 → 乘數會錯(v2 頁面據此示警)
         'missing_cores': [tk for tk in CORE_TICKERS if tk not in out],
+        'price_date': (lambda ds: max(ds).strftime('%Y-%m-%d') if ds else None)(
+            [series(tk).index[-1] for tk in CORE_TICKERS if series(tk) is not None]),
+        # 22:30 那班美股開盤中:台股的信用乘數(HYG/LQD/SOXX)也是盤中暫定值
+        'intraday_tentative': C._intraday_tentative()[0],
         'missing_canary': [tk for tk in CANARY_TICKERS if tk in missing],
         'daily_verdict': daily_verdict(out, rotation_hold, canary),
         'ma_window': MA, 'panic_vix': PANIC_VIX, 'vix': round(vix_last, 2) if vix_last is not None else None,

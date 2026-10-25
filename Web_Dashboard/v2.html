@@ -62,7 +62,9 @@
   .foot{color:var(--muted);font-size:11.5px;margin-top:20px;text-align:center}
   .note{font-size:12px;color:var(--muted);margin-top:8px}
   .rowline{display:flex;gap:8px;align-items:baseline;margin-top:4px;font-size:12.5px}
-  .rowline .who{color:var(--muted);flex:none;width:44px}
+  .rowline .who{color:var(--muted);flex:none;width:76px}
+  .tiles{display:flex;gap:5px;margin-top:7px;flex-wrap:wrap}
+  @media(max-width:600px){.tiles{display:grid;grid-template-columns:1fr 1fr}}
   .sum{background:#0e1b2e;border:1px solid #2a4a72;border-radius:8px;padding:8px 10px;font-size:13px;margin:6px 0 8px}
   .warnbox{margin:6px 0;border-radius:8px;padding:8px 10px;font-size:12.5px}
   .warnbox.red{background:#3a1414;border:1px solid #7a2a2a;color:#ffc9c9}
@@ -110,6 +112,7 @@
       </div>
       <div class="note">填了才會算出每一份的目標金額和股數。只存在這個瀏覽器,不會上傳;換手機/電腦或清除瀏覽器資料要重填。</div>
     </div>
+    <div class="note" id="applied" style="margin:0 0 6px"></div>
     <div style="display:flex;gap:6px;margin:4px 0 0" id="mktsel"></div>
     <div class="mkt" id="markets"></div>
   </div>
@@ -117,7 +120,7 @@
   <div class="pane" id="p-dec"><div id="decBox"></div></div>
 
   <div class="pane" id="p-res">
-    <div class="tabbar" id="subbar" style="margin-top:10px">
+    <div class="tabbar" id="subbar" style="margin-top:10px;flex-wrap:wrap">
       <button class="subbtn on" data-s="fwd">📈 前瞻追蹤</button>
       <button class="subbtn" data-s="ev">📐 規則與證據</button>
       <button class="subbtn" data-s="news">🧪 研究紀錄</button>
@@ -158,7 +161,10 @@ document.querySelectorAll('.subbtn').forEach(b=>b.onclick=()=>goSub(b.dataset.s)
 function setCap(m,v){ v?ls.set('v2cap_'+m,v):ls.del('v2cap_'+m); render(); }
 const cap=m=>parseFloat(ls.get('v2cap_'+m))||null;
 const DEC_DEF={method_us:null,method_tw:null,lev_us:'1',lev_tw:'1',sat_tw:'0',conflict:'hold',credit_us:'smooth'};
-function dec(k){ const v=ls.get('v2d_'+k); return v!==null?v:DEC_DEF[k]; }
+const UNTESTED={lev_us:['0.5','0.75'],lev_tw:['0.5','0.75']};   // 現行設定下未回測 → 暫不開放
+function dec(k){ const v=ls.get('v2d_'+k); return (v!==null && !(UNTESTED[k]||[]).includes(v))?v:DEC_DEF[k]; }
+function resetDec(){ Object.keys(DEC_DEF).forEach(k=>ls.del('v2d_'+k)); render(); renderDecisions(); }
+window.resetDec=resetDec;
 function setDec(k,v){ ls.set('v2d_'+k,v); render(); renderDecisions(); }
 window.setDec=setDec;
 const fmt=n=>n==null?'—':n.toLocaleString(undefined,{maximumFractionDigits:2});
@@ -188,7 +194,8 @@ function summaryLine(hs){
   if(eb) e.push(`<b class="buy">可買 ${eb} 份</b>`);
   if(ew) e.push(`<b class="wait">先別買 ${ew} 份</b>`);
   if(ec) e.push(`<b class="cash">不進場 ${ec} 份</b>`);
-  return `<div class="sum">📌 <b>今天:</b>已持有 → ${h.join('、')||'—'};空手 → ${e.join('、')||'—'}</div>`;
+  return `<div class="sum">📌 <b>今天:</b>如果你持有 → ${h.join('、')||'—'};如果你空手 → ${e.join('、')||'—'}
+    <span class="why">(資金平均分成 ${live.length} 份,一檔一份)</span></div>`;
 }
 
 function mktCard(mk, m, title, cur){
@@ -216,6 +223,7 @@ function mktCard(mk, m, title, cur){
       <div class="tlab">${lab}</div>
       <div style="font-size:13px;font-weight:800;color:${col||'var(--txt)'};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${val}</div></div>`;
   const held = hs.filter(p=>p.weight>0 && coreShare>0);
+  const seen = new Set();   // 每條規則的白話說明只在第一張卡顯示
   const rsRank = hs.filter(p=>p.rs!=null).sort((a,b)=>b.rs-a.rs).map(p=>p.ticker);
   const rsTxt = p => (meth==='rotation' && p.rs!=null) ? ` · RS ${(+p.rs).toFixed(2)}(第 ${rsRank.indexOf(p.ticker)+1} 名)` : '';
   const other = hs.filter(p=>!(p.weight>0 && coreShare>0));
@@ -227,6 +235,7 @@ function mktCard(mk, m, title, cur){
     const tgt  = (slot!=null && p.expo!=null) ? slot*p.expo*cadj*lev : null;
     const sh   = (tgt!=null && p.close) ? Math.floor(tgt/p.close) : null;
     const tgtv = p.expo==null ? '維持現倉'
+      : p.expo===0 ? `${cur}0(不持有)`
       : tgt!=null ? `${cur}${fmt(Math.round(tgt))}` : `${Math.round(p.expo*cadj*lev*100)}%`;
     const stopRed = p.hold_action==='sell' && p.state==='risk_off';
     const rescue = p.vbottom_active ? `<div class="warnbox orange" style="margin-top:6px">🚑 V底救援觸發:半倉進場,停損 −7%(見下方說明)</div>`:'';
@@ -236,18 +245,22 @@ function mktCard(mk, m, title, cur){
         <span class="why">${p.name||''}${rsTxt(p)}</span>
         <span class="why" style="margin-left:auto">這份 ${Math.round(p.weight*coreShare*100)}%${slot!=null?` = ${cur}${fmt(Math.round(slot))}`:''}</span>
       </div>
-      <div class="rowline"><span class="who">持有中</span><span class="act ${hc}">${hl}</span><span class="why">${p.hold_reason||''}</span></div>
-      <div class="rowline"><span class="who">空手</span><span class="act ${ec}">${el}</span><span class="why">${p.reason||''}</span></div>
+      <div class="rowline"><span class="who">如果你持有</span><span class="act ${hc}">${hl}</span><span class="why">${p.hold_reason||''}</span></div>
+      <div class="rowline"><span class="who">如果你空手</span><span class="act ${ec}">${el}</span><span class="why">${clean(p.reason)}</span></div>
       ${rescue}
-      <div style="display:flex;gap:5px;margin-top:7px;flex-wrap:wrap">
+      <div class="tiles">
+        ${tile(`目標部位(槓桿 ×${lev})`, tgtv, p.expo===0?'var(--grey)':'var(--txt)')}
         ${tile('現價', cur+fmt(p.close))}
         ${tile('追高上限(超過先別買)', p.limit!=null?cur+fmt(p.limit):'—', '#4da3ff')}
         ${tile('停損線(看收盤)', p.stop!=null?cur+fmt(p.stop):'—', stopRed?'#ff5a5a':null)}
-        ${tile(`目標部位 ×${lev}`, tgtv, p.expo===0?'var(--grey)':'var(--txt)')}
+        ${p.far_band?tile('可買價(信用示警期間)', '≤ '+cur+fmt(p.far_band.buy_below), '#ffcb45'):''}
       </div>
-      ${(sh!=null&&p.expo>0)?`<div class="why" style="margin-top:4px">目標約 ${fmt(sh)} 股${mk==='tw'?'(以零股計;1 張 = 1000 股)':''}。
-        持有中:調到這個部位;空手:亮 🟢 時買到這個部位。</div>`:''}
-      ${traceBlock(p)}
+      ${(slot!=null&&p.expo!=null)?`<div class="why" style="margin-top:4px">算式:這份 ${cur}${fmt(Math.round(slot))} × 系統曝險 ${Math.round(p.expo*cadj*100)}%(已含信用乘數)${lev!==1?` × 槓桿 ${lev}`:''} = ${cur}${fmt(Math.round(tgt))}
+        ${(sh!=null&&p.expo>0)?` ≈ ${fmt(sh)} 股${mk==='tw'?'(以零股計;1 張 = 1000 股;回測假設收盤價成交,零股盤中/盤後下單沒測過)':''}`:''}。
+        如果你持有:調到這個部位;如果你空手:亮 🟢 時買到這個部位。</div>`:''}
+      ${p.far_band?`<div class="why" style="margin-top:3px">🟡 信用示警期間:價格 ≤ ${cur}${fmt(p.far_band.buy_below)} 才可買;
+        高於 ${cur}${fmt(p.far_band.unchecked_above)} 時這條沒驗證過、不檢查(所以反而會顯示可買)。</div>`:''}
+      ${traceBlock(p,seen)}
       ${(p.conflict && meth==='rotation')?`<div class="warnbox orange" style="margin-top:6px;font-size:11.5px">
         ${p.conflict_note} <b>你目前選的:${dec('conflict')==='hold'?'續抱到跌破停損線':'不在200MA之上就換掉'}</b>
         <a href="#" onclick="goTab('dec');return false;">(改)</a></div>`:''}
@@ -260,20 +273,34 @@ function mktCard(mk, m, title, cur){
   const picked = (held[0]||{}).ticker;
   const pick = meth==='rotation' ? `<div class="note" style="margin:0 0 6px">${rh.ticker
       ? `目前選中:<b>${rh.ticker.replace('.TW','')}</b>(RS 最強)· 已持有 ${rh.days_held} 天${rh.locked?`,還要鎖 ${rh.lock_days_left} 天才准換`:''}`
-      : `目前沒有合格的持有標的;今天 RS 最強 = <b>${(picked||rh.today_strongest||'—').replace('.TW','')}</b>,下面列的是它`}</div>`
+      : `系統目前空手(沒有合格標的)。不論你持有哪一檔,都照下面「如果你持有」處理;恢復後第一順位是 <b>${(picked||rh.today_strongest||'—').replace('.TW','')}</b>(RS 最強)`}</div>`
     : meth==='single' ? `<div class="note" style="margin:0 0 6px">固定持有 <b>${mk==='us'?'QQQ':'0050'}</b>,不換。</div>` : '';
   const miss = ((m.missing_cores||[]).length || (m.missing_canary||[]).length)
     ? `<div class="warnbox red">❓ <b>今天有資料沒抓到</b>:${[...(m.missing_cores||[]),...(m.missing_canary||[]).map(t=>t+'(信用哨)')].join('、')}。
       ${(m.missing_canary||[]).length?'信用哨不完整,<b>今天的乘數不可靠,整個市場先別動</b>。':'缺的那一份先別動,其他份照常(份數仍以應有的檔數計)。'}等下一班更新。</div>` : '';
   const cm = (V.credit_mismatch||[]).length ? `<div class="warnbox red">❓ <b>美股表和台股表的 ${V.credit_mismatch.join('、')} 收盤對不上</b>,
       其中一份可能不是最新資料。以資料時間較新的那一邊為準,舊的那個市場先別動。</div>` : '';
-  const intraday = (mk==='us' && m.intraday_tentative) ? `<div class="warnbox blue">⏳ <b>美股盤中暫定數字</b>:${m.intraday_note||''} 決策看隔天 09:00 那班(收盤價)。</div>`:'';
-  const cbox = (h!=null && h<=0) ? `<div class="warnbox red">🔴 <b>信用哨全部跌破</b>:已持有 → 下一個交易日全部賣出;空手 → 不買。等哨兵站回 200MA 再進。
-      ${mk==='us'?`<br><span style="font-size:11.5px"><b>建議照做(證據等級:中)</b>。美股這條統計上不顯著(ΔSharpe +0.08、p=0.17,24 年只有 3~4 次危機),但 2022 年升息空頭少跌 21 個百分點;
-      官方績效(${OF.x1?OF.x1.cagr+'% / '+OF.x1.mdd+'%':''})含這條規則,不照做就和官方數字對不上。</span>`:''}</div>`
-    : (h!=null && h<1) ? `<div class="warnbox orange">🟠 <b>信用部分示警(×${Math.round(h*100)}%)</b>:已持有 → 持股減到原本的 ${Math.round(h*100)}%;空手 → 照 ${Math.round(h*100)}% 的量買(黃燈另計)。</div>` : '';
-  const levNote = (lev===1||lev===1.25)
-    ? `你目前用 <b>×${lev}</b>:年化 ${OF['x'+(lev===1?'1':'125')].cagr}% / 最大回撤 ${OF['x'+(lev===1?'1':'125')].mdd}%`
+  const intraday = !m.intraday_tentative ? '' : mk==='us'
+    ? `<div class="warnbox blue">⏳ <b>美股盤中暫定數字</b>:${m.intraday_note||''} 決策看隔天 09:00 那班(收盤價)。</div>`
+    : `<div class="warnbox blue">⏳ <b>盤中暫定</b>:美股還在開盤,台股的信用乘數(HYG/LQD/SOXX)用的是盤中價。決策看隔天 09:00 那班。</div>`;
+  const live = hs.filter(p=>p.weight>0 && coreShare>0 && !p.missing);
+  const nTrend = live.filter(p=>p.in_trend).length;
+  const sinceTxt = m.credit_since ? `(自 ${m.credit_since.slice(5)} 起,第 ${m.credit_since_days} 個交易日)` : '';
+  const pct = Math.round((h||0)*100);
+  const nb = live.filter(p=>p.action==='buy').length, nw = live.filter(p=>p.action==='wait').length;
+  const emptyTxt = nb ? `🟢 的那 ${nb} 檔照 ${pct}% 的量買${nw?`;🟡 的 ${nw} 檔先別買`:''}`
+    : nw===live.length ? '今天先別買(離停損線太遠,等價格拉近;可買價見各卡)' : '見各卡';
+  const cbox = (h!=null && h<=0) ? `<div class="warnbox red">🔴 <b>如果你持有 → 下一個交易日全部賣出;如果你空手 → 不買</b>${sinceTxt}<br>
+      原因:${nTrend===live.length?`${live.length} 檔的趨勢都正常(都在 200MA 之上),`:''}賣出是因為債券市場示警(信用哨全部跌破)。等哨兵站回 200MA 再進。
+      ${mk==='us'?`<br><span style="font-size:11.5px"><b>建議照做(證據等級:中)</b>:這條歷史上只遇過 3~4 次大危機,統計上還不能算證實;
+      但在只看 200MA 的基礎上,2022 年少跌 21 個百分點,本頁的回測績效也是含這條算的。</span>`:''}</div>`
+    : (h!=null && h<1) ? `<div class="warnbox orange">🟠 <b>信用部分示警(×${pct}%)</b>${sinceTxt}:如果你持有 → 每一份只放 ${pct}% 在股票裡(調到各卡的目標部位);
+      如果你空手 → ${emptyTxt}。</div>` : '';
+  const mdec = (V.decisions||[]).find(d=>d.key==='method_'+mk);
+  const mopt = mdec ? mdec.options.find(o=>o.v===meth) : null;
+  const levNote = sat>0 ? `你目前配了 <b>正2衛星 ${Math.round(sat*100)}%</b>:這個組合的數字見設定頁的進階選項`
+    : meth!==m.default_method ? (lev===1 && mopt ? `你目前用 <b>${mopt.label} ×1</b>:${mopt.nums}` : `你目前用 <b>${METH_NAME[meth]||meth} ×${lev}</b>:這個組合<b>還沒回測</b>`)
+    : (lev===1||lev===1.25) ? `你目前用 <b>×${lev}</b>:年化 ${OF['x'+(lev===1?'1':'125')].cagr}% / 最大回撤 ${OF['x'+(lev===1?'1':'125')].mdd}%`
     : `你目前用 <b>×${lev}</b>:這個倍數在現行設定下<b>還沒回測</b>`;
   return `<div class="card">
     <h2>${title} ${credit}</h2>
@@ -293,12 +320,16 @@ function mktCard(mk, m, title, cur){
     <div class="note">📊 <b>預設設定的回測績效</b>(${OF.setup||''},${OF.period||''}${meth!==m.default_method?`;你選的「${METH_NAME[meth]||meth}」數字見 <a href="#" onclick="goTab('dec');return false;">我的設定</a>`:''}):
       ×1.0 年化 ${OF.x1?OF.x1.cagr:''}% / 最大回撤 ${OF.x1?OF.x1.mdd:''}%;×1.25 年化 ${OF.x125?OF.x125.cagr:''}% / 最大回撤 ${OF.x125?OF.x125.mdd:''}%。
       ${levNote}(<a href="#" onclick="goTab('dec');return false;">在設定改</a>)。<br>
-      ${OF.margin_note||''} ${OF.hindsight_note||''} 績效不含黃燈規則。</div>
+      ${OF.margin_note||''} ${OF.hindsight_note||''}
+      這個數字只含 200MA + 信用哨${mk==='us'?' + RiskTarget':''};③ 別追高、④ 空手先別進、V底救援、R3、隔日執行都沒算進去。</div>
     <div class="note">💰 <b>買多少</b>:${(RE['sizing_'+mk]||{}).plain||''}</div>
-    <div class="note">🔁 <b>不用定期再平衡</b>:只在某一檔進場或出場時動它那一份。空手時 🟡/⚪ 的那幾份先放現金,等它轉 🟢 再補,不要挪去加碼別檔。</div>
+    <div class="note">🔁 <b>不用定期再平衡</b>:只在某一檔進場或出場時動它那一份。空手時 🟡/⚪ 的那幾份先放現金,等它轉 🟢 再補,不要挪去加碼別檔。
+      空手的錢:回測假設${mk==='us'?'美股現金賺國庫券利率':'台股現金不計利息'}。</div>
     ${creditBlock(mk,m)}
     <details class="ev" style="margin-top:10px"><summary>為什麼預設用這個持有方式 — ${ev.verdict||''}</summary>
-      <div class="body">${clean(ev.detail)}</div></details>
+      <div class="body">${mk==='us'?'三種方式在現行設定下統計上分不出高下;預設等權是為了分散,不依賴無法證實的挑選能力。'
+        :'等權勝過單押最強;和只持有 0050 打平。預設 4 檔是偏好(分散到 0052/0051),不是數據證明比較好。'}
+        各選項的數字見 <a href="#" onclick="goTab('dec');return false;">我的設定</a>,驗證細節見 <a href="#" onclick="goSub('ev');return false;">規則與證據</a>。</div></details>
   </div>`;
 }
 
@@ -315,14 +346,16 @@ function satCard(mk,m,K,sat,lev,cur,tile){
     <div style="display:flex;gap:5px;margin-top:7px;flex-wrap:wrap">
       ${tile('現價', cur+fmt(t.close))}${tile('追高上限', t.limit!=null?cur+fmt(t.limit):'—','#4da3ff')}
       ${tile('停損線(看收盤)', t.stop!=null?cur+fmt(t.stop):'—')}
-      ${tile(`目標部位 ×${lev}`, ps!=null?cur+fmt(Math.round(ps)):(t.action==='cash'?'現金':'—'))}</div>
+      ${tile(`目標部位(槓桿 ×${lev})`, ps!=null?cur+fmt(Math.round(ps)):(t.action==='cash'?'現金':'—'))}</div>
     ${(t.action==='buy'&&shs!=null)?`<div class="why" style="margin-top:4px">約 ${fmt(shs)} 股(零股)</div>`:''}
     <div class="why" style="margin-top:6px">${t.gate_0050_ok?'✅ 母股 0050 在 200MA 之上(閘門開)':'🔴 母股 0050 跌破 200MA → 正2 一律空手'} · ${clean(t.reason)}</div>
-    <div class="why" style="margin-top:4px">⚠️ 槓桿ETF:實測加了它比純核心差(Sharpe 1.28 vs 1.36);2015 年正2擇時單年 −41%。${t.gate_note||''}</div>
+    <div class="why" style="margin-top:4px">如果你持有:0050 跌破 200MA 或正2 收盤跌破停損線 → 賣;信用示警時照乘數減。</div>
+    <div class="why" style="margin-top:4px">⚠️ 槓桿ETF:現行設定回測,配 20% 報酬較高,但超額 Sharpe 1.64 < 純核心 1.71(顯著較差)。${t.gate_note||''}</div>
   </div>`;
 }
 
-function traceBlock(p){
+function traceBlock(p,seen){
+  seen = seen || new Set();
   const tr=p.trace||[]; if(!tr.length) return '';
   const RE=(V.rule_evidence)||{};
   const ICON={ok:['✔','#7ee0a0'],part:['⚠','#ffcb45'],bad:['✘','#ff8f8f']};
@@ -332,7 +365,9 @@ function traceBlock(p){
     return `<div style="border-top:1px solid #16233a;padding:6px 0">
       <div style="font-size:12.5px;font-weight:700;color:${col}">${ic} ${c.name}</div>
       <div class="why">條件:<b>${c.cond}</b><br>今天:${c.now} → <b>${c.verdict}</b></div>
-      ${ev.plain?`<div class="why" style="margin-top:2px">💬 ${ev.plain} <span class="st">證據等級 ${ev.grade}</span></div>`:''}
+      ${c.id==='credit' ? `<div class="why" style="margin-top:2px">全市場共用,說明見下方「信用哨明細」。</div>`
+        : !ev.plain ? '' : seen.has(c.id) ? `<div class="why" style="margin-top:2px">💬 說明同第一張卡 <span class="st">證據等級 ${ev.grade}</span></div>`
+        : (seen.add(c.id), `<div class="why" style="margin-top:2px">💬 ${ev.plain} <span class="st">證據等級 ${ev.grade}</span></div>`)}
     </div>`;}).join('');
   return `<details style="margin-top:7px"><summary style="font-size:12.5px;font-weight:700;color:var(--accent)">
       為什麼是這個燈?(逐條規則 + 今天的數字)</summary>
@@ -342,7 +377,7 @@ function traceBlock(p){
 
 function creditBlock(mk,m){
   const a=m.credit_assets||{}; const h=m.credit_health;
-  const NAME={HYG:'HYG 美高收益債',LQD:'LQD 美投資級債',SOXX:'SOXX 費半'};
+  const NAME={HYG:'HYG 美高收益債',LQD:'LQD 美投資級債',SOXX:'SOXX 費半(當警報器用,不是要買的標的)'};
   const rows=Object.entries(a).map(([tk,v])=>`<tr>
     <td style="padding:4px 6px"><b>${NAME[tk]||tk}</b></td>
     <td style="padding:4px 6px" class="num">${v.close}</td>
@@ -359,7 +394,8 @@ function creditBlock(mk,m){
       <tr><th>哨兵</th><th>收盤</th><th>它的200MA</th><th>距離</th><th>狀態</th></tr>${rows}</table></div>
     <div class="why" style="margin-top:3px">資料時間:${m.source_time||'不明'}</div>
     <div class="why" style="margin-top:5px">健康 ${ok} / ${n} 個 → 乘數 = ${ok}÷${n} = <b>${Math.round((h||0)*100)}%</b>。
-      乘數<b>同時適用於已持有的部位</b>:0% = 全部賣出;33% = 持股減到原本的 1/3;100% = 不動。</div>
+      乘數<b>同時適用於已持有的部位</b>:0% = 全部賣出;33% = 每一份只放 33% 在股票裡;100% = 每一份全部放股票。
+      ${m.credit_since?`目前狀態自 ${m.credit_since} 起,已 ${m.credit_since_days} 個交易日。`:''}</div>
     <div class="why" style="margin-top:4px">完整回測數字 → <a href="#" onclick="goSub('ev');return false;">研究細節/規則與證據</a></div></details>`;
 }
 
@@ -371,6 +407,12 @@ function render(){
   if(!V) return;
   $('#cap_us').value = ls.get('v2cap_us')||'';
   $('#cap_tw').value = ls.get('v2cap_tw')||'';
+  const LEVN={'1':'×1.0','1.25':'×1.25'};
+  const nonDef=['method_us','method_tw','lev_us','lev_tw','sat_tw','credit_us'].some(k=>ls.get('v2d_'+k)!==null);
+  const mN=mk=>{const d=(V.decisions||[]).find(x=>x.key==='method_'+mk);const o=d&&d.options.find(o=>o.v===methOf(mk,V.markets[mk]));return o?o.label:'';};
+  $('#applied').innerHTML = `目前套用:美股 ${mN('us')} ${LEVN[dec('lev_us')]||dec('lev_us')}|台股 ${mN('tw')} ${LEVN[dec('lev_tw')]||dec('lev_tw')}`
+    + (parseFloat(dec('sat_tw'))>0?` + 正2 ${Math.round(parseFloat(dec('sat_tw'))*100)}%`:'')
+    + (nonDef?` <span style="color:var(--orange)">(和預設不同)</span> <a href="#" onclick="resetDec();return false;">重設為預設</a>`:' (預設)');
   const sel = ls.get('v2mkt')||'all';
   $('#mktsel').innerHTML = [['all','全部'],['us','🇺🇸 只看美股'],['tw','🇹🇼 只看台股']]
     .map(([v,t])=>`<button class="mbtn ${sel===v?'on':''}" onclick="setMkt('${v}')">${t}</button>`).join('');
@@ -386,7 +428,10 @@ function renderDecisions(){
   const card=d=>{
     const cur=dec(d.key) ?? (d.key.startsWith('method_') ? V.markets[d.key.slice(7)].default_method : null);
     const curOpt=d.options.find(o=>String(o.v)===String(cur));
-    const opts=d.options.map(o=>`<div onclick="setDec('${d.key}','${o.v}')"
+    const opts=d.options.map(o=>(UNTESTED[d.key]||[]).includes(String(o.v))
+      ? `<div style="border:1px dashed var(--line);border-radius:9px;padding:9px 11px;margin-top:7px;opacity:.5">
+          <div style="font-weight:700;font-size:13.5px">　${o.label}(回測中,暫不開放)</div><div class="why" style="margin-top:3px">${o.nums}</div></div>`
+      : `<div onclick="setDec('${d.key}','${o.v}')"
       style="cursor:pointer;border:1px solid ${String(cur)===String(o.v)?'var(--accent)':'var(--line)'};
       background:${String(cur)===String(o.v)?'rgba(77,163,255,0.12)':'var(--panel2)'};
       border-radius:9px;padding:9px 11px;margin-top:7px">
@@ -421,25 +466,27 @@ function renderForward(){
     const all=raw.flatMap(r=>r.curve.map(c=>c[1])); const lo=Math.min(0,...all), hi=Math.max(0,...all);
     const n=Math.max(...raw.map(r=>r.curve.length));
     const y=v=>H-18-(v-lo)/((hi-lo)||1)*(H-30), x=i=>L+i/Math.max(n-1,1)*(W-L-8);
-    const lines=groups.map((g,k)=>`<polyline fill="none" stroke="${col[k]}" stroke-width="2" points="${g.rows[0].curve.map((c,i)=>x(i)+','+y(c[1])).join(' ')}"/>`).join('');
+    const roleCol=g=>{const nm=g.rows.map(r=>r.name).join();return nm.includes('新版')?'#4da3ff':nm.includes('原版')?'#ff9d5a':'#8a96ad';};
+    const lines=groups.map((g,k)=>`<polyline fill="none" stroke="${roleCol(g)}" stroke-width="2" points="${g.rows[0].curve.map((c,i)=>x(i)+','+y(c[1])).join(' ')}"/>`).join('');
     const ax=[hi,0,lo].filter((v,i,a)=>a.indexOf(v)===i).map(v=>`<text x="${L-4}" y="${y(v)+4}" fill="#8a96ad" font-size="10" text-anchor="end">${v>0?'+':''}${(+v).toFixed(2)}%</text>
       <line x1="${L}" x2="${W-8}" y1="${y(v)}" y2="${y(v)}" stroke="#26304a" ${v===0?'stroke-dasharray="3 3"':''}/>`).join('');
     const c0=raw[0].curve; const dates=c0.length?`<text x="${L}" y="${H-3}" fill="#8a96ad" font-size="10">${c0[0][0]}</text>
       <text x="${W-8}" y="${H-3}" fill="#8a96ad" font-size="10" text-anchor="end">${c0[c0.length-1][0]}</text>`:'';
-    const legend=groups.map((g,k)=>`<span style="color:${col[k]}">●</span> ${g.rows.map(r=>r.name).join(' = ')}${g.rows.length>1?'(今天持倉相同,線重疊)':''}`).join('<br>');
-    const tbl=raw.map(r=>{const k=groups.findIndex(g=>g.rows.includes(r));return `<tr><td style="padding:5px"><span style="color:${col[k]}">●</span> ${r.name}</td>
+    const legend=groups.map((g,k)=>`<span style="color:${roleCol(g)}">●</span> ${g.rows.map(r=>r.name).join(' = ')}${g.rows.length>1?'(今天持倉相同,線重疊)':''}`).join('<br>');
+    const tbl=raw.map(r=>{const g=groups.find(g=>g.rows.includes(r));return `<tr><td style="padding:5px"><span style="color:${roleCol(g)}">●</span> ${r.name}</td>
       <td class="num" style="padding:5px;color:${r.ret_pct>=0?'#7ee0a0':'#ff8f8f'}">${r.ret_pct>0?'+':''}${r.ret_pct}%</td>
       <td class="num" style="padding:5px">${r.mdd_pct}%</td><td class="num" style="padding:5px">${Math.round(r.expo_now*100)}%</td></tr>`;}).join('');
     return `<div class="card"><h2>${title}</h2>
       <svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;background:var(--panel2);border-radius:8px">${ax}${lines}${dates}</svg>
       <div class="why" style="margin-top:4px">${legend}<br>縱軸 = 規則定案後的累積報酬;虛線 = 0%。</div>
       <div style="overflow-x:auto"><table style="margin-top:6px"><tr><th>版本</th><th>定案後報酬</th><th>最大回撤</th><th>模擬持有者曝險</th></tr>${tbl}</table></div>
-      <div class="why">已經過 ${raw[0].days} 個交易日。${mk==='us'?'全現金時的報酬 = 美國國庫券利息。':''}
+      <div class="why">已經過 ${raw[0].days} 個交易日,資料到 ${c0.length?c0[c0.length-1][0]:'—'}。${mk==='us'?'全現金時的報酬 = 美國國庫券利息。':''}
       「模擬持有者曝險」是已持有者的部位;新進資金依黃燈規則可能是 0%。</div></div>`;
   };
   box.innerHTML=`<div class="card"><h2>📈 前瞻追蹤</h2>
     <div class="why" style="font-size:12.5px">這是規則定案(<b>${FW.freeze}</b>)之後的<b>真實表現</b>,不是事後回測。天數少時差距多半是雜訊,至少看滿 12 個月再下結論。
-    (模擬持有層;黃燈進場時機、V底救援、R3 未模擬。)</div>
+    沒有模擬:黃燈(別追高、空手先別進)、V底救援(大跌後半倉搶反彈)、R3(追高但可照常買)。
+    新版以每月再平衡模擬,實際操作不再平衡(回測顯示兩者 Sharpe 差距 ≤0.02)。</div>
     <div class="why" style="margin-top:4px">更新:${FW.generated}</div></div>`+card('us','🇺🇸 美股')+card('tw','🇹🇼 台股');
 }
 
@@ -497,8 +544,10 @@ function renderLimit(){
     const srcs=[['頁面資料',V.generated],['美股',V.markets.us.source_time],['台股',V.markets.tw.source_time]];
     const oldest=srcs.reduce((a,b)=>ageH(b[1])>ageH(a[1])?b:a);
     const stale=ageH(oldest[1])>STALE_H;
-    $('#updated').innerHTML = `${stale?'🔴':'🟢'} 資料時間(台北):美股 <b>${String(V.markets.us.source_time||'—').slice(5,16)}</b> · 台股 <b>${String(V.markets.tw.source_time||'—').slice(5,16)}</b>`
-      + `(每天 09:00 / 21:00 / 22:30 自動更新,排程偶爾延遲,以這裡的時間為準)`
+    const anyIntra = V.markets.us.intraday_tentative || V.markets.tw.intraday_tentative;
+    $('#updated').innerHTML = `${stale?'🔴':'🟢'} 收盤價日期:美股 <b>${String(V.markets.us.price_date||'—').slice(5)}</b> · 台股 <b>${String(V.markets.tw.price_date||'—').slice(5)}</b>`
+      + ` ${anyIntra?'<b style="color:var(--yellow)">⏳ 盤中暫定</b>':'✅ 收盤確定'}`
+      + `<span class="why">(計算時間 ${String(V.generated||'').slice(5,16)};每天 09:00 / 21:00 / 22:30 自動更新)</span>`
       + (stale?` — <b style="color:var(--red)">${oldest[0]}已經 ${Math.round(ageH(oldest[1]))} 小時沒更新,先別依那一塊下單</b>`:'');
     render(); renderDecisions(); renderForward(); renderNews(); renderEvidence(); renderDiff(); renderLimit();
     $('#foot').textContent = `v2 · 規則版本 ${V.rules_version||EV.version} · 訊號用收盤價計算,下一個交易日執行(回測假設收盤成交,這一天的落差未量化)`;
