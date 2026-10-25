@@ -208,13 +208,16 @@ function mktCard(mk, m, title, cur){
   const RE = V.rule_evidence||{};
   const OF = m.official||{};
   const h = m.credit_health;
-  const credit = h>=1 ? `<span class="badge" style="color:#9fe7bd">信用🟢 全額</span>`
-    : h>0 ? `<span class="badge" style="color:#ffd9b0">信用🟠 ×${Math.round(h*100)}%</span>`
-    : `<span class="badge" style="color:#ffb4b4">信用🔴 全部跌破</span>`;
+  const ctip = `title="信用哨:看債券市場${mk==='tw'?'(和費半)':''}是否站在 200 日均線之上。健康比例就是今天的部位乘數,已持有的也照乘。"`;
+  const credit = h>=1 ? `<span class="badge" ${ctip} style="color:#9fe7bd">信用🟢 全額</span>`
+    : h>0 ? `<span class="badge" ${ctip} style="color:#ffd9b0">信用🟠 ×${Math.round(h*100)}%</span>`
+    : `<span class="badge" ${ctip} style="color:#ffb4b4">信用🔴 全部跌破</span>`;
   const tile=(lab,val,col)=>`<div style="flex:1;min-width:76px;background:var(--panel2);border-radius:7px;padding:5px 7px;text-align:center">
       <div class="tlab">${lab}</div>
       <div style="font-size:13px;font-weight:800;color:${col||'var(--txt)'};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${val}</div></div>`;
   const held = hs.filter(p=>p.weight>0 && coreShare>0);
+  const rsRank = hs.filter(p=>p.rs!=null).sort((a,b)=>b.rs-a.rs).map(p=>p.ticker);
+  const rsTxt = p => (meth==='rotation' && p.rs!=null) ? ` · RS ${(+p.rs).toFixed(2)}(第 ${rsRank.indexOf(p.ticker)+1} 名)` : '';
   const other = hs.filter(p=>!(p.weight>0 && coreShare>0));
   const rows = held.map(p=>{
     const [el,ec]=ENTRY[p.action]||['—','grey'];
@@ -230,7 +233,7 @@ function mktCard(mk, m, title, cur){
     return `<div style="background:#0b1727;border:1px solid #16233a;border-radius:9px;padding:9px 11px;margin-top:8px">
       <div style="display:flex;align-items:baseline;gap:7px;flex-wrap:wrap">
         <b style="font-size:15px">${p.ticker.replace('.TW','')}</b>
-        <span class="why">${p.name||''}</span>
+        <span class="why">${p.name||''}${rsTxt(p)}</span>
         <span class="why" style="margin-left:auto">這份 ${Math.round(p.weight*coreShare*100)}%${slot!=null?` = ${cur}${fmt(Math.round(slot))}`:''}</span>
       </div>
       <div class="rowline"><span class="who">持有中</span><span class="act ${hc}">${hl}</span><span class="why">${p.hold_reason||''}</span></div>
@@ -251,7 +254,7 @@ function mktCard(mk, m, title, cur){
     </div>`;
   }).join('');
   const otherBox = other.length ? `<details style="margin-top:8px"><summary class="why">其他 ${other.length} 檔不在「${METH_NAME[meth]||meth}」裡(展開看)</summary>
-    <div class="why" style="padding:4px 0 0 14px">${other.map(p=>`${p.ticker.replace('.TW','')} 現價 ${cur}${fmt(p.close)} · 持有中 ${(HOLD[p.hold_action]||['—'])[0]} · 空手 ${(ENTRY[p.action]||['—'])[0]}`).join('<br>')}</div></details>` : '';
+    <div class="why" style="padding:4px 0 0 14px">${other.map(p=>`${p.ticker.replace('.TW','')}${rsTxt(p)} · 現價 ${cur}${fmt(p.close)} · 持有中 ${(HOLD[p.hold_action]||['—'])[0]} · 空手 ${(ENTRY[p.action]||['—'])[0]}`).join('<br>')}</div></details>` : '';
   const mbtn=(v,txt)=>`<button class="mbtn ${meth===v?'on':''}" onclick="setMethod('${mk}','${v}')">${txt}${m.default_method===v?' ·預設':''}</button>`;
   const rh = m.rotation_hold||{};
   const picked = (held[0]||{}).ticker;
@@ -262,6 +265,8 @@ function mktCard(mk, m, title, cur){
   const miss = ((m.missing_cores||[]).length || (m.missing_canary||[]).length)
     ? `<div class="warnbox red">❓ <b>今天有資料沒抓到</b>:${[...(m.missing_cores||[]),...(m.missing_canary||[]).map(t=>t+'(信用哨)')].join('、')}。
       ${(m.missing_canary||[]).length?'信用哨不完整,<b>今天的乘數不可靠,整個市場先別動</b>。':'缺的那一份先別動,其他份照常(份數仍以應有的檔數計)。'}等下一班更新。</div>` : '';
+  const cm = (V.credit_mismatch||[]).length ? `<div class="warnbox red">❓ <b>美股表和台股表的 ${V.credit_mismatch.join('、')} 收盤對不上</b>,
+      其中一份可能不是最新資料。以資料時間較新的那一邊為準,舊的那個市場先別動。</div>` : '';
   const intraday = (mk==='us' && m.intraday_tentative) ? `<div class="warnbox blue">⏳ <b>美股盤中暫定數字</b>:${m.intraday_note||''} 決策看隔天 09:00 那班(收盤價)。</div>`:'';
   const cbox = (h!=null && h<=0) ? `<div class="warnbox red">🔴 <b>信用哨全部跌破</b>:已持有 → 下一個交易日全部賣出;空手 → 不買。等哨兵站回 200MA 再進。
       ${mk==='us'?`<br><span style="font-size:11.5px"><b>建議照做(證據等級:中)</b>。美股這條統計上不顯著(ΔSharpe +0.08、p=0.17,24 年只有 3~4 次危機),但 2022 年升息空頭少跌 21 個百分點;
@@ -273,6 +278,7 @@ function mktCard(mk, m, title, cur){
   return `<div class="card">
     <h2>${title} ${credit}</h2>
     ${miss}
+    ${cm}
     ${intraday}
     ${summaryLine(hs.filter(p=>coreShare>0))}
     ${cbox}

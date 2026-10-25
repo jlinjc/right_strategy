@@ -402,7 +402,10 @@ def _trace(d, mkt, health):
         now = f"離停損線 {sr}%" + ('' if 0 < (health or 1) < 1 else '(信用滿血時這條不啟用)') + \
             (f'(超過 {lim_hi}% 不在驗證範圍內,這條不啟用)' if (sr is not None and sr > lim_hi and 0 < (health or 1) < 1) else '')
     out.append({'id': 'far_' + mkt, 'name': '④ 空手先別進:離停損線太遠嗎?',
-                'cond': (f"離停損線 < {lim}%" if mkt == 'us' else f"信用示警期間:離停損線 < {lim}%(只在 ≤ {lim_hi}% 的驗證範圍內檢查)"),
+                'cond': (f"離停損線 < {lim}%" if mkt == 'us' else
+                         f"信用示警期間:離停損線 < 門檻 {lim}%"
+                         f"(= 本檔 budget {(d.get('budget') or 0) * 100:.2f}% × 信用 {(health or 1):.0%} ÷ 0.5;"
+                         f"只在 ≤ {lim_hi}% 的驗證範圍內檢查)"),
                 'now': now, 'ok': far_ok,
                 'verdict': '距離可接受' if far_ok else ('太遠 → 空手先別進(只影響新買進)' if mkt == 'us'
                                                        else '太遠 → 空手先別進(已持有的照信用乘數減碼)')})
@@ -593,6 +596,13 @@ def build():
             'dist200_pct': twc.get('dist_pct'),
             'gate_note': '正2的停損線用它自己的200MA;母股 0050 跌破自己的200MA時,核心那幾份本來就會轉現金。',
         }
+    # ★共用哨兵一致性(2026-10-24 稽核 Q12:同一天 HYG 美股表 77.05、台股表 78.1,因為台股來源過期):
+    #   兩支腳本各自下載,收盤差 >0.5% 就代表其中一份不是同一天的資料 → 標出來讓前端示警
+    ua = data['markets']['us'].get('credit_assets') or {}
+    ta = data['markets']['tw'].get('credit_assets') or {}
+    mism = [tk for tk in ua if tk in ta and ua[tk].get('close') and ta[tk].get('close')
+            and abs(ua[tk]['close'] / ta[tk]['close'] - 1) > 0.005]
+    data['credit_mismatch'] = mism
     data['method_evidence'] = METHOD_EVIDENCE
     data['diff'] = DIFF
     data['limits'] = LIMITS
