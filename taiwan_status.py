@@ -190,8 +190,8 @@ def core_signal(close: pd.Series, vix_last, ticker: str, name: str) -> dict:
 
 
 def canary_signal(credit_closes: dict) -> dict:
-    """台股信用哨:HYG+LQD+SMH 各看是否站上自己200MA → 健康比例=平滑縮倉乘數。
-    全球信用(HYG/LQD)+費半領先(SMH);一壞×0.67、兩壞×0.33、三壞×0。"""
+    """台股信用哨:HYG+LQD+SOXX 各看是否站上自己200MA → 健康比例=平滑縮倉乘數。
+    全球信用(HYG/LQD)+費半領先(SOXX);一壞×0.67、兩壞×0.33、三壞×0。"""
     assets = {}; healthy = 0
     for tk, close in credit_closes.items():
         ma = float(close.iloc[-MA:].mean()); last = float(close.iloc[-1])
@@ -202,11 +202,11 @@ def canary_signal(credit_closes: dict) -> dict:
     frac = healthy / n
     bad = [CANARY_NAME.get(tk, tk) for tk, a in assets.items() if not a['ok']]
     if frac >= 1.0:
-        note = '全球風險健康(HYG+LQD+SMH 皆站上200MA) → 曝險×100%'
+        note = '全球風險健康(HYG+LQD+SOXX 皆站上200MA) → 曝險×100%'
     elif frac > 0:
         note = f'部分示警({"/".join(bad)} 跌破200MA) → 曝險×{frac:.0%}(平滑減碼)'
     else:
-        note = '全示警(HYG+LQD+SMH 皆跌破200MA) → 曝險×0(全出)'
+        note = '全示警(HYG+LQD+SOXX 皆跌破200MA) → 曝險×0(全出)'
     return {'health': round(frac, 3), 'n_healthy': healthy, 'n_total': n, 'assets': assets,
             'credit_ok': frac >= 1.0,
             'state': 'credit_on' if frac >= 1.0 else ('credit_half' if frac > 0 else 'credit_off'),
@@ -246,7 +246,7 @@ def daily_verdict(out: dict, rotation_hold: dict, canary: dict | None) -> str:
     if not out:
         return '今日核心動作:無資料'
     if canary and canary.get('health', 1) <= 0:
-        return '🔴 今日核心動作【清倉/不進場】:信用全示警(HYG+LQD+SMH皆跌破200MA),等信用站回。'
+        return '🔴 今日核心動作【清倉/不進場】:信用全示警(HYG+LQD+SOXX皆跌破200MA),等信用站回。'
     held = rotation_hold.get('ticker') if rotation_hold else None
     seg = []
     if held and held in out:
@@ -267,9 +267,10 @@ def daily_verdict(out: dict, rotation_hold: dict, canary: dict | None) -> str:
 def main():
     watch_have = []
     dl_list = CORE_TICKERS + list(TW_WATCH) + CANARY_TICKERS + [PANIC_TICKER]
-    print(f"📥 下載 台股核心 + 候選 + 全球信用哨(HYG/LQD/SMH) + 恐慌計 ({len(dl_list)}檔, 3y)...")
-    raw = yf.download(' '.join(dl_list), period='3y', interval='1d',
-                      progress=False, group_by='ticker')
+    print(f"📥 下載 台股核心 + 候選 + 全球信用哨(HYG/LQD/SOXX) + 恐慌計 ({len(dl_list)}檔, 3y)...")
+    from scanner_base import download_retry
+    raw, missing = download_retry(dl_list, CORE_TICKERS + CANARY_TICKERS, MA, period='3y', interval='1d',
+                                  progress=False, group_by='ticker')
 
     def series(tk):
         try:
@@ -315,21 +316,24 @@ def main():
             d['credit_mult'] = ch
             if ch <= 0:
                 d['credit_cut'] = True
-                d['hold_action'] = '🔴 全球風險全示警(HYG+LQD+SMH皆跌破200MA)→曝險砍0,等站回再進'
+                d['hold_action'] = '🔴 全球風險全示警(HYG+LQD+SOXX皆跌破200MA)→已持有全部賣出、曝險0,等站回再進'
                 d['action'] = d['hold_action']
                 d['entry_state'] = 'no_entry'
-                d['entry_action'] = '全示警期間不進場(等HYG/LQD/SMH站回200MA)'
+                d['entry_action'] = '全示警期間不進場(等HYG/LQD/SOXX站回200MA)'
             else:
-                d['hold_action'] += f'  🟠部分示警→減碼半倉(仍可買·量×{ch:.0%})'
+                d['hold_action'] += f'  🟠部分示警→持股減到原本的 {ch:.0%}(回測每天把曝險乘上健康比例)'
                 d['action'] = d['hold_action']
                 # ★信用部分示警期間的「空手先別進」(research_q2e_credit_yellow.py,用 live 三合哨驗證):
                 #   條件=打折後曝險<50% ⟺ 離停損 > budget×健康度÷0.5。台股此時等拉近再買:
                 #   平均 +0.63%、勝64%、14年中11年較好,前半 6/6、後半 5/8 年皆成立 → 保留。
                 lim = d['budget'] * ch / 0.5 * 100      # 驗證時的條件(離停損 > budget×健康度÷0.5),與倉位算法脫鉤
-                if d.get('entry_state') == 'can_enter' and d['stop_risk_pct'] > lim:
+                # ★2026-10-25 Jason 決定(v2 UX 稽核 D1):只在驗證涵蓋的範圍內啟用。q2e 只測了 raw_ok
+                #   (原始曝險 ≥50% ⟺ 離停損 ≤ 2×budget)的日子;更遠的距離沒驗證過 → 不亮黃燈。
+                lim_hi = d['budget'] / 0.5 * 100
+                if d.get('entry_state') == 'can_enter' and lim < d['stop_risk_pct'] <= lim_hi:
                     d['entry_state'] = 'expensive'
                     d['entry_action'] = (f'空手先別進(信用部分示警期間,離停損線 {d["stop_risk_pct"]:.1f}% > '
-                                         f'{lim:.1f}% 門檻;台股歷史此時等拉近再買 14年中11年較好);已持有者續抱')
+                                         f'{lim:.1f}% 門檻;台股歷史此時等拉近再買 14年中11年較好)')
                 elif d.get('entry_state') == 'can_enter':
                     d['entry_action'] += f'(信用部分示警,曝險×{ch:.0%})'
 
@@ -390,6 +394,9 @@ def main():
     data = {
         'market': 'TW', 'currency': 'TWD',
         'last_updated': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+        # 缺資料一定要標出來:缺核心 → 等權份數會錯;缺信用哨 → 乘數會錯(v2 頁面據此示警)
+        'missing_cores': [tk for tk in CORE_TICKERS if tk not in out],
+        'missing_canary': [tk for tk in CANARY_TICKERS if tk in missing],
         'daily_verdict': daily_verdict(out, rotation_hold, canary),
         'ma_window': MA, 'panic_vix': PANIC_VIX, 'vix': round(vix_last, 2) if vix_last is not None else None,
         'risk_mult': RISK_MULT, 'strongest': strongest, 'rotation_hold': rotation_hold,

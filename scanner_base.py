@@ -422,3 +422,30 @@ def get_market_regime():
     return result
 
 
+def download_retry(tickers, must, min_len, tries=3, **kw):
+    """yf.download 偶爾整批回來卻少幾檔(2026-10-25 實例:QQQ 沒抓到,等權靜靜變成 4 檔各 25%)。
+    必要的標的(核心+信用哨)缺任何一檔就整批重抓;最後仍缺就回報缺哪些,由輸出端標示,不准靜默。"""
+    import time
+    import yfinance as yf
+    raw, miss = None, list(must)
+    for i in range(tries):
+        try:
+            raw = yf.download(' '.join(tickers), **kw)
+        except Exception as e:
+            print(f'⚠️ 第{i + 1}次下載失敗:{e}')
+            raw = None
+        miss = []
+        for tk in must:
+            try:
+                s = raw[tk]['Close']
+                s = (s.iloc[:, 0] if hasattr(s, 'columns') else s).dropna()
+                if len(s) < min_len:
+                    miss.append(tk)
+            except Exception:
+                miss.append(tk)
+        if not miss:
+            return raw, []
+        print(f'⚠️ 第{i + 1}次下載缺 {miss}' + (',重試' if i < tries - 1 else ',放棄'))
+        if i < tries - 1:
+            time.sleep(5)
+    return raw, miss

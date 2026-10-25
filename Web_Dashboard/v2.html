@@ -4,11 +4,12 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>作戰中心 v2 · 實證版</title>
+<link rel="icon" href="data:,">
 <style>
   :root{
     --bg:#0a0e17; --panel:#121826; --panel2:#1a2233; --line:#26304a;
     --txt:#e6ecf5; --muted:#8a96ad; --accent:#4da3ff;
-    --green:#2ecc71; --red:#ff5a5a; --yellow:#ffcb45; --grey:#6b7686;
+    --green:#2ecc71; --red:#ff5a5a; --yellow:#ffcb45; --orange:#ff9d5a; --grey:#6b7686;
   }
   *{box-sizing:border-box;margin:0;padding:0}
   body{background:var(--bg);color:var(--txt);font-family:-apple-system,"Segoe UI","Microsoft JhengHei",sans-serif;
@@ -22,81 +23,113 @@
   .vswitch{display:flex;gap:0;border:1px solid var(--line);border-radius:8px;overflow:hidden;margin-left:auto}
   .vswitch a{padding:6px 12px;font-size:12.5px;color:var(--muted);background:var(--panel)}
   .vswitch a.on{background:var(--accent);color:#04101f;font-weight:700}
-  .updated{font-size:11.5px;color:var(--muted)}
+  .updated{font-size:12px;color:var(--muted)}
   .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin:14px 0}
   .card h2{font-size:15px;margin-bottom:8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
   .mkt{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .mkt.one{grid-template-columns:1fr}
   @media(max-width:860px){.mkt{grid-template-columns:1fr}}
   .badge{font-size:11px;padding:2px 8px;border-radius:20px;border:1px solid var(--line);color:var(--muted);background:var(--panel2)}
   table{width:100%;border-collapse:collapse;font-size:13px}
   th{font-size:11px;color:var(--muted);font-weight:600;text-align:left;padding:5px 6px;background:var(--panel2);white-space:nowrap}
   td{padding:7px 6px;border-top:1px solid #1b2436;vertical-align:top}
   .act{font-weight:800;white-space:nowrap;font-size:12.5px}
-  .buy{color:var(--green)} .wait{color:var(--yellow)} .cash{color:var(--red)} .grey{color:var(--grey)}
+  .buy{color:var(--green)} .wait{color:var(--yellow)} .cash{color:var(--grey)} .sell{color:var(--red)} .reduce{color:var(--orange)} .grey{color:var(--grey)}
   .num{font-variant-numeric:tabular-nums;white-space:nowrap}
-  .why{font-size:11px;color:var(--muted);line-height:1.5}
+  .why{font-size:12px;color:var(--muted);line-height:1.55}
   input[type=number]{background:var(--panel2);border:1px solid var(--line);border-radius:6px;color:var(--txt);
     padding:5px 8px;font-size:13px;width:130px}
-  .tabbar{display:flex;gap:6px;margin:12px 0 4px;overflow-x:auto;scrollbar-width:none}
+  .tabwrap{position:relative}
+  .tabwrap::after{content:'';position:absolute;right:0;top:0;bottom:0;width:28px;pointer-events:none;
+    background:linear-gradient(90deg,rgba(10,14,23,0),var(--bg))}
+  @media(min-width:700px){.tabwrap::after{display:none}}
+  .tabbar{display:flex;gap:6px;margin:12px 0 4px;overflow-x:auto;scrollbar-width:none;padding-right:20px}
   .tabbar::-webkit-scrollbar{display:none}
-  .tabbtn{padding:7px 13px;font-size:13.5px;font-weight:600;cursor:pointer;border:1px solid var(--line);
+  .tabbtn,.subbtn,.mbtn{padding:7px 13px;font-size:13.5px;font-weight:600;cursor:pointer;border:1px solid var(--line);
     background:var(--panel);color:var(--muted);border-radius:9px;white-space:nowrap;flex:none}
-  .tabbtn.on{color:var(--txt);background:var(--panel2);border-color:var(--accent)}
+  .subbtn,.mbtn{padding:5px 11px;font-size:12.5px}
+  .tabbtn.on,.subbtn.on,.mbtn.on{color:var(--txt);background:var(--panel2);border-color:var(--accent)}
   .pane{display:none} .pane.on{display:block}
+  .sub{display:none} .sub.on{display:block}
+  details>summary{cursor:pointer;list-style:none}
+  details>summary::-webkit-details-marker{display:none}
+  details>summary::before{content:'▸';display:inline-block;margin-right:5px;color:var(--accent);transition:transform .15s}
+  details[open]>summary::before{transform:rotate(90deg)}
   .ev{border:1px solid var(--line);border-radius:10px;margin:9px 0;overflow:hidden;background:var(--panel)}
-  .ev summary{padding:10px 13px;cursor:pointer;font-size:13.5px;font-weight:700;list-style:none;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
-  .ev summary::-webkit-details-marker{display:none}
+  .ev summary{padding:10px 13px;font-size:13.5px;font-weight:700;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
   .ev .body{padding:0 13px 12px;font-size:12.5px;color:var(--muted);line-height:1.7}
-  .st{font-size:10.5px;padding:1px 7px;border-radius:5px;border:1px solid var(--line)}
-  .st.強,.st.中~強{color:#9fe7bd;border-color:#155f3a}
-  .st.中{color:#ffe39a;border-color:#5e4d14}
-  .st.弱~中,.st.未重驗{color:#9fb0cc}
-  .diff td{font-size:12.5px}
+  .st{font-size:11px;padding:1px 7px;border-radius:5px;border:1px solid var(--line);color:#9fb0cc}
   .foot{color:var(--muted);font-size:11.5px;margin-top:20px;text-align:center}
-  .note{font-size:11.5px;color:var(--muted);margin-top:8px}
-  .big{font-size:19px;font-weight:800}
+  .note{font-size:12px;color:var(--muted);margin-top:8px}
+  .rowline{display:flex;gap:8px;align-items:baseline;margin-top:4px;font-size:12.5px}
+  .rowline .who{color:var(--muted);flex:none;width:44px}
+  .sum{background:#0e1b2e;border:1px solid #2a4a72;border-radius:8px;padding:8px 10px;font-size:13px;margin:6px 0 8px}
+  .warnbox{margin:6px 0;border-radius:8px;padding:8px 10px;font-size:12.5px}
+  .warnbox.red{background:#3a1414;border:1px solid #7a2a2a;color:#ffc9c9}
+  .warnbox.orange{background:#2a1d10;border:1px solid #6b4a1e;color:#ffd9b0}
+  .warnbox.blue{background:#0e1b2e;border:1px solid #2a4a72;color:#cfe2ff}
+  .tlab{font-size:11px;color:#8090a8;white-space:nowrap}
+  @media(max-width:600px){
+    table.diff tr:first-child{display:none}
+    table.diff tr{display:block;border-top:1px solid var(--line);padding:6px 0}
+    table.diff td{display:block;border:0;padding:2px 4px}
+    table.diff td::before{content:attr(data-l)'：';color:var(--muted);font-size:11px}
+  }
 </style>
 </head>
 <body>
 <header><div class="wrap hrow">
   <div class="brand">
     <h1>作戰中心 <span style="color:var(--accent)">v2</span></h1>
-    <div class="sub">每條規則都附得起數據的版本</div>
+    <div class="sub">目前使用中的版本 · 每條規則都附得起數據</div>
   </div>
-  <div class="vswitch"><a href="strategy_dashboard.html">原版</a><a class="on" href="v2.html">新版</a></div>
+  <div class="vswitch"><a href="strategy_dashboard.html" title="原版 = 單押輪動的呈現方式 + 舊面板(進取模式等);每檔的訊號兩版共用同一份資料">原版</a><a class="on" href="v2.html">新版</a></div>
 </div></header>
 
 <div class="wrap">
   <div class="updated" id="updated" style="margin-top:10px">載入中…</div>
+  <details style="margin-top:6px"><summary class="why" style="display:inline">ℹ️ 這是什麼網站?怎麼用?</summary>
+    <div class="why" style="padding:6px 0 0 14px;font-size:12.5px">
+      個人研究用的 ETF 趨勢擇時規則:美股 5 檔、台股 4 檔 ETF,價格在 200 日均線之上才持有,
+      再用債券市場的「信用哨」調整部位大小。<b>每天只要看「今天怎麼做」每個市場最上面的一行總結</b>,
+      細節再點開看。所有績效數字都是歷史回測,不保證未來;<b>這不是投資建議</b>,請自行判斷並承擔風險。
+    </div></details>
 
-  <div class="tabbar" id="tabbar">
+  <div class="tabwrap"><div class="tabbar" id="tabbar">
     <button class="tabbtn on" data-t="today">🎯 今天怎麼做</button>
-    <button class="tabbtn" data-t="dec">🗳 決策清單</button>
-    <button class="tabbtn" data-t="fwd">📈 前瞻追蹤</button>
-    <button class="tabbtn" data-t="news">🧪 最新發現與待辦</button>
-    <button class="tabbtn" data-t="diff">🔍 和原版差在哪</button>
-    <button class="tabbtn" data-t="ev">📐 規則與證據</button>
-    <button class="tabbtn" data-t="limit">⚠️ 限制與待決</button>
-  </div>
+    <button class="tabbtn" data-t="dec">⚙️ 我的設定</button>
+    <button class="tabbtn" data-t="res">📚 研究細節</button>
+  </div></div>
 
   <div class="pane on" id="p-today">
     <div class="card" style="border-color:var(--accent)">
-      <h2>💰 先填:這次要投入這套策略的錢</h2>
+      <h2>💰 這套策略的總資金(含已持有的市值)</h2>
       <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:center">
         <label style="font-size:13px">🇺🇸 美股 $<input type="number" id="cap_us" placeholder="例 10000" oninput="setCap('us',this.value)"></label>
         <label style="font-size:13px">🇹🇼 台股 NT$<input type="number" id="cap_tw" placeholder="例 300000" oninput="setCap('tw',this.value)"></label>
       </div>
-      <div class="note">填了才會算出每檔要買多少錢/幾股。只存在你自己的瀏覽器,不會上傳。</div>
+      <div class="note">填了才會算出每一份的目標金額和股數。只存在這個瀏覽器,不會上傳;換手機/電腦或清除瀏覽器資料要重填。</div>
     </div>
+    <div style="display:flex;gap:6px;margin:4px 0 0" id="mktsel"></div>
     <div class="mkt" id="markets"></div>
   </div>
 
   <div class="pane" id="p-dec"><div id="decBox"></div></div>
-  <div class="pane" id="p-fwd"><div id="fwdBox"></div></div>
-  <div class="pane" id="p-news"><div id="newsBox"></div></div>
-  <div class="pane" id="p-diff"><div id="diffBox"></div></div>
-  <div class="pane" id="p-ev"><div id="evBox"></div></div>
-  <div class="pane" id="p-limit"><div id="limitBox"></div></div>
+
+  <div class="pane" id="p-res">
+    <div class="tabbar" id="subbar" style="margin-top:10px">
+      <button class="subbtn on" data-s="fwd">📈 前瞻追蹤</button>
+      <button class="subbtn" data-s="ev">📐 規則與證據</button>
+      <button class="subbtn" data-s="news">🧪 研究紀錄</button>
+      <button class="subbtn" data-s="limit">⚠️ 限制</button>
+      <button class="subbtn" data-s="diff">🔍 和原版差在哪</button>
+    </div>
+    <div class="sub on" id="s-fwd"><div id="fwdBox"></div></div>
+    <div class="sub" id="s-ev"><div id="evBox"></div></div>
+    <div class="sub" id="s-news"><div id="newsBox"></div></div>
+    <div class="sub" id="s-limit"><div id="limitBox"></div></div>
+    <div class="sub" id="s-diff"><div id="diffBox"></div></div>
+  </div>
 
   <div class="foot" id="foot"></div>
 </div>
@@ -104,132 +137,201 @@
 <script>
 const $=s=>document.querySelector(s);
 const j=async p=>{const r=await fetch(p+'?t='+Date.now());if(!r.ok)throw new Error(p+' '+r.status);return r.json();};
-let V=null, EV=null;
-document.querySelectorAll('.tabbtn').forEach(b=>b.onclick=()=>{
-  document.querySelectorAll('.tabbtn').forEach(x=>x.classList.toggle('on',x===b));
-  document.querySelectorAll('.pane').forEach(p=>p.classList.toggle('on',p.id==='p-'+b.dataset.t));
-});
-function setCap(m,v){ v?localStorage.setItem('v2cap_'+m,v):localStorage.removeItem('v2cap_'+m); render(); }
-const cap=m=>parseFloat(localStorage.getItem('v2cap_'+m))||null;
+const ls={get:k=>{try{return localStorage.getItem(k)}catch(e){return null}},
+          set:(k,v)=>{try{localStorage.setItem(k,v)}catch(e){}},
+          del:k=>{try{localStorage.removeItem(k)}catch(e){}}};
+let V=null, EV=null, FW=null, FW_ERR='';
+function goTab(t){
+  document.querySelectorAll('.tabbtn').forEach(x=>{const on=x.dataset.t===t;x.classList.toggle('on',on);
+    if(on) x.scrollIntoView({inline:'center',block:'nearest'});});
+  document.querySelectorAll('.pane').forEach(p=>p.classList.toggle('on',p.id==='p-'+t));
+}
+function goSub(s){
+  goTab('res');
+  document.querySelectorAll('.subbtn').forEach(x=>{const on=x.dataset.s===s;x.classList.toggle('on',on);
+    if(on) x.scrollIntoView({inline:'center',block:'nearest'});});
+  document.querySelectorAll('.sub').forEach(p=>p.classList.toggle('on',p.id==='s-'+s));
+}
+window.goTab=goTab; window.goSub=goSub;
+document.querySelectorAll('.tabbtn').forEach(b=>b.onclick=()=>goTab(b.dataset.t));
+document.querySelectorAll('.subbtn').forEach(b=>b.onclick=()=>goSub(b.dataset.s));
+function setCap(m,v){ v?ls.set('v2cap_'+m,v):ls.del('v2cap_'+m); render(); }
+const cap=m=>parseFloat(ls.get('v2cap_'+m))||null;
 const DEC_DEF={method_us:null,method_tw:null,lev_us:'1',lev_tw:'1',sat_tw:'0',conflict:'hold',credit_us:'smooth'};
-function dec(k){ const v=localStorage.getItem('v2d_'+k); return v!==null?v:DEC_DEF[k]; }
-function setDec(k,v){ localStorage.setItem('v2d_'+k,v); render(); renderDecisions(); }
+function dec(k){ const v=ls.get('v2d_'+k); return v!==null?v:DEC_DEF[k]; }
+function setDec(k,v){ ls.set('v2d_'+k,v); render(); renderDecisions(); }
 window.setDec=setDec;
 const fmt=n=>n==null?'—':n.toLocaleString(undefined,{maximumFractionDigits:2});
+// 前台(今天怎麼做/我的設定)不顯示研究腳本檔名;完整出處留在「研究細節」
+const clean=s=>String(s||'').replace(/[((]\s*research_[\w.\/ ]+?[))]/g,'').replace(/research_[\w]+\.py\s*[,、/]?\s*/g,'');
+const ageH=t=>t?(Date.now()-new Date(String(t).replace(' ','T')+'+08:00').getTime())/3.6e6:Infinity;
+const STALE_H=36;
 
-const ACT={buy:['🟢 買進','buy'],hold_wait:['🟠 維持現倉','wait'],wait:['🟡 先別買','wait'],
-           cash:['🔴 這份放現金','cash']};
+// 空手的人 / 已持有的人 各自的燈號
+const ENTRY={buy:['🟢 可買','buy'],wait:['🟡 先別買','wait'],cash:['⚪ 不進場','cash'],missing:['❓ 資料缺失','sell']};
+const HOLD={hold:['🟢 續抱','buy'],reduce:['🟠 減碼','reduce'],sell:['🔴 賣出','sell'],missing:['❓ 資料缺失','sell']};
+const METH_NAME={ew:'等權',ew3:'3檔等權',single:'只持有一檔',rotation:'單押最強',topn:'前N名'};
+
+function methOf(mk,m){ return dec('method_'+mk) || m.default_method; }
+
+function summaryLine(hs){
+  const live=hs.filter(p=>p.weight>0);
+  const cnt=(arr,k)=>arr.filter(p=>p[k.split(':')[0]]===k.split(':')[1]).length;
+  const h=[], e=[];
+  const hs_=cnt(live,'hold_action:sell'), hr=cnt(live,'hold_action:reduce'), hh=cnt(live,'hold_action:hold');
+  if(hs_) h.push(`<b class="sell">賣出 ${hs_} 份</b>`);
+  if(hr)  h.push(`<b class="reduce">減碼 ${hr} 份</b>`);
+  if(hh)  h.push(`<b class="buy">續抱 ${hh} 份</b>`);
+  const hm=cnt(live,'hold_action:missing');
+  if(hm) h.push(`<b class="sell">資料缺失 ${hm} 份(先別動)</b>`);
+  const eb=cnt(live,'action:buy'), ew=cnt(live,'action:wait'), ec=cnt(live,'action:cash');
+  if(eb) e.push(`<b class="buy">可買 ${eb} 份</b>`);
+  if(ew) e.push(`<b class="wait">先別買 ${ew} 份</b>`);
+  if(ec) e.push(`<b class="cash">不進場 ${ec} 份</b>`);
+  return `<div class="sum">📌 <b>今天:</b>已持有 → ${h.join('、')||'—'};空手 → ${e.join('、')||'—'}</div>`;
+}
 
 function mktCard(mk, m, title, cur){
+  const age=ageH(m.source_time);
+  if(age>STALE_H){
+    return `<div class="card"><h2>${title}</h2><div class="warnbox red">🔴 <b>這個市場的資料已經 ${Math.round(age)} 小時沒更新</b>
+      (最後一次:${m.source_time||'不明'})。自動更新可能失敗了,<b>先別依這一塊下單</b>。</div></div>`;
+  }
   const K=cap(mk);
-  const meth = dec('method_'+mk) || localStorage.getItem('v2m_'+mk) || m.default_method;
+  const meth = methOf(mk,m);
   const lev = parseFloat(dec('lev_'+mk))||1;
   const sat = (mk==='tw') ? (parseFloat(dec('sat_tw'))||0) : 0;
-  const satAll = sat>=1;                       // 全押正2
+  const satAll = sat>=1;
   const coreShare = satAll ? 0 : (1-sat);
   const hs = m.methods[meth] || m.positions;
   const ev = (V.method_evidence||{})[mk] || {};
-  const hearts = m.credit_health;
-  const credit = hearts>=1 ? `<span class="badge" style="color:#9fe7bd">信用🟢 全額</span>`
-    : hearts>0 ? `<span class="badge" style="color:#ffe39a">信用🟠 每筆量×${Math.round(hearts*100)}%</span>`
-    : `<span class="badge" style="color:#ffb4b4">信用🔴 清倉不買</span>`;
-  const tile=(lab,val,col)=>`<div style="flex:1;min-width:74px;background:var(--panel2);border-radius:7px;padding:5px 7px;text-align:center">
-      <div style="font-size:10px;color:#64748b;white-space:nowrap">${lab}</div>
+  const RE = V.rule_evidence||{};
+  const OF = m.official||{};
+  const h = m.credit_health;
+  const credit = h>=1 ? `<span class="badge" style="color:#9fe7bd">信用🟢 全額</span>`
+    : h>0 ? `<span class="badge" style="color:#ffd9b0">信用🟠 ×${Math.round(h*100)}%</span>`
+    : `<span class="badge" style="color:#ffb4b4">信用🔴 全部跌破</span>`;
+  const tile=(lab,val,col)=>`<div style="flex:1;min-width:76px;background:var(--panel2);border-radius:7px;padding:5px 7px;text-align:center">
+      <div class="tlab">${lab}</div>
       <div style="font-size:13px;font-weight:800;color:${col||'var(--txt)'};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${val}</div></div>`;
-  const rows = hs.map(p=>{
-    const [lab,cls]=ACT[p.action]||['—','grey'];
+  const held = hs.filter(p=>p.weight>0 && coreShare>0);
+  const other = hs.filter(p=>!(p.weight>0 && coreShare>0));
+  const rows = held.map(p=>{
+    const [el,ec]=ENTRY[p.action]||['—','grey'];
+    const [hl,hc]=HOLD[p.hold_action]||['—','grey'];
     const slot = K!=null ? K*p.weight*coreShare : null;
-    const cadj = (mk==='us' && dec('credit_us')==='wealth' && hearts>0 && hearts<1) ? 1/hearts : 1;  // 美股信用哨「皆壞才清倉」版:部分示警不打折
-    const pos  = (slot!=null && p.expo!=null) ? slot*p.expo*cadj*1.0 : null;      // ×1.0
-    const pos125=(slot!=null && p.expo!=null) ? slot*p.expo*cadj*1.25 : null;     // ×1.25(Jason 要求兩種都列)
-    const sh   = (pos!=null && p.close) ? Math.floor(pos/p.close) : null;
-    const sh125= (pos125!=null && p.close) ? Math.floor(pos125/p.close) : null;
-    const zero = p.weight<=0 || coreShare<=0;
-    const buyv = zero ? '不持有'
-      : p.action==='buy' ? (pos!=null? `${cur}${fmt(Math.round(pos))}` : `${Math.round((p.expo||0)*100)}%`)
-      : p.action==='cash' ? '現金' : '先等';
-    const buyv125 = zero ? '—'
-      : p.action==='buy' ? (pos125!=null? `${cur}${fmt(Math.round(pos125))}` : `${Math.round((p.expo||0)*125)}%`)
-      : p.action==='cash' ? '現金' : '先等';
-    const buyc = zero? 'var(--grey)' : (p.action==='buy'?'var(--green)':(p.action==='cash'?'var(--red)':'var(--yellow)'));
-    return `<div style="background:#0b1727;border:1px solid #16233a;border-radius:9px;padding:9px 11px;margin-top:8px${zero?';opacity:.45':''}">
+    const cadj = (mk==='us' && dec('credit_us')==='wealth' && h>0 && h<1) ? 1/h : 1;  // 美股信用哨「皆壞才清倉」版:部分示警不打折
+    const tgt  = (slot!=null && p.expo!=null) ? slot*p.expo*cadj*lev : null;
+    const sh   = (tgt!=null && p.close) ? Math.floor(tgt/p.close) : null;
+    const tgtv = p.expo==null ? '維持現倉'
+      : tgt!=null ? `${cur}${fmt(Math.round(tgt))}` : `${Math.round(p.expo*cadj*lev*100)}%`;
+    const stopRed = p.hold_action==='sell' && p.state==='risk_off';
+    const rescue = p.vbottom_active ? `<div class="warnbox orange" style="margin-top:6px">🚑 V底救援觸發:半倉進場,停損 −7%(見下方說明)</div>`:'';
+    return `<div style="background:#0b1727;border:1px solid #16233a;border-radius:9px;padding:9px 11px;margin-top:8px">
       <div style="display:flex;align-items:baseline;gap:7px;flex-wrap:wrap">
         <b style="font-size:15px">${p.ticker.replace('.TW','')}</b>
         <span class="why">${p.name||''}</span>
-        <span class="act ${cls}" style="margin-left:auto">${zero?'—':lab}</span>
+        <span class="why" style="margin-left:auto">這份 ${Math.round(p.weight*coreShare*100)}%${slot!=null?` = ${cur}${fmt(Math.round(slot))}`:''}</span>
       </div>
-      <div class="why" style="margin-top:2px">這份資金 ${Math.round(p.weight*100)}%${slot!=null?` = ${cur}${fmt(Math.round(slot))}`:''}</div>
+      <div class="rowline"><span class="who">持有中</span><span class="act ${hc}">${hl}</span><span class="why">${p.hold_reason||''}</span></div>
+      <div class="rowline"><span class="who">空手</span><span class="act ${ec}">${el}</span><span class="why">${p.reason||''}</span></div>
+      ${rescue}
       <div style="display:flex;gap:5px;margin-top:7px;flex-wrap:wrap">
         ${tile('現價', cur+fmt(p.close))}
-        ${tile('買進限價≤', p.limit!=null?cur+fmt(p.limit):'—', '#4da3ff')}
-        ${tile('停損(收盤)', p.stop!=null?cur+fmt(p.stop):'—', '#ff5a5a')}
-        ${tile('買多少 ×1.0', buyv, buyc)}
-        ${tile('買多少 ×1.25', buyv125, buyc)}
+        ${tile('追高上限(超過先別買)', p.limit!=null?cur+fmt(p.limit):'—', '#4da3ff')}
+        ${tile('停損線(看收盤)', p.stop!=null?cur+fmt(p.stop):'—', stopRed?'#ff5a5a':null)}
+        ${tile(`目標部位 ×${lev}`, tgtv, p.expo===0?'var(--grey)':'var(--txt)')}
       </div>
-      ${(p.action==='buy'&&sh!=null)?`<div class="why" style="margin-top:4px">股數:×1.0 約 ${fmt(sh)} 股 · ×1.25 約 ${fmt(sh125)} 股</div>`:''}
-      <div class="why" style="margin-top:6px">${p.reason||''}</div>
+      ${(sh!=null&&p.expo>0)?`<div class="why" style="margin-top:4px">目標約 ${fmt(sh)} 股${mk==='tw'?'(以零股計;1 張 = 1000 股)':''}。
+        持有中:調到這個部位;空手:亮 🟢 時買到這個部位。</div>`:''}
       ${traceBlock(p)}
-      ${p.conflict?`<div style="margin-top:6px;font-size:11.5px;background:#2a2510;border:1px solid #5e4d14;color:#ffe39a;border-radius:7px;padding:6px 8px">
+      ${(p.conflict && meth==='rotation')?`<div class="warnbox orange" style="margin-top:6px;font-size:11.5px">
         ${p.conflict_note} <b>你目前選的:${dec('conflict')==='hold'?'續抱到跌破停損線':'不在200MA之上就換掉'}</b>
-        <a href="#" onclick="document.querySelector('.tabbtn[data-t=dec]').click();return false;">(改)</a></div>`:''}
+        <a href="#" onclick="goTab('dec');return false;">(改)</a></div>`:''}
     </div>`;
   }).join('');
-  const mbtn=(v,txt)=>`<button class="tabbtn ${meth===v?'on':''}" style="padding:4px 10px;font-size:12px"
-     onclick="setMethod('${mk}','${v}')">${txt}${m.default_method===v?' ·預設':''}</button>`;
-  const off = hs.filter(p=>p.weight>0 && p.action!=='buy' && p.action!=='hold_wait').length;
+  const otherBox = other.length ? `<details style="margin-top:8px"><summary class="why">其他 ${other.length} 檔不在「${METH_NAME[meth]||meth}」裡(展開看)</summary>
+    <div class="why" style="padding:4px 0 0 14px">${other.map(p=>`${p.ticker.replace('.TW','')} 現價 ${cur}${fmt(p.close)} · 持有中 ${(HOLD[p.hold_action]||['—'])[0]} · 空手 ${(ENTRY[p.action]||['—'])[0]}`).join('<br>')}</div></details>` : '';
+  const mbtn=(v,txt)=>`<button class="mbtn ${meth===v?'on':''}" onclick="setMethod('${mk}','${v}')">${txt}${m.default_method===v?' ·預設':''}</button>`;
+  const rh = m.rotation_hold||{};
+  const picked = (held[0]||{}).ticker;
+  const pick = meth==='rotation' ? `<div class="note" style="margin:0 0 6px">${rh.ticker
+      ? `目前選中:<b>${rh.ticker.replace('.TW','')}</b>(RS 最強)· 已持有 ${rh.days_held} 天${rh.locked?`,還要鎖 ${rh.lock_days_left} 天才准換`:''}`
+      : `目前沒有合格的持有標的;今天 RS 最強 = <b>${(picked||rh.today_strongest||'—').replace('.TW','')}</b>,下面列的是它`}</div>`
+    : meth==='single' ? `<div class="note" style="margin:0 0 6px">固定持有 <b>${mk==='us'?'QQQ':'0050'}</b>,不換。</div>` : '';
+  const miss = ((m.missing_cores||[]).length || (m.missing_canary||[]).length)
+    ? `<div class="warnbox red">❓ <b>今天有資料沒抓到</b>:${[...(m.missing_cores||[]),...(m.missing_canary||[]).map(t=>t+'(信用哨)')].join('、')}。
+      ${(m.missing_canary||[]).length?'信用哨不完整,<b>今天的乘數不可靠,整個市場先別動</b>。':'缺的那一份先別動,其他份照常(份數仍以應有的檔數計)。'}等下一班更新。</div>` : '';
+  const intraday = (mk==='us' && m.intraday_tentative) ? `<div class="warnbox blue">⏳ <b>美股盤中暫定數字</b>:${m.intraday_note||''} 決策看隔天 09:00 那班(收盤價)。</div>`:'';
+  const cbox = (h!=null && h<=0) ? `<div class="warnbox red">🔴 <b>信用哨全部跌破</b>:已持有 → 下一個交易日全部賣出;空手 → 不買。等哨兵站回 200MA 再進。
+      ${mk==='us'?`<br><span style="font-size:11.5px"><b>建議照做(證據等級:中)</b>。美股這條統計上不顯著(ΔSharpe +0.08、p=0.17,24 年只有 3~4 次危機),但 2022 年升息空頭少跌 21 個百分點;
+      官方績效(${OF.x1?OF.x1.cagr+'% / '+OF.x1.mdd+'%':''})含這條規則,不照做就和官方數字對不上。</span>`:''}</div>`
+    : (h!=null && h<1) ? `<div class="warnbox orange">🟠 <b>信用部分示警(×${Math.round(h*100)}%)</b>:已持有 → 持股減到原本的 ${Math.round(h*100)}%;空手 → 照 ${Math.round(h*100)}% 的量買(黃燈另計)。</div>` : '';
+  const levNote = (lev===1||lev===1.25)
+    ? `你目前用 <b>×${lev}</b>:年化 ${OF['x'+(lev===1?'1':'125')].cagr}% / 最大回撤 ${OF['x'+(lev===1?'1':'125')].mdd}%`
+    : `你目前用 <b>×${lev}</b>:這個倍數在現行設定下<b>還沒回測</b>`;
   return `<div class="card">
     <h2>${title} ${credit}</h2>
-    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">${mk==='us'
+    ${miss}
+    ${intraday}
+    ${summaryLine(hs.filter(p=>coreShare>0))}
+    ${cbox}
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px"><span class="why" style="align-self:center">持有方式:</span>${mk==='us'
       ? mbtn('ew','5檔等權')+mbtn('single','只持有QQQ')+mbtn('rotation','單押最強')
       : mbtn('ew','4檔等權')+mbtn('ew3','3檔等權')+mbtn('single','只持有0050')+mbtn('rotation','單押最強')}</div>
-    <div class="note" style="margin:0 0 6px">${(ev.options||{})[meth]||''}</div>
-    ${(m.credit_health!=null && m.credit_health<=0)?`<div style="margin:6px 0;background:#3a1414;border:1px solid #7a2a2a;color:#ffc9c9;border-radius:8px;padding:8px 10px;font-size:12.5px">
-      🔴 <b>信用哨全部跌破</b>:系統規則是「清倉、不新增」—— 已持有的也轉現金,等哨兵站回 200MA 再進。
-      ${mk==='us'?'美股這條規則整體不顯著(ΔSharpe +0.08、p=0.17,危機樣本太少),但 2022 年升息空頭時少跌 21 個百分點。要不要照做由你決定。':''}
-    </div>`:''}
-    ${creditBlock(mk,m)}
-    <div class="note" style="margin:0 0 8px">買多少:${m.sizing}<br>
-      💡 每檔都列 <b>×1.0</b>(不融資)和 <b>×1.25</b>(積極)兩種金額——
-      美股 ×1.0 年化 17.7%/回撤 −48.6%、×1.25 年化 20.9%/回撤 −57.2%;
-      台股 ×1.0 年化 19.3%/回撤 −20.3%、×1.25 年化 23.3%/回撤 −24.4%。挑一種、之後就一直用同一種。</div>
+    <div class="note" style="margin:0 0 6px">${clean((ev.options||{})[meth])}</div>
+    ${pick}
     ${rows}
-    ${(mk==='tw'&&sat>0&&m.satellite)?(()=>{const t=m.satellite;const sl=K!=null?K*sat:null;
-      const ps=(sl!=null&&t.expo!=null)?sl*t.expo*lev:null;const shs=(ps!=null&&t.close)?Math.floor(ps/t.close):null;
-      const [l2,c2]=ACT[t.action]||['—','grey'];
-      return `<div style="background:#160f1f;border:1px solid #3a2a50;border-radius:9px;padding:9px 11px;margin-top:10px">
-        <div style="display:flex;align-items:baseline;gap:7px;flex-wrap:wrap"><b style="font-size:15px">00631L</b>
-          <span class="why">${t.name||'正2'} · 衛星 ${Math.round(sat*100)}%</span>
-          <span class="act ${c2}" style="margin-left:auto">${l2}</span></div>
-        <div class="why" style="margin-top:2px">這份資金 ${Math.round(sat*100)}%${sl!=null?` = ${cur}${fmt(Math.round(sl))}`:''}${t.action==='buy'&&shs!=null?` · 約 ${fmt(shs)} 股`:''}</div>
-        <div style="display:flex;gap:5px;margin-top:7px;flex-wrap:wrap">
-          ${tile('現價', cur+fmt(t.close))}${tile('買進限價≤', t.limit!=null?cur+fmt(t.limit):'—','#4da3ff')}
-          ${tile('停損(收盤)', t.stop!=null?cur+fmt(t.stop):'—','#ff5a5a')}
-          ${tile('買多少 ×1.0', t.action==='buy'?(ps!=null?cur+fmt(Math.round(ps/lev)):'—'):(t.action==='cash'?'現金':'先等'), t.action==='buy'?'var(--green)':'var(--yellow)')}
-          ${tile('買多少 ×1.25', t.action==='buy'?(ps!=null?cur+fmt(Math.round(ps/lev*1.25)):'—'):(t.action==='cash'?'現金':'先等'), t.action==='buy'?'var(--green)':'var(--yellow)')}</div>
-        <div class="why" style="margin-top:6px">${t.gate_0050_ok?'✅ 母股 0050 在 200MA 之上(閘門開)':'🔴 母股 0050 跌破 200MA → 正2 一律空手'} · ${t.reason||''}</div>
-        <div class="why" style="margin-top:4px">⚠️ 槓桿ETF:實測加了它比純核心差(Sharpe 1.28 vs 1.36);2015 年正2擇時單年 −41%。${t.gate_note||''}</div>
-      </div>`;})():''}
-    <div class="note">🔁 <b>不用定期再平衡</b>:只在某一檔進場或出場時動它那一份就好。每月/每季/每年/從不再平衡,績效差距都 ≤0.02(全不顯著),「從不」少下 27~36% 的單(research_b5)。</div>
-    <div class="note">🟡/🔴 的那幾份先放現金${off?`(目前 ${off} 份)`:''};等它轉 🟢 再補,不要挪去加碼別檔。停損只看<b>收盤</b>。</div>
-    <details class="ev" style="margin-top:10px"><summary>📊 為什麼用這個持有方式 — ${ev.verdict||''}</summary>
-      <div class="body">${ev.detail||''}</div></details>
+    ${otherBox}
+    ${satCard(mk,m,K,sat,lev,cur,tile)}
+    <div class="note">📊 <b>預設設定的回測績效</b>(${OF.setup||''},${OF.period||''}${meth!==m.default_method?`;你選的「${METH_NAME[meth]||meth}」數字見 <a href="#" onclick="goTab('dec');return false;">我的設定</a>`:''}):
+      ×1.0 年化 ${OF.x1?OF.x1.cagr:''}% / 最大回撤 ${OF.x1?OF.x1.mdd:''}%;×1.25 年化 ${OF.x125?OF.x125.cagr:''}% / 最大回撤 ${OF.x125?OF.x125.mdd:''}%。
+      ${levNote}(<a href="#" onclick="goTab('dec');return false;">在設定改</a>)。<br>
+      ${OF.margin_note||''} ${OF.hindsight_note||''} 績效不含黃燈規則。</div>
+    <div class="note">💰 <b>買多少</b>:${(RE['sizing_'+mk]||{}).plain||''}</div>
+    <div class="note">🔁 <b>不用定期再平衡</b>:只在某一檔進場或出場時動它那一份。空手時 🟡/⚪ 的那幾份先放現金,等它轉 🟢 再補,不要挪去加碼別檔。</div>
+    ${creditBlock(mk,m)}
+    <details class="ev" style="margin-top:10px"><summary>為什麼預設用這個持有方式 — ${ev.verdict||''}</summary>
+      <div class="body">${clean(ev.detail)}</div></details>
+  </div>`;
+}
+
+function satCard(mk,m,K,sat,lev,cur,tile){
+  if(!(mk==='tw'&&sat>0&&m.satellite)) return '';
+  const t=m.satellite; const sl=K!=null?K*sat:null;
+  const ps=(sl!=null&&t.expo!=null)?sl*t.expo*lev:null; const shs=(ps!=null&&t.close)?Math.floor(ps/t.close):null;
+  const [l2,c2]=ENTRY[t.action]||['—','grey'];
+  return `<div style="background:#160f1f;border:1px solid #3a2a50;border-radius:9px;padding:9px 11px;margin-top:10px">
+    <div style="display:flex;align-items:baseline;gap:7px;flex-wrap:wrap"><b style="font-size:15px">00631L</b>
+      <span class="why">${t.name||'正2'} · 衛星 ${Math.round(sat*100)}%</span>
+      <span class="act ${c2}" style="margin-left:auto">${l2}</span></div>
+    <div class="why" style="margin-top:2px">這份資金 ${Math.round(sat*100)}%${sl!=null?` = ${cur}${fmt(Math.round(sl))}`:''}</div>
+    <div style="display:flex;gap:5px;margin-top:7px;flex-wrap:wrap">
+      ${tile('現價', cur+fmt(t.close))}${tile('追高上限', t.limit!=null?cur+fmt(t.limit):'—','#4da3ff')}
+      ${tile('停損線(看收盤)', t.stop!=null?cur+fmt(t.stop):'—')}
+      ${tile(`目標部位 ×${lev}`, ps!=null?cur+fmt(Math.round(ps)):(t.action==='cash'?'現金':'—'))}</div>
+    ${(t.action==='buy'&&shs!=null)?`<div class="why" style="margin-top:4px">約 ${fmt(shs)} 股(零股)</div>`:''}
+    <div class="why" style="margin-top:6px">${t.gate_0050_ok?'✅ 母股 0050 在 200MA 之上(閘門開)':'🔴 母股 0050 跌破 200MA → 正2 一律空手'} · ${clean(t.reason)}</div>
+    <div class="why" style="margin-top:4px">⚠️ 槓桿ETF:實測加了它比純核心差(Sharpe 1.28 vs 1.36);2015 年正2擇時單年 −41%。${t.gate_note||''}</div>
   </div>`;
 }
 
 function traceBlock(p){
   const tr=p.trace||[]; if(!tr.length) return '';
   const RE=(V.rule_evidence)||{};
+  const ICON={ok:['✔','#7ee0a0'],part:['⚠','#ffcb45'],bad:['✘','#ff8f8f']};
   const rows=tr.map(c=>{
     const ev=RE[c.id]||{};
+    const lv=c.level||(c.ok?'ok':'part'); const [ic,col]=ICON[lv];
     return `<div style="border-top:1px solid #16233a;padding:6px 0">
-      <div style="font-size:12px;font-weight:700;color:${c.ok?'#7ee0a0':'#ffcb45'}">${c.ok?'✔':'✘'} ${c.name}</div>
+      <div style="font-size:12.5px;font-weight:700;color:${col}">${ic} ${c.name}</div>
       <div class="why">條件:<b>${c.cond}</b><br>今天:${c.now} → <b>${c.verdict}</b></div>
-      ${ev.evidence?`<details style="margin-top:3px"><summary class="why" style="cursor:pointer;color:var(--accent)">這條門檻是怎麼定的?有回測嗎</summary>
-        <div class="why" style="padding:4px 0 0 8px;border-left:2px solid #24314a;margin-top:3px">${ev.evidence}</div></details>`:''}
+      ${ev.plain?`<div class="why" style="margin-top:2px">💬 ${ev.plain} <span class="st">證據等級 ${ev.grade}</span></div>`:''}
     </div>`;}).join('');
-  return `<details style="margin-top:7px"><summary style="cursor:pointer;font-size:12px;font-weight:700;color:var(--accent);list-style:none">
-      🔎 為什麼是這個燈?(逐條規則 + 今天的數字)</summary>
-    <div style="margin-top:4px">${rows}</div></details>`;
+  return `<details style="margin-top:7px"><summary style="font-size:12.5px;font-weight:700;color:var(--accent)">
+      為什麼是這個燈?(逐條規則 + 今天的數字)</summary>
+    <div style="margin-top:4px">${rows}
+    <div class="why" style="margin-top:4px">完整回測數字 → <a href="#" onclick="goSub('ev');return false;">研究細節/規則與證據</a></div></div></details>`;
 }
 
 function creditBlock(mk,m){
@@ -239,100 +341,139 @@ function creditBlock(mk,m){
     <td style="padding:4px 6px"><b>${NAME[tk]||tk}</b></td>
     <td style="padding:4px 6px" class="num">${v.close}</td>
     <td style="padding:4px 6px" class="num">${v.ma200}</td>
-    <td style="padding:4px 6px" class="num" style="color:${v.ok?'#7ee0a0':'#ff8f8f'}">${v.dist_pct>0?'+':''}${v.dist_pct}%</td>
+    <td style="padding:4px 6px;color:${v.ok?'#7ee0a0':'#ff8f8f'}" class="num">${v.dist_pct>0?'+':''}${v.dist_pct}%</td>
     <td style="padding:4px 6px">${v.ok?'🟢 健康':'🔴 跌破'}</td></tr>`).join('');
   const n=Object.keys(a).length, ok=Object.values(a).filter(v=>v.ok).length;
   const ev=(V.rule_evidence||{}).credit||{};
-  return `<details style="margin-top:8px"><summary style="cursor:pointer;font-size:12.5px;font-weight:700;color:var(--accent);list-style:none">
+  return `<details style="margin-top:8px"><summary style="font-size:12.5px;font-weight:700;color:var(--accent)">
       🚦 信用哨明細:為什麼今天是 ×${Math.round((h||0)*100)}%?</summary>
+    <div class="why" style="margin-top:5px">💬 ${ev.plain||''}${mk==='tw'?'台股以半導體為主,所以另外加看費半 SOXX。':''}
+      <span class="st">證據等級 ${ev.grade||''}</span></div>
     <div style="overflow-x:auto;margin-top:5px"><table style="font-size:12px">
       <tr><th>哨兵</th><th>收盤</th><th>它的200MA</th><th>距離</th><th>狀態</th></tr>${rows}</table></div>
-    <div class="why" style="margin-top:5px">健康 ${ok} / ${n} 個 → 乘數 = ${ok}÷${n} = <b>${Math.round((h||0)*100)}%</b>
-      —— 今天每一筆買進的金額都先乘上這個比例(不是叫你賣,已持有的不動)。</div>
-    <div class="why" style="margin-top:4px">${ev.evidence||''}</div></details>`;
+    <div class="why" style="margin-top:3px">資料時間:${m.source_time||'不明'}</div>
+    <div class="why" style="margin-top:5px">健康 ${ok} / ${n} 個 → 乘數 = ${ok}÷${n} = <b>${Math.round((h||0)*100)}%</b>。
+      乘數<b>同時適用於已持有的部位</b>:0% = 全部賣出;33% = 持股減到原本的 1/3;100% = 不動。</div>
+    <div class="why" style="margin-top:4px">完整回測數字 → <a href="#" onclick="goSub('ev');return false;">研究細節/規則與證據</a></div></details>`;
 }
 
-function setMethod(mk,v){ localStorage.setItem('v2d_method_'+mk, v); render(); renderDecisions(); }
-window.setMethod = setMethod; window.setCap = setCap;
+function setMethod(mk,v){ ls.set('v2d_method_'+mk, v); render(); renderDecisions(); }
+function setMkt(v){ ls.set('v2mkt', v); render(); }
+window.setMethod = setMethod; window.setCap = setCap; window.setMkt = setMkt;
 
 function render(){
   if(!V) return;
-  $('#cap_us').value = localStorage.getItem('v2cap_us')||'';
-  $('#cap_tw').value = localStorage.getItem('v2cap_tw')||'';
-  $('#markets').innerHTML = mktCard('us', V.markets.us, '🇺🇸 美股', '$')
-                          + mktCard('tw', V.markets.tw, '🇹🇼 台股', 'NT$');
+  $('#cap_us').value = ls.get('v2cap_us')||'';
+  $('#cap_tw').value = ls.get('v2cap_tw')||'';
+  const sel = ls.get('v2mkt')||'all';
+  $('#mktsel').innerHTML = [['all','全部'],['us','🇺🇸 只看美股'],['tw','🇹🇼 只看台股']]
+    .map(([v,t])=>`<button class="mbtn ${sel===v?'on':''}" onclick="setMkt('${v}')">${t}</button>`).join('');
+  $('#markets').className = 'mkt' + (sel==='all'?'':' one');
+  $('#markets').innerHTML = (sel!=='tw'?mktCard('us', V.markets.us, '🇺🇸 美股', '$'):'')
+                          + (sel!=='us'?mktCard('tw', V.markets.tw, '🇹🇼 台股', 'NT$'):'');
 }
 
 function renderDecisions(){
   const box=$('#decBox'); if(!box||!V) return;
   const ds=V.decisions||[];
-  box.innerHTML = `<div class="card"><h2>🗳 要你決定的事(每項附證據判斷)</h2>
-    <div class="note">每條都附兩邊的實測數字。選了就直接套用到「今天怎麼做」那頁(只存在你的瀏覽器)。
-    沒有「數據上唯一正確」的答案才會放進這裡——數據能決定的部分我已經直接改好了。</div></div>`
-    + ds.map(d=>{
-      const cur=dec(d.key) ?? (d.key.startsWith('method_') ? V.markets[d.key.slice(7)].default_method : null);
-      const opts=d.options.map(o=>`<div onclick="setDec('${d.key}','${o.v}')"
-        style="cursor:pointer;border:1px solid ${String(cur)===String(o.v)?'var(--accent)':'var(--line)'};
-        background:${String(cur)===String(o.v)?'rgba(77,163,255,0.12)':'var(--panel2)'};
-        border-radius:9px;padding:9px 11px;margin-top:7px">
-        <div style="font-weight:700;font-size:13.5px">${String(cur)===String(o.v)?'✅ ':'　'}${o.label}</div>
-        <div class="why" style="margin-top:3px">${o.nums}</div></div>`).join('');
-      return `<div class="card"><h2 style="font-size:14px">${d.title}</h2>
-        <div class="why">${d.note}</div>${d.verdict?`<div style="margin-top:7px;font-size:12.5px;background:#0e1b2e;border:1px solid #2a4a72;border-radius:8px;padding:8px 10px"><b>📊 證據判斷:</b>${d.verdict}</div>`:''}${opts}</div>`;
-    }).join('');
+  const meths=['us','tw'].map(mk=>methOf(mk,V.markets[mk]));
+  const card=d=>{
+    const cur=dec(d.key) ?? (d.key.startsWith('method_') ? V.markets[d.key.slice(7)].default_method : null);
+    const curOpt=d.options.find(o=>String(o.v)===String(cur));
+    const opts=d.options.map(o=>`<div onclick="setDec('${d.key}','${o.v}')"
+      style="cursor:pointer;border:1px solid ${String(cur)===String(o.v)?'var(--accent)':'var(--line)'};
+      background:${String(cur)===String(o.v)?'rgba(77,163,255,0.12)':'var(--panel2)'};
+      border-radius:9px;padding:9px 11px;margin-top:7px">
+      <div style="font-weight:700;font-size:13.5px">${String(cur)===String(o.v)?'✅ ':'　'}${o.label}</div>
+      <div class="why" style="margin-top:3px">${o.nums}</div></div>`).join('');
+    return `<div class="card"><h2 style="font-size:14px">${d.title}</h2>
+      <div style="font-size:12.5px;margin-bottom:6px">目前:<b>${curOpt?curOpt.label:'—'}</b></div>
+      <div class="why">${clean(d.note)}</div>${d.verdict?`<div class="sum" style="font-size:12.5px"><b>📊 證據判斷:</b>${clean(d.verdict)}</div>`:''}${opts}</div>`;
+  };
+  const main=ds.filter(d=>!['sat_tw','conflict'].includes(d.key));
+  const conflict=ds.find(d=>d.key==='conflict'), sat=ds.find(d=>d.key==='sat_tw');
+  const anyRot=meths.includes('rotation');
+  box.innerHTML = `<div class="card"><h2>⚙️ 我的設定</h2>
+    <div class="note">每一項都附兩邊的實測數字;選了會直接套用到「今天怎麼做」。
+    沒有「數據上唯一正確」的答案才會放進這裡,數據能決定的部分已經直接改好了。
+    <b>選擇只存在這個瀏覽器</b>,換手機/電腦或清除瀏覽器資料要重選。</div></div>`
+    + main.map(card).join('')
+    + (conflict ? (anyRot ? card(conflict)
+        : `<details class="ev"><summary>停損線~200MA 之間要續抱還是換掉?(只在選「單押最強」時才需要)</summary><div class="body">${card(conflict)}</div></details>`) : '')
+    + (sat ? `<details class="ev"><summary>進階選項:槓桿 ETF 00631L 衛星(結論:不建議)</summary><div class="body">${card(sat)}</div></details>` : '');
 }
 
-let FW=null;
 function renderForward(){
   const box=$('#fwdBox'); if(!box) return;
-  if(!FW){ box.innerHTML='<div class="card">前瞻追蹤資料尚未產生</div>'; return; }
-  const W=340,H=150,col=['#ff9d5a','#4da3ff','#8a96ad'];
+  if(!FW){ box.innerHTML=`<div class="card">前瞻追蹤資料載入失敗${FW_ERR?`(${FW_ERR})`:''}</div>`; return; }
+  const W=360,H=170,L=40,col=['#ff9d5a','#4da3ff','#8a96ad'];
   const card=(mk,title)=>{
-    const rows=FW.markets[mk]||[]; if(!rows.length) return '';
-    const all=rows.flatMap(r=>r.curve.map(c=>c[1])); const lo=Math.min(0,...all), hi=Math.max(0,...all);
-    const n=Math.max(...rows.map(r=>r.curve.length));
-    const y=v=>H-8-(v-lo)/((hi-lo)||1)*(H-16), x=i=>8+i/Math.max(n-1,1)*(W-16);
-    const lines=rows.map((r,k)=>`<polyline fill="none" stroke="${col[k]}" stroke-width="2" points="${r.curve.map((c,i)=>x(i)+','+y(c[1])).join(' ')}"/>`).join('');
-    const zero=`<line x1="8" x2="${W-8}" y1="${y(0)}" y2="${y(0)}" stroke="#26304a" stroke-dasharray="3 3"/>`;
-    const tbl=rows.map((r,k)=>`<tr><td style="padding:5px"><span style="color:${col[k]}">●</span> ${r.name}</td>
+    const raw=FW.markets[mk]||[]; if(!raw.length) return '';
+    // 曲線完全相同的版本合併成一條(否則後畫的會把前面的蓋掉)
+    const groups=[]; raw.forEach(r=>{const key=JSON.stringify(r.curve.map(c=>c[1]));
+      const g=groups.find(x=>x.key===key); g?g.rows.push(r):groups.push({key,rows:[r]});});
+    const all=raw.flatMap(r=>r.curve.map(c=>c[1])); const lo=Math.min(0,...all), hi=Math.max(0,...all);
+    const n=Math.max(...raw.map(r=>r.curve.length));
+    const y=v=>H-18-(v-lo)/((hi-lo)||1)*(H-30), x=i=>L+i/Math.max(n-1,1)*(W-L-8);
+    const lines=groups.map((g,k)=>`<polyline fill="none" stroke="${col[k]}" stroke-width="2" points="${g.rows[0].curve.map((c,i)=>x(i)+','+y(c[1])).join(' ')}"/>`).join('');
+    const ax=[hi,0,lo].filter((v,i,a)=>a.indexOf(v)===i).map(v=>`<text x="${L-4}" y="${y(v)+4}" fill="#8a96ad" font-size="10" text-anchor="end">${v>0?'+':''}${(+v).toFixed(2)}%</text>
+      <line x1="${L}" x2="${W-8}" y1="${y(v)}" y2="${y(v)}" stroke="#26304a" ${v===0?'stroke-dasharray="3 3"':''}/>`).join('');
+    const c0=raw[0].curve; const dates=c0.length?`<text x="${L}" y="${H-3}" fill="#8a96ad" font-size="10">${c0[0][0]}</text>
+      <text x="${W-8}" y="${H-3}" fill="#8a96ad" font-size="10" text-anchor="end">${c0[c0.length-1][0]}</text>`:'';
+    const legend=groups.map((g,k)=>`<span style="color:${col[k]}">●</span> ${g.rows.map(r=>r.name).join(' = ')}${g.rows.length>1?'(今天持倉相同,線重疊)':''}`).join('<br>');
+    const tbl=raw.map(r=>{const k=groups.findIndex(g=>g.rows.includes(r));return `<tr><td style="padding:5px"><span style="color:${col[k]}">●</span> ${r.name}</td>
       <td class="num" style="padding:5px;color:${r.ret_pct>=0?'#7ee0a0':'#ff8f8f'}">${r.ret_pct>0?'+':''}${r.ret_pct}%</td>
-      <td class="num" style="padding:5px">${r.mdd_pct}%</td><td class="num" style="padding:5px">${Math.round(r.expo_now*100)}%</td></tr>`).join('');
+      <td class="num" style="padding:5px">${r.mdd_pct}%</td><td class="num" style="padding:5px">${Math.round(r.expo_now*100)}%</td></tr>`;}).join('');
     return `<div class="card"><h2>${title}</h2>
-      <svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;background:var(--panel2);border-radius:8px">${zero}${lines}</svg>
-      <div style="overflow-x:auto"><table style="margin-top:6px"><tr><th>版本</th><th>凍結後報酬</th><th>最大回撤</th><th>目前曝險</th></tr>${tbl}</table></div>
-      <div class="why">已經過 ${rows[0].days} 個交易日。</div></div>`;
+      <svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;background:var(--panel2);border-radius:8px">${ax}${lines}${dates}</svg>
+      <div class="why" style="margin-top:4px">${legend}<br>縱軸 = 規則定案後的累積報酬;虛線 = 0%。</div>
+      <div style="overflow-x:auto"><table style="margin-top:6px"><tr><th>版本</th><th>定案後報酬</th><th>最大回撤</th><th>模擬持有者曝險</th></tr>${tbl}</table></div>
+      <div class="why">已經過 ${raw[0].days} 個交易日。${mk==='us'?'全現金時的報酬 = 美國國庫券利息。':''}
+      「模擬持有者曝險」是已持有者的部位;新進資金依黃燈規則可能是 0%。</div></div>`;
   };
-  box.innerHTML=`<div class="card"><h2>📈 前瞻追蹤(真正的樣本外)</h2>
-    <div class="why" style="font-size:12.5px">研究凍結日 <b>${FW.freeze}</b> 之前的資料,研究時全部看過;只有之後的資料才是真考驗。${FW.note}</div>
+  box.innerHTML=`<div class="card"><h2>📈 前瞻追蹤</h2>
+    <div class="why" style="font-size:12.5px">這是規則定案(<b>${FW.freeze}</b>)之後的<b>真實表現</b>,不是事後回測。天數少時差距多半是雜訊,至少看滿 12 個月再下結論。
+    (模擬持有層;黃燈進場時機、V底救援、R3 未模擬。)</div>
     <div class="why" style="margin-top:4px">更新:${FW.generated}</div></div>`+card('us','🇺🇸 美股')+card('tw','🇹🇼 台股');
 }
 
 function renderNews(){
-  const f=(V.findings||[]).map(x=>`<div class="card"><div class="why">${x.date} · <code>${x.script}</code></div>
+  const f=(V.findings||[]).map(x=>`<div class="card"><div class="why">${x.date}</div>
     <h2 style="font-size:14px;margin:4px 0">${x.title}</h2><div class="why" style="font-size:12.5px">${x.body}</div>
-    <div style="font-size:12px;margin-top:6px;color:#7ee0a0">▶ ${x.status}</div></div>`).join('');
+    <div style="margin-top:6px"><span class="badge" style="color:#9fe7bd">結論:${x.status}</span></div>
+    <details style="margin-top:4px"><summary class="why">可重跑的腳本</summary><div class="why" style="padding-left:14px"><code>${x.script}</code></div></details></div>`).join('');
+  const pend=(V.research_pending||[]).map(x=>`<tr><td style="padding:6px"><b>${x.item}</b><br><span class="why">${x.why}</span></td>
+    <td style="padding:6px;white-space:nowrap;color:#ffcb45">進行中/待補</td></tr>`).join('');
   const t=(V.research_todo||[]).map(x=>`<tr><td style="padding:6px"><b>${x.item}</b><br><span class="why">${x.why}</span></td>
-    <td style="padding:6px;white-space:nowrap;color:${x.status.startsWith('✅')?'#7ee0a0':'#ffcb45'}">${x.status}</td></tr>`).join('');
-  $('#newsBox').innerHTML = `<div class="card"><h2>🧪 最新有價值的發現(都已落地)</h2>
-    <div class="note">每條都附可重跑的腳本名;數字皆為回測結果。</div></div>${f}
-    <div class="card"><h2>📋 研究待辦</h2><div style="overflow-x:auto"><table>${t}</table></div></div>`;
+    <td style="padding:6px;white-space:nowrap;color:#7ee0a0">${x.status}</td></tr>`).join('');
+  $('#newsBox').innerHTML = `<div class="card"><h2>⏳ 進行中 / 還沒有證據的題目</h2>
+      <div class="note">這些題目目前沒有回測數字,所以頁面上不會出現它們的數字。</div>
+      <div style="overflow-x:auto"><table>${pend}</table></div></div>
+    <div class="card"><h2>🧪 研究紀錄(每條結論都已處理:採用或不採用)</h2>
+    <div class="note">數字皆為回測結果。</div></div>${f}
+    <div class="card"><h2>✅ 已完成的研究</h2><div style="overflow-x:auto"><table>${t}</table></div></div>`;
 }
 
 function renderEvidence(){
   const g = {both:'美股+台股', us:'美股', tw:'台股'};
   $('#evBox').innerHTML = `<div class="card"><h2>📐 每條規則的數據依據</h2>
-    <div class="note">${EV.method_note}</div></div>` +
-    EV.rules.map(r=>`<details class="ev"><summary>${r.light} ${r.rule}
-      <span class="badge">${g[r.market]}</span><span class="st ${r.strength}">證據 ${r.strength}</span></summary>
-      <div class="body"><b>數據:</b>${r.evidence}<br><b>可重跑:</b>${r.script}</div></details>`).join('');
+    <div class="note">${EV.method_note}</div>
+    <div class="note">「可信度」= 回測結果有多可靠(強/中/弱);規則有沒有被採用看前面的標記(❌ = 不採用)。</div></div>` +
+    EV.rules.map((r,i)=>`<details class="ev" ${i===0?'open':''}><summary>${r.light} ${r.rule}
+      <span class="badge">${g[r.market]}</span><span class="st">可信度 ${r.strength}</span></summary>
+      <div class="body"><b>數據:</b>${r.evidence}
+      <details style="margin-top:4px"><summary class="why">可重跑的腳本</summary><div style="padding-left:14px"><code>${r.script}</code></div></details></div></details>`).join('');
 }
 
 function renderDiff(){
-  const rows = (V.diff||[]).map(d=>`<tr><td><b>${d.item}</b></td><td>${d.old}</td><td style="color:#9fe7bd">${d.new}</td><td class="why">${d.why}</td></tr>`).join('');
-  $('#diffBox').innerHTML = `<div class="card"><h2>🔍 新版和原版差在哪</h2>
+  const rows = (V.diff||[]).map(d=>`<tr><td data-l="項目"><b>${d.item}</b></td><td data-l="改版前">${d.old}</td>
+    <td data-l="現在" style="color:#9fe7bd">${d.new}</td><td data-l="理由" class="why">${d.why}</td></tr>`).join('');
+  $('#diffBox').innerHTML = `<div class="card"><h2>🔍 和改版前差在哪(沒用過原版可略過)</h2>
+    <div class="note" style="margin:0 0 8px">「改版前」= 2026-09-23 以前的規則。原版頁面現在也讀同一份每日資料,所以下面多數改動在原版頁面也已經生效;
+    兩個頁面主要差在持有方式的呈現(原版是單押輪動)和額外面板(進取模式等)。</div>
     <div style="overflow-x:auto"><table class="diff">
-      <tr><th>項目</th><th>原版</th><th>新版</th><th>改的理由(數據)</th></tr>${rows}</table></div>
-    <div class="note">沒列出來的部分兩版完全一樣:200MA 進出場、信用哨、恐慌容忍、停損只看收盤。</div></div>`;
+      <tr><th>項目</th><th>改版前</th><th>現在</th><th>改的理由(數據)</th></tr>${rows}</table></div>
+    <div class="note">沒列出來的部分沒有變:200MA 進出場、信用哨、美股恐慌容忍、停損只看收盤。</div></div>`;
 }
 
 function renderLimit(){
@@ -345,13 +486,16 @@ function renderLimit(){
 (async ()=>{
   try{
     [V, EV] = await Promise.all([j('v2_status.json'), j('v2_evidence.json')]);
-    try{ FW = await j('paper_forward.json'); }catch(e){ FW=null; }
-    const stale = (Date.now()-new Date(String(V.generated).replace(' ','T')).getTime())/3.6e6;
-    $('#updated').innerHTML = `${stale>36?'🔴 資料過期':'🟢'} 資料更新 <b>${V.generated.slice(5,16)}</b>`
-      + `(台北時間;伺服器每天 09:00/21:00/22:30 自動更新,GitHub 常延遲 1-4 小時)`
-      + (stale>36?` — 已經 ${Math.round(stale)} 小時沒更新,先別依這頁下單`:'');
+    try{ FW = await j('paper_forward.json'); }catch(e){ FW=null; FW_ERR=e.message; }
+    // ★新舊逐來源檢查:頁首取「最舊」的那個(之前只看 v2_status 產生時間,台股來源舊了一個月也亮綠燈)
+    const srcs=[['頁面資料',V.generated],['美股',V.markets.us.source_time],['台股',V.markets.tw.source_time]];
+    const oldest=srcs.reduce((a,b)=>ageH(b[1])>ageH(a[1])?b:a);
+    const stale=ageH(oldest[1])>STALE_H;
+    $('#updated').innerHTML = `${stale?'🔴':'🟢'} 資料時間(台北):美股 <b>${String(V.markets.us.source_time||'—').slice(5,16)}</b> · 台股 <b>${String(V.markets.tw.source_time||'—').slice(5,16)}</b>`
+      + `(每天 09:00 / 21:00 / 22:30 自動更新,排程偶爾延遲,以這裡的時間為準)`
+      + (stale?` — <b style="color:var(--red)">${oldest[0]}已經 ${Math.round(ageH(oldest[1]))} 小時沒更新,先別依那一塊下單</b>`:'');
     render(); renderDecisions(); renderForward(); renderNews(); renderEvidence(); renderDiff(); renderLimit();
-    $('#foot').textContent = `v2 · 規則版本 ${EV.version} · 訊號皆為收盤價計算,隔日限價執行`;
+    $('#foot').textContent = `v2 · 規則版本 ${V.rules_version||EV.version} · 訊號用收盤價計算,下一個交易日執行(回測假設收盤成交,這一天的落差未量化)`;
   }catch(e){
     $('#updated').innerHTML = '<span style="color:var(--red)">⚠️ 資料載入失敗:'+e.message+'</span>';
   }

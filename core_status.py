@@ -334,7 +334,7 @@ def core_signal(close: pd.Series, vix_last: float | None, ticker: str,
     elif stop_risk >= STOP_TOO_FAR_PCT:
         entry_state = 'expensive'
         entry_action = (f'空手先別進(離停損線 {stop_risk:.1f}% ≥ {STOP_TOO_FAR_PCT:.0f}% 門檻;'
-                        f'美股歷史此時等拉近再買,14年中12年較好);已持有者續抱')
+                        f'美股歷史此時等拉近再買,14年中12年較好)')
     else:
         entry_state = 'can_enter'
         extra = '；VIX高=恐慌綠燈,果斷進' if panic else ''
@@ -510,8 +510,9 @@ def daily_verdict(out: dict, combined: dict | None, rotation_hold: dict,
 def main():
     tickers = CORE_TICKERS + CREDIT_TICKERS + [PANIC_TICKER]
     print(f"📥 下載核心指數 + 信用breadth(HYG+LQD) + 恐慌計 ({'/'.join(tickers)}, 2y)...")
-    raw = yf.download(' '.join(tickers), period='2y',
-                      interval='1d', progress=False, group_by='ticker')
+    from scanner_base import download_retry
+    raw, missing = download_retry(tickers, CORE_TICKERS + CREDIT_TICKERS, MA, period='2y',
+                                  interval='1d', progress=False, group_by='ticker')
 
     vix_last = None
     vix_ma20 = None
@@ -583,7 +584,7 @@ def main():
             d['credit_mult'] = ch
             if ch <= 0:
                 d['credit_cut'] = True
-                d['hold_action'] = '🔴 信用全示警(HYG+LQD皆跌破200MA)→曝險砍0,等信用站回再進'
+                d['hold_action'] = '🔴 信用全示警(HYG+LQD皆跌破200MA)→已持有全部賣出、曝險0,等信用站回再進'
                 d['action'] = d['hold_action']
                 d['entry_state'] = 'no_entry'
                 d['entry_action'] = '信用全示警期間不進場(等HYG/LQD站回200MA)'
@@ -658,6 +659,9 @@ def main():
     data = {
         'last_updated': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
         'intraday_tentative': intraday_flag, 'intraday_note': intraday_note,
+        # 缺資料一定要標出來:缺核心 → 等權份數會錯;缺信用哨 → 乘數會錯(v2 頁面據此示警)
+        'missing_cores': [tk for tk in CORE_TICKERS if tk not in out],
+        'missing_canary': [tk for tk in CREDIT_TICKERS if tk in missing],
         'daily_verdict': verdict, 'panic_base_rate': PANIC_BASE_RATE,
         'ma_window': MA, 'panic_vix': PANIC_VIX, 'panic_delay': PANIC_DELAY,
         'vix': round(vix_last, 2) if vix_last is not None else None,

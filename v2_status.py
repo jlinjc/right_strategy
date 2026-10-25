@@ -30,53 +30,78 @@ from scanner_base import DASHBOARD_DIR
 #   而且不依賴無法證實的挑選能力),頁面仍保留切回單押的選項。
 DEFAULT_METHOD = {'us': 'ew', 'tw': 'ew'}
 TOPN = {'us': 3, 'tw': 3}
+
+# ── 官方績效:頁面上「現行設定」的數字一律從這裡取,禁止在別處手打(2026-10-24 v2 UX 稽核 P1)──
+#   重算來源:research_b6_options_table.py(等權+RiskTarget+信用哨,不再平衡)/ research_b9_final.py 槓桿階梯;
+#   2026-10-24 稽核以 scratchpad chk_expo.py / chk2.py / audit_expo.py 重跑,逐位一致。
+#   其他設定(單押、1 倍、無信用哨…)的數字可以出現,但必須附設定標籤。
+OFFICIAL = {
+    'us': {'setup': '5 檔等權 + RiskTarget + 信用哨', 'period': '2002-05 ~ 2026-09',
+           'x1': {'cagr': 17.3, 'mdd': -34.2, 'sharpe': 0.83},
+           'x125': {'cagr': 20.7, 'mdd': -41.1, 'sharpe': 0.82},
+           'margin_note': '美股 ×1.0 就會用到融資:每檔最多買到這一份的 1.5 倍,回測中約一半的日子(52.7%)總曝險超過 100%。',
+           'hindsight_note': '5 檔標的是 2026 年回頭挑的(事後挑選),未來期望值應往下調;'
+                             '在 1 倍、無信用哨的設定下差 2.9 個百分點(13.5%→10.6%),現行設定下的幅度未回測。'},
+    'tw': {'setup': '4 檔等權 + 信用哨(固定 1 倍)', 'period': '2013-04 ~ 2026-09',
+           'x1': {'cagr': 22.4, 'mdd': -18.2, 'sharpe': 1.60},
+           'x125': {'cagr': 27.6, 'mdd': -22.4, 'sharpe': 1.59},
+           'margin_note': '台股 ×1.0 不融資;×1.25 需要融資,回測只算 1% 利息,實際利率以券商為準。',
+           'hindsight_note': ''},
+}
 METHOD_EVIDENCE = {
-    'us': {'default': 'rotation', 'verdict': '打平 — 沒有證據更換',
-           'detail': '主判定池(SMH/SOXX/QQQ/XLK/SPY,2002-2026):等權 − 單押最強 = 超額Sharpe +0.013、p=0.41、'
+    'us': {'default': 'ew', 'verdict': '三種打平 — 選等權是為了分散',
+           'detail': '(以下為 2026-09-23 驗證時的設定:1 倍、未含信用哨)'
+                     '主判定池(SMH/SOXX/QQQ/XLK/SPY,2002-2026):等權 − 單押最強 = 超額Sharpe +0.013、p=0.41、'
                      '同波動年化 +0.03pp → 兩者沒有差別;前 N 名曲線平坦(1檔0.71/2檔0.67/3檔0.69/4檔0.68/5檔0.68)'
                      '→「挑選訊號無法判定」。但無後見之明的 14 檔產業池:等權 +0.264、p=0.024、三段全正、'
                      '同波動年化 +4.3pp,明顯站在等權那邊;「挑選 alpha」t 值僅 1.66(不顯著)。'
                      '回撤:單押 −36.1% vs 等權 −26.0%。',
-           'options': {'rotation': '單押 RS 最強一檔(現行,持滿30日才准換);換手少(約15筆/年)',
-                       'ew': '5 檔各 1/5,各自看自己的 200MA;回撤較淺,但換手多(約70筆/年)'}},
-    'tw': {'default': 'ew', 'verdict': '等權勝出 — 已改',
-           'detail': '主判定池(0050/0052/006208/0051,2013-2026):等權 − 單押最強 = 超額Sharpe +0.210、p=0.038、'
+           'options': {'rotation': '單押 RS 最強一檔(原版做法,持滿30日才准換);RS = 近半年報酬÷波動,越高越強;約32筆/年',
+                       'ew': '5 檔各 1/5,各自看自己的 200MA;現行設定下回撤和單押差不多(−34.2% vs −33.4%),交易約102筆/年',
+                       'single': '只持有 QQQ,不換;和等權統計上打平(Sharpe 0.75 vs 0.83,不顯著),交易最少(約19筆/年)'}},
+    'tw': {'default': 'ew', 'verdict': '等權勝過單押;和只持有 0050 打平',
+           'detail': '(以下為 2026-09-23 驗證時的設定:1 倍、未含信用哨)'
+                     '主判定池(0050/0052/006208/0051,2013-2026):等權 − 單押最強 = 超額Sharpe +0.210、p=0.038、'
                      '同波動年化 +4.28pp、三段有兩段為正,2倍成本/統一緩衝/RiskTarget倉位/21個換倉日全部同方向;'
                      '長樣本池(0050/0052/0051,2009起)+0.229、p=0.015(Holm 校正後 0.045 過關)。'
                      '前 N 名曲線單調上升:1檔1.06 → 2檔1.16 → 3檔1.23 → 4檔1.22。'
                      '同群換倉(0050↔006208)占 25%,換完之後 21 日平均 −0.19% = 白付成本。'
                      '⚠️主池顯著性 Holm 校正後 0.114,差一點沒過 → 證據等級「中等」。',
-           'options': {'ew': '4~5 檔各占一份,各自看自己的 200MA(新版預設)',
-                       'rotation': '單押 RS 最強一檔(原版做法)'}},
+           'options': {'ew': '4 檔各占一份,各自看自己的 200MA。注意:006208 和 0050 追蹤同一指數,等於台灣 50 占一半',
+                       'ew3': '3 檔等權:去掉和 0050 同指數的 006208;績效幾乎相同(22.3% vs 22.4%),交易較少(約48筆/年)',
+                       'single': '只持有 0050,不換;和等權打平(Sharpe 1.58 vs 1.60),交易最少(約16筆/年)',
+                       'rotation': '單押 RS 最強一檔(原版做法,持滿30日才准換);等權勝過它(p=0.038)'}},
 }
 
 
 DECISION_VERDICT = {
-    "method_us": "⚖️ 三者打平,沒有證據偏好任何一個:等權−單押 Δ−0.016(p=0.56)、等權−QQQ +0.074(p=0.20)、單押−QQQ +0.090(p=0.14)。你選的等權沒問題;若想省事,只持有 QQQ 交易最少(19 筆/年)。",
+    "method_us": "⚖️ 三者打平,沒有證據偏好任何一個:等權−單押 Δ−0.016(p=0.56)、等權−QQQ +0.074(p=0.20)、單押−QQQ +0.090(p=0.14)。預設的等權沒問題;若想省事,只持有 QQQ 交易最少(19 筆/年)。",
     "method_tw": "✅ 「單押最強」最站不住:等權勝過它(主池 +0.171,p=0.076;長樣本 +0.209,p=0.020)。⚖️ 其餘三個打平:4檔−0050 +0.027(p=0.30)、長樣本 0050 反而略好(p=0.16)、4檔−3檔 +0.021(p=0.135)。→ 交易最少的「只持有 0050」成本最低。⚠️最嚴格的 Deflated Sharpe 檢定 0.75/0.85(門檻0.90)未過 = 證據中等。",
-    "lev_us": "⚖️ 數據無法決定(Sharpe 0.83 vs 0.82)= 純風險偏好。×1.25 多年化 3.4pp,但回撤 −34%→−41%、最差12個月 −21.5%→−27.1%、最長水下 3.8→5.7 年。另:美股回測約有 3pp 後見之明灌水。",
-    "lev_tw": "⚖️ 數據無法決定(Sharpe 1.60 vs 1.59)= 純風險偏好。×1.25 多年化 5.2pp,回撤 −18%→−22%、最差12個月 −9.6%→−12.0%、水下期都 1.2 年。⚠️回測只算 1% 融資成本,台股融資利率約 6%,實際多賺約 3.8pp。",
+    "lev_us": "⚖️ 數據無法決定(Sharpe 0.83 vs 0.82)= 純風險偏好。×1.25 多年化 3.4pp,但回撤 −34%→−41%、最差12個月 −21.5%→−27.1%、最長水下 3.8→5.7 年(research_b9)。另:美股標的是事後挑的,未來期望值應往下調。",
+    "lev_tw": "⚖️ 數據無法決定(Sharpe 1.60 vs 1.59)= 純風險偏好。×1.25 多年化 5.2pp,回撤 −18%→−22%、最差12個月 −9.6%→−12.0%、水下期都 1.2 年。⚠️回測只算 1% 融資成本;實際融資利率通常更高(以券商為準),扣息後實際多賺會少於 5.2pp(幅度未回測)。",
     "sat_tw": "✅ 0% 最站得住:配 20% 正2,Sharpe 顯著變差(−0.059,90%信賴區間 [−0.10,−0.01] 整段小於 0);換到年化 +5.5pp、回撤 −14.4%→−18.7%。想加報酬,直接把核心開 ×1.25 效率比較好。",
     "credit_us": "⚖️ 打平(皆壞才清倉 − 平滑 +0.004,p=0.46)。差別只在交易量。",
-    "conflict": "⚖️ 打平,而且你已選等權:等權本身就是「續抱到跌破停損線」,這題只在選「單押最強」時才有意義。(美股 −0.001 p=0.51;台股主池換掉略好、長樣本續抱略好 p=0.061,方向相反。)"
+    "conflict": "⚖️ 打平。用等權或只持有一檔時不用選:那兩種本身就是「續抱到跌破停損線」,這題只在選「單押最強」時才有意義。(美股 −0.001 p=0.51;台股主池換掉略好、長樣本續抱略好 p=0.061,方向相反。)"
 }
 
 LEV_TICKER = '00631L.TW'
+# 每個市場「應該有」的核心標的:下載缺一檔時,等權份數仍以這個為準(不准靜默變成 1/4),缺的那份標示資料缺失
+EXPECTED_CORES = {'us': ['SMH', 'QQQ', 'XLK', 'SOXX', 'SPY'], 'tw': ['0050.TW', '0052.TW', '006208.TW', '0051.TW']}
 SINGLE_ANCHOR = {'us': 'QQQ', 'tw': '0050.TW'}
 
 # ── 決策清單:每條都給正反兩邊的實測數字,選了就直接影響上面的「今天怎麼做」──
 #    數字來源:research_q4_choices.py(A 槓桿階梯 / D 正2接法)、research_rot_verify_p1.py(持有方式)
 DECISIONS = [
-    {'key': 'method_us', 'title': '美股持有方式(你已選:等權)',
+    {'key': 'method_us', 'title': '美股持有方式(預設:5 檔等權)',
      'note': '統一基準重算(research_b6_options_table.py,2002-2026,含信用哨、RiskTarget、不再平衡):'
              '三者 Sharpe 0.75~0.84,統計上都分不出高下(等權 vs 單押 p=0.41)。差別在交易量與集中度。'
-             '⚠️美股回測有後見之明:5 檔是 2026 年回頭挑的,站在每年當下挑只有年化 10.6%(research_b4),'
-             '未來期望值請往下調約 3 個百分點。',
+             '⚠️美股回測有後見之明:5 檔是 2026 年回頭挑的。在 1 倍、無信用哨的設定下,事後挑 13.5% vs 站在每年當下挑 10.6%'
+             '(research_b4);現行設定下的下修幅度未回測,但方向是往下。',
      'options': [
          {'v': 'ew', 'label': '5 檔等權', 'nums': 'CAGR 17.3% · 回撤 −34.2% · Sharpe 0.83 · 約102筆/年'},
-         {'v': 'rotation', 'label': '單押最強(原版輪動)', 'nums': 'CAGR 18.9% · 回撤 −33.4% · Sharpe 0.84 · 約32筆/年'},
+         {'v': 'rotation', 'label': '單押最強(原版的持有方式)', 'nums': 'CAGR 18.9% · 回撤 −33.4% · Sharpe 0.84 · 約32筆/年'},
          {'v': 'single', 'label': '只持有 QQQ(最省事)', 'nums': 'CAGR 15.5% · 回撤 −33.5% · Sharpe 0.75 · 約19筆/年'}]},
-    {'key': 'method_tw', 'title': '台股持有方式(你已選:4 檔等權)',
+    {'key': 'method_tw', 'title': '台股持有方式(預設:4 檔等權)',
      'note': '統一基準重算(2013-2026,含信用哨、固定1倍、不再平衡)。只持有 0050 和等權打平(Sharpe 1.58 vs 1.60),'
              '交易只有 1/4;長樣本(2009起)0050 甚至略好(年化 18.2% vs 16.1%,p=0.22 不顯著)。'
              '小資金請注意手續費:最低 NT$20/筆,資金 10 萬、每年 64 筆 ≈ 每年拖累 1.3%(research_b5)。',
@@ -84,34 +109,36 @@ DECISIONS = [
          {'v': 'ew', 'label': '4 檔等權', 'nums': 'CAGR 22.4% · 回撤 −18.2% · Sharpe 1.60 · 約64筆/年'},
          {'v': 'ew3', 'label': '3 檔等權(去掉重複的 006208)', 'nums': 'CAGR 22.3% · 回撤 −18.2% · Sharpe 1.58 · 約48筆/年'},
          {'v': 'single', 'label': '只持有 0050(最省事)', 'nums': 'CAGR 23.4% · 回撤 −18.7% · Sharpe 1.58 · 約16筆/年'},
-         {'v': 'rotation', 'label': '單押最強(原版輪動)', 'nums': 'CAGR 22.9% · 回撤 −18.2% · Sharpe 1.43 · 約27筆/年'}]},
-    {'key': 'lev_us', 'title': '美股要開多少槓桿?(頁面同時列出 ×1.0 與 ×1.25 的金額)',
-     'note': '2002-2026 單押輪動+RiskTarget。Sharpe 幾乎不隨槓桿變(0.69~0.73)=沿同一條效率線滑動,'
-             '差別只有「賺多少 vs 跌多深」。$10萬起算的期末值供感受規模。',
+         {'v': 'rotation', 'label': '單押最強(原版的持有方式,1 倍)', 'nums': 'CAGR 22.9% · 回撤 −18.2% · Sharpe 1.43 · 約27筆/年'}]},
+    {'key': 'lev_us', 'title': '美股要開多少槓桿?(選了會套用到「今天怎麼做」的金額)',
+     'note': '2002-2026,5 檔等權+RiskTarget+信用哨(現行設定)。×1.0 與 ×1.25 的 Sharpe 幾乎一樣(0.83 vs 0.82),'
+             '差別只有「賺多少 vs 跌多深」。⚠️×1.0 本身就會用到融資(RiskTarget 每檔上限 1.5 倍)。'
+             '×0.5、×0.75 在現行設定下還沒回測,所以不列數字。',
      'options': [
-         {'v': '0.5', 'label': '×0.5(保守)', 'nums': 'CAGR 10.5% · 回撤 −27.0% · 10萬→114萬'},
-         {'v': '0.75', 'label': '×0.75', 'nums': 'CAGR 14.3% · 回撤 −38.6% · 10萬→260萬'},
-         {'v': '1', 'label': '×1.0(現行)', 'nums': 'CAGR 17.7% · 回撤 −48.6% · 10萬→529萬'},
-         {'v': '1.25', 'label': '×1.25(積極)', 'nums': 'CAGR 20.9% · 回撤 −57.2% · 10萬→1017萬'}]},
-    {'key': 'lev_tw', 'title': '台股要開多少槓桿?(頁面同時列出 ×1.0 與 ×1.25 的金額)',
-     'note': '2013-2026 等權+固定1倍。同樣是沿效率線滑動(Sharpe 1.21~1.26)。台股融資成本較高,'
-             '×1.25 以上要自己確認券商利率。',
+         {'v': '0.5', 'label': '×0.5(保守)', 'nums': '現行設定下未回測'},
+         {'v': '0.75', 'label': '×0.75', 'nums': '現行設定下未回測'},
+         {'v': '1', 'label': '×1.0(預設,已含 RiskTarget 融資)', 'nums': 'CAGR 17.3% · 回撤 −34.2% · Sharpe 0.83'},
+         {'v': '1.25', 'label': '×1.25(積極)', 'nums': 'CAGR 20.7% · 回撤 −41.1% · Sharpe 0.82'}]},
+    {'key': 'lev_tw', 'title': '台股要開多少槓桿?(選了會套用到「今天怎麼做」的金額)',
+     'note': '2013-2026,4 檔等權+信用哨(現行設定)。×1.0 不融資;×1.25 需融資,回測只算 1% 利息,'
+             '要自己確認券商利率。×0.5、×0.75 在現行設定下還沒回測,所以不列數字。',
      'options': [
-         {'v': '0.5', 'label': '×0.5(保守)', 'nums': 'CAGR 10.2% · 回撤 −11.3%'},
-         {'v': '0.75', 'label': '×0.75', 'nums': 'CAGR 15.1% · 回撤 −16.6%'},
-         {'v': '1', 'label': '×1.0(現行)', 'nums': 'CAGR 19.3% · 回撤 −20.3%'},
-         {'v': '1.25', 'label': '×1.25(積極)', 'nums': 'CAGR 23.3% · 回撤 −24.4%'}]},
-    {'key': 'sat_tw', 'title': '台股要不要配正2(00631L)當衛星?',
-     'note': '2015-08~2026-09 實測:加正2衛星比純核心差;想加報酬,直接把核心加槓桿比較划算。'
-             '⚠️2015 年正2擇時單年 −41%、純買持最差年 −36%。這條是你指定要接的,數字照實列。',
+         {'v': '0.5', 'label': '×0.5(保守)', 'nums': '現行設定下未回測'},
+         {'v': '0.75', 'label': '×0.75', 'nums': '現行設定下未回測'},
+         {'v': '1', 'label': '×1.0(預設,不融資)', 'nums': 'CAGR 22.4% · 回撤 −18.2% · Sharpe 1.60'},
+         {'v': '1.25', 'label': '×1.25(需融資)', 'nums': 'CAGR 27.6% · 回撤 −22.4% · Sharpe 1.59'}]},
+    {'key': 'sat_tw', 'title': '進階:要不要配槓桿 ETF 00631L(元大台灣50正2)當衛星?結論:不建議',
+     'note': '2015-08~2026-09 同期比較(核心等權、1 倍、未含信用哨):加正2衛星比純核心差;想加報酬,直接把核心加槓桿比較划算。'
+             '⚠️2015 年正2擇時單年 −41%、純買持最差年 −36%。應使用者要求列出,數字照實列。',
      'options': [
          {'v': '0', 'label': '不配(數據最佳)', 'nums': '核心等權:CAGR 21.8% · 回撤 −20.3% · Sharpe 1.36'},
          {'v': '0.2', 'label': '衛星 20%', 'nums': 'CAGR 22.0% · 回撤 −22.0% · Sharpe 1.28(正2用0050的200MA當閘門)'},
          {'v': '0.4', 'label': '衛星 40%', 'nums': 'CAGR 22.5% · 回撤 −25.5% · Sharpe 1.10 · 最差年 −18.7%'},
          {'v': '1', 'label': '全押正2+擇時(最兇)', 'nums': 'CAGR 28.5% · 回撤 −47.2% · Sharpe 0.92 · 最差年 −41.2%'}]},
     {'key': 'credit_us', 'title': '美股信用哨要用哪一版?(台股那版已驗證有效,不動)',
-     'note': '2026-09-24 重驗:美股信用哨整體效果很小(ΔSharpe +0.08、p=0.17,校正後不顯著)。'
-             '兩個版本風險幾乎一樣,差在報酬與交易量。',
+     'note': '2026-09-24 重驗:美股信用哨整體效果很小(ΔSharpe +0.08、p=0.17,校正後不顯著),但 2022 年少跌 21pp。'
+             '兩個都跌破時兩版都清倉;差別只在只有一個跌破時(平滑版減半、另一版不動)。'
+             '以下數字為等權、1 倍、未含 RiskTarget 的設定。',
      'options': [
          {'v': 'smooth', 'label': '平滑減碼(現行:一壞砍半)', 'nums': 'CAGR 12.5% · 回撤 −24.4% · Sharpe 0.78 · 約100筆/年'},
          {'v': 'wealth', 'label': '皆壞才清倉(較簡單)', 'nums': 'CAGR 13.3% · 回撤 −24.6% · Sharpe 0.78 · 約74筆/年'}]},
@@ -137,9 +164,9 @@ DIFF = [
     {'item': '台股倉位', 'old': 'RiskTarget:離均線越遠押越少', 'new': '在場時固定 1 倍',
      'why': 'RiskTarget 在台股全期5/5檔、2018後5/5檔 Sharpe 都輸固定1倍,年化少2~5%,回撤沒更小(q3b)'},
     {'item': '持有方式', 'old': '單押 RS 最強一檔', 'new': '美股、台股都等權',
-     'why': '台股 +0.210(p=0.038)/長樣本 +0.229(p=0.015);美股打平,Jason 選回撤較淺的等權(rot_verify)'},
+     'why': '台股 +0.210(p=0.038)/長樣本 +0.229(p=0.015);美股三種打平,選等權是為了分散、不依賴無法證實的挑選能力(rot_verify)'},
     {'item': '台股標的', 'old': '0050/0052/006208/0051/00757', 'new': '0050/0052/006208/0051(移除 00757)',
-     'why': '00757=美股FANG+,與既有美股部位重複;9個候選沒有一檔達標(b3_tw_replace)'},
+     'why': '00757=美股FANG+,和美股區塊重複;單獨加入效果未達門檻(+0.094,p=0.165),9個候選也沒有一檔達標(b3_tw_replace)'},
     {'item': '台股 V底救援', 'old': '沒有(只有美股 SMH/SOXX)', 'new': '啟用',
      'why': '+0.137、p=0.014、校正後 0.056、三段全正(b2_overlays)'},
     {'item': '台股恐慌容忍', 'old': 'VIX>30 跌破給3日', 'new': '關閉',
@@ -187,7 +214,8 @@ FINDINGS = [
      'status': '規則不動;風險數字已標示', 'script': 'research_b7_aggressive.py'},
     {'date': '2026-10-24', 'title': '美股回測被後見之明灌水約每年 3 個百分點',
      'body': '現用 5 檔是回頭挑的:事後挑年化 13.5%;站在每年當下用「過去 36 個月報酬前 5」挑只有 10.6%,'
-             '差 0.12 Sharpe(p=0.045)。零挑選的 14 檔產業池只有 7.6%。→ 美股未來期望值應往 10~11% 調。'
+             '差 0.12 Sharpe(p=0.045)。零挑選的 14 檔產業池只有 7.6%。(以上為 1 倍、無信用哨的設定)'
+             '→ 美股未來期望值應往下調;現行設定(17.3%)下的下修幅度未回測。'
              '好消息:事前法在 2017 年後自己也會選到 QQQ/SMH/SOXX/XLK,差距主要集中在 2009、2023、2025。',
      'status': '已標示在決策清單', 'script': 'research_b4_pool_hindsight.py'},
     {'date': '2026-10-24', 'title': '等權不需要再平衡;只持有一檔寬基指數和等權打平',
@@ -215,13 +243,26 @@ FINDINGS = [
      'body': '9 個候選當第5檔(同期比較):最好的 00692 只有 +0.014,00757 自己 +0.094(p=0.165)'
              '→ 沒有一檔達標。0050/006208 相關 0.896,去掉一檔績效一樣但少 25 筆交易/年(見決策清單)。',
      'status': '已落地:台股核心 4 檔', 'script': 'research_b3_tw_replace.py'},
-    {'date': '2026-09-23', 'title': '新版 vs 原版(台股):年化 13.2% → 19.3%、回撤 −33.7% → −20.3%',
-     'body': '等權+固定1倍 vs 單押輪動+RiskTarget:ΔSharpe +0.375(p=0.041);長樣本池 +0.391(p=0.011)。美股兩版相同。',
+    {'date': '2026-09-23', 'title': '新版 vs 原版(台股):年化 13.2% → 19.3%、回撤 −33.7% → −20.3%(1 倍、未含信用哨)',
+     'body': '等權+固定1倍 vs 單押輪動+RiskTarget:ΔSharpe +0.375(p=0.041);長樣本池 +0.391(p=0.011)。'
+             '拆成兩步:取消 RiskTarget 13.2%→18.7%(主要的報酬來源);單押→等權 Sharpe 1.05→1.26(主要的穩定度來源)。'
+             '加上信用哨後的現行設定是 22.4%/−18.2%。美股兩版相同。',
      'status': '已落地', 'script': 'research_q4_choices.py'},
     {'date': '2026-09-23', 'title': 'RS「挑最強」沒有可證實的選股能力',
      'body': '四個池子的挑選 alpha t 值 1.66/0.29/0.59/0.11 全 <2;12 個候選挑選機制校正後全部沒過。'
              '分散(等權)才是穩定的來源。',
      'status': '已落地:兩市場都改等權', 'script': 'research_rot_verify_p1.py / p2.py'},
+]
+# 進行中/待補的驗證(2026-10-24 UX 稽核的開放問題;只列題目,不放未驗證的數字)
+RESEARCH_PENDING = [
+    {'item': '前瞻追蹤 12 個月', 'why': '規則定案(2026-09-24)後的真實表現;天數見「前瞻追蹤」'},
+    {'item': '隔日執行的落差', 'why': '回測假設訊號當天收盤成交,實際是下一個交易日執行;這一天的影響還沒量化'},
+    {'item': '槓桿 ×0.5 / ×0.75 在現行設定下的績效', 'why': '目前只有 ×1.0 / ×1.25 用現行設定(等權+RiskTarget+信用哨)算過'},
+    {'item': '美股真正不融資版本(每檔上限 100%)', 'why': '已決定要提供;回測跑完、有數字後才上架成選項'},
+    {'item': '台股信用黃燈的完整範圍', 'why': '驗證只涵蓋離停損 ≤ 2×budget 的日子;live 已收窄到這個範圍,更遠的範圍要不要也啟用待測'},
+    {'item': '後見之明在現行設定下的下修幅度', 'why': '1 倍、無信用哨下是 2.9pp;現行設定下未回測'},
+    {'item': '全參數使用率掃描', 'why': '確認沒有第二個像 credit_k 那樣「定義了但程式沒用到」的參數'},
+    {'item': '美股停損緩衝(0.98~1.00)重驗', 'why': '沿用舊研究的逐檔校準,本輪沒有重驗'},
 ]
 RESEARCH_TODO = [
     {'item': '個股衛星整套重驗', 'why': '上限測試:最好也只跟 QQQ 擇時打平;乾淨驗證需歷史成分股資料(付費)', 'status': '✅ 2026-10-24 完成(上限測試)'},
@@ -239,52 +280,79 @@ RESEARCH_TODO = [
 ]
 
 LIMITS = [
-    '訊號全部用<b>收盤價</b>,盤中數字只是暫定;22:30 那班是美股盤中,決策看隔天早上那班。',
+    '訊號全部用<b>收盤價</b>,盤中數字只是暫定;22:30 那班是美股盤中,決策看隔天早上 09:00 那班。',
+    '回測假設在訊號當天收盤成交;實際上是下一個交易日才執行,這一天的落差<b>還沒量化</b>。',
+    '頁面上的績效數字都<b>不含</b>黃燈規則(別追高、空手先別進)。',
     '回測期間:美股 2002-2026、台股 2013-2026(0050/0052/0051 可回到 2009)。台股樣本短,結論強度本來就低於美股。',
-    '2002-2026 的資料在研究過程中已經全部看過,沒有真正的樣本外。任何新做法都應該先紙上追蹤 12 個月。',
-    '信用哨(HYG/LQD/SOXX)沿用既有研究,這一輪<b>沒有</b>重新驗證。',
+    '2026-09-24 以前的資料在研究過程中已經全部看過;之後的真實表現見「前瞻追蹤」,至少看滿 12 個月再下結論。',
+    '美股 5 檔標的是事後挑的,回測報酬有後見之明,未來期望值應往下調(現行設定下的幅度未回測)。',
+    '信用哨 2026-09-24 已重驗:台股證據強;美股統計上不顯著(危機樣本少),但 2022 年少跌 21pp。',
     '成本假設:美股 0.05%、台股 0.10%/單邊(已含賣出證交稅的粗估)。所有判定都在 2 倍成本下重跑過,方向不變。',
-    '槓桿、每月定投、個股衛星等其他面板不在這一版範圍內,請回原版看。',
+    '進取模式(TQQQ/SOXL)、每月定投、個股衛星不在 v2;槓桿倍數在「設定」的決策清單裡選。',
 ]
 
 
 # ── 規則依據(每條規則的門檻怎麼來、有沒有回測、效果多大)──
 #    給前端逐條顯示,不准只寫結論不寫數字。
 RULE_EVIDENCE = {
-    'trend': ('收盤 ≥ 200日均線才持有;收盤跌破 200MA×緩衝 全部轉現金',
-              '緩衝各檔不同(美股0.98~1.00、台股0.98~1.00),來自舊研究的逐檔校準。'
-              '擇時本身的價值:SPY 回撤 −55%→−21%、SMH −68%→−31%、0050 −34%→−21%(research_q1)。'),
-    'credit': ('信用哨健康比例 = 曝險乘數',
+    # (規則, 證據原文, 一句白話, 證據等級)——前台先顯示白話+等級,原文收在「看細節」(2026-10-24 UX 稽核 P3-1)
+    'trend': ('進場:收盤 ≥ 200日均線;出場:收盤跌破停損線(= 200MA×緩衝)才全部轉現金',
+              '緩衝各檔不同(SPY/QQQ 1.00、SOXX 0.99、SMH/XLK 0.98;台股 0.98~0.99),來自舊研究的逐檔校準,本輪未重驗。'
+              '進出場線不同是刻意的(遲滯):跌破 200MA 但還在停損線之上時,已持有的續抱、空手的不進。'
+              '擇時本身的價值:SPY 回撤 −55%→−21%、SMH −68%→−31%、0050 −34%→−21%(research_q1)。',
+              '價格在長期均線之上才持有;跌破停損線就出場。大空頭的回撤明顯變淺(SPY −55%→−21%、0050 −34%→−21%)。',
+              '擇時:強;緩衝數值:弱(未重驗)'),
+    'credit': ('信用哨健康比例 = 曝險乘數(已持有的部位也照乘)',
                '2026-09-24 重驗(research_b1_credit_canary.py,等權基礎):'
                '台股 ΔSharpe +0.359、p<0.001、Holm 校正後仍過、三段全正,回撤 −20.3→−17.7%;'
-               '美股 +0.080(p=0.172):不顯著,但「不顯著≠沒用」——24 年裡只有 3~4 次危機能證明它,樣本太少;實際上 2022 年(升息空頭,200MA 反應慢)只用 200MA −24.3%,加信用哨 −3.4%,少跌 21pp;2008 −8.4%→−4.8%、2015 −5.0%→+2.1%(research_b11_us_layers.py)。'),
+               '美股 +0.080(p=0.172):不顯著,但「不顯著≠沒用」——24 年裡只有 3~4 次危機能證明它,樣本太少;實際上 2022 年(升息空頭,200MA 反應慢)只用 200MA −24.3%,加信用哨 −3.4%,少跌 21pp;2008 −8.4%→−4.8%、2015 −5.0%→+2.1%(research_b11_us_layers.py)。',
+               '債券市場(高收益債、投資級債)通常比股市先出問題;它們跌破長期均線時,股票部位跟著減碼。',
+               '台股:強;美股:中'),
     'extended_us': ('離 50 日均線 ≥ 門檻 → 別追高(等拉回)',
                     '門檻來自各檔逐檔校準(SMH/XLK +10%、SOXX/QQQ +7%、SPY +5%)。'
                     '2026-09-23 到場測試驗證:等拉回較好 67%、32年中27年、平均 +0.43%;'
-                    '但 2026-09-24 用更保守的逐年 bootstrap 重算 p=0.130(不顯著)→ 方向對、強度弱。'),
+                    '但 2026-09-24 用更保守的逐年 bootstrap 重算 p=0.130(不顯著)→ 方向對、強度弱。',
+                    '短期漲太多時先等拉回再買;方向對,但統計上不顯著,直接買也和回測一致。',
+                    '弱'),
     'extended_tw': ('離 50 日均線 ≥ +12% → 別追高(等拉回)',
                     '2026-09-23 掃 3%~15% 一整排門檻後選出的平台區中間值:+12% 等待較好 71%、平均 +1.08%,'
                     '前半(<2018)4年中3年、後半 6/6 年、5檔全正;+10% 不成立。'
-                    'p<0.001,是所有結論中唯一撐過整體多重檢定的一條。舊門檻 +6~8% 反而有害(p=0.955)。'),
+                    'p<0.001,是所有結論中唯一撐過整體多重檢定的一條。舊門檻 +6~8% 反而有害(p=0.955)。',
+                    '短期漲太多(離 50 日線 12% 以上)時先等拉回;這是所有規則裡證據最強的一條,建議照做。',
+                    '強'),
     'far_us': ('沒追高但離停損線 ≥ 20% → 空手先別進',
                '舊版用「曝險<50%」= 離停損 38~43%,美股 25 年一天都沒觸發過(等於沒這條)。'
                '改用距離掃描:只看沒被別追高擋下的日子,離停損 ≥20% 時等拉近再買平均 +0.66%、14年中12年較好;'
-               '但逐年 bootstrap p=0.200(不顯著)→ 保留是因為方向一致且無害。'),
+               '但逐年 bootstrap p=0.200(不顯著)→ 保留是因為方向一致且無害。',
+               '離停損線太遠時,空手的人先等價格拉近;只影響新買進,已持有的照常持有。統計上不顯著。',
+               '弱'),
     'far_tw': ('信用示警期間,離停損線 > budget×信用健康度÷0.5 → 空手先別進',
                '台股平時版本被反證(離停損 12~18% 時等待平均少賺 3~4%、勝率<40%)已移除;'
-               '只有信用示警期間的版本有支撐:等待平均 +0.63%、勝64%、14年中11年,前半6/6、後半5/8。'),
-    'r3': ('別追高的日子裡,若 200MA 上彎 且 VIX 低於自己20日均(恐慌退燒)→ 可小額試單',
-           '「小額試單」= 不等拉回、先用系統算出的曝險買進(不是額外加碼)。'
+               '只有信用示警期間的版本有支撐:等待平均 +0.63%、勝64%、14年中11年,前半6/6、後半5/8。'
+               '驗證只涵蓋「離停損 ≤ 2×budget」的日子,所以 live 也只在這個範圍內啟用(2026-10-25 收窄)。',
+               '信用示警期間,離停損線太遠的話空手先別進;已持有的照信用乘數減碼。',
+               '中'),
+    'r3': ('別追高的日子裡,若 200MA 上彎 且 VIX 低於自己20日均(恐慌退燒)→ 可照系統曝險買進',
+           '不等拉回、直接用系統算出的曝險買進(不是額外加碼)。'
            '依據:R3 成立時「等拉回」和「立即買」幾乎沒差(平均 −0.19%),所以等待沒有價值;'
-           'R3 不成立時等拉回較好(+0.41%)。台股同現象但逐年不一致 → 台股沒有這條。'),
+           'R3 不成立時等拉回較好(+0.41%)。台股同現象但逐年不一致 → 台股沒有這條。',
+           '雖然漲多了,但趨勢向上、恐慌在退,這時等拉回沒有好處,可以照常買。',
+           '弱~中'),
     'vbottom': ('系統空手 + 距252日高回撤>15% + VIX從≥40尖峰退燒至75% → 半倉救援進場,停損 −7%',
                 '台股 2026-09-24 新增:等權基礎 ΔSharpe +0.137、p=0.014、Holm 後 0.056、三段全正,'
-                'CAGR 19.3→22.1%(research_b2_overlays.py)。美股同測僅 +0.025,維持 SMH/SOXX 限定。'),
+                'CAGR 19.3→22.1%(research_b2_overlays.py)。美股同測僅 +0.025,維持 SMH/SOXX 限定。',
+                '大跌後恐慌指數從高點明顯退燒時,先用半倉搶反彈,停損設 −7%。美股只用在 SMH/SOXX。',
+                '台股:中~強'),
     'sizing_us': ('曝險 = min(budget ÷ 離停損距離, 150%) × 信用乘數',
                   '實測 ≈ 同平均槓桿的固定倍數(ΔSharpe +0.01~0.03)→ 多賺的是槓桿本身。'
-                  'vol-timing 已於 2026-09-24 關閉(+0.008、p=0.374,但交易 70→133 筆/年)。'),
+                  '上限 150% 代表會用到融資:現行設定回測中約一半的日子(52.7%)總曝險超過 100%,平均借款約淨值的 19%,最高 56%。'
+                  'vol-timing 已於 2026-09-24 關閉(+0.008、p=0.374,但交易 70→133 筆/年)。',
+                  '離停損線越近買越多(停損時虧的錢固定),每檔最多買到這一份的 1.5 倍,所以會用到融資。',
+                  '中(效果等同固定槓桿)'),
     'sizing_tw': ('曝險 = 100% × 信用乘數(固定1倍)',
-                  'RiskTarget 在台股逐檔 5/5、2018後 5/5 都較差(組合層 p=0.367),2026-09-23 改固定1倍。'),
+                  'RiskTarget 在台股逐檔 5/5、2018後 5/5 都較差(組合層 p=0.367),2026-09-23 改固定1倍。',
+                  '在場時就買滿這一份(不融資),信用示警時照比例減。',
+                  '中'),
 }
 
 
@@ -297,14 +365,26 @@ def _trace(d, mkt, health):
     sr = d.get('stop_risk_pct')
     out = []
     ok_trend = (dist is not None and dist >= 0)
+    st = d.get('state')
+    stop = d.get('exit_price')
+    if ok_trend:
+        v1, lvl1 = '在趨勢中', 'ok'
+    elif st in ('warning', 'panic_watch'):
+        v1, lvl1 = f'跌破 200MA,但還在停損線 {stop} 之上 → 已持有續抱、空手不進', 'part'
+    else:
+        v1, lvl1 = f'收盤跌破停損線 {stop} → 已持有賣出、空手不進', 'bad'
     out.append({'id': 'trend', 'name': '① 趨勢:站上200MA?',
-                'cond': f"收盤 ≥ 200MA(={ma})", 'now': f"收盤 {close}(離200MA {dist:+.1f}%)" if dist is not None else '—',
-                'ok': ok_trend, 'verdict': '在趨勢中' if ok_trend else '跌破 → 這份放現金'})
+                'cond': f"進場:收盤 ≥ 200MA(={ma});出場:收盤 < 停損線(={stop})",
+                'now': f"收盤 {close}(離200MA {dist:+.1f}%)" if dist is not None else '—',
+                'ok': ok_trend, 'level': lvl1, 'verdict': v1})
     out.append({'id': 'credit', 'name': '② 信用哨:今天的曝險上限',
                 'cond': '健康的哨兵數 ÷ 全部哨兵 = 曝險乘數',
                 'now': f"健康比例 {health:.0%} → 每筆量 ×{health:.0%}" if health is not None else '—',
-                'ok': (health or 0) > 0, 'verdict': ('全額' if (health or 0) >= 1 else
-                                                     ('減量' if (health or 0) > 0 else '清倉不買'))})
+                'ok': (health or 0) >= 1,
+                'level': 'ok' if (health or 0) >= 1 else ('part' if (health or 0) > 0 else 'bad'),
+                'verdict': ('全額' if (health or 0) >= 1 else
+                            (f'減量 ×{health:.0%}(已持有的也減到這個比例)' if (health or 0) > 0
+                             else '清倉:已持有全部賣出、空手不買'))})
     # ★直接用數字判斷(不看 entry_state):信用全示警時 entry_state 會被整批改成 no_entry,
     #   用它回推會讓「其實已經追高」的標的誤顯示成 ✔ 沒追高(2026-09-24 SOXX 實例:+7.39% > 7%)。
     ext = (dist50 is not None and dist50 >= thr_pct)
@@ -317,14 +397,17 @@ def _trace(d, mkt, health):
         now = f"離停損線 {sr}%" if sr is not None else '—'
     else:
         lim = round((d.get('budget') or 0) * (health or 1) / 0.5 * 100, 1)
-        far_ok = not (0 < (health or 1) < 1 and sr is not None and sr > lim)
-        now = f"離停損線 {sr}%" + ('' if 0 < (health or 1) < 1 else '(信用滿血時這條不啟用)')
+        lim_hi = round((d.get('budget') or 0) / 0.5 * 100, 1)     # 驗證涵蓋的上限(D1:超過不啟用)
+        far_ok = not (0 < (health or 1) < 1 and sr is not None and lim < sr <= lim_hi)
+        now = f"離停損線 {sr}%" + ('' if 0 < (health or 1) < 1 else '(信用滿血時這條不啟用)') + \
+            (f'(超過 {lim_hi}% 不在驗證範圍內,這條不啟用)' if (sr is not None and sr > lim_hi and 0 < (health or 1) < 1) else '')
     out.append({'id': 'far_' + mkt, 'name': '④ 空手先別進:離停損線太遠嗎?',
-                'cond': (f"離停損線 < {lim}%" if mkt == 'us' else f"信用示警期間:離停損線 < {lim}%"),
+                'cond': (f"離停損線 < {lim}%" if mkt == 'us' else f"信用示警期間:離停損線 < {lim}%(只在 ≤ {lim_hi}% 的驗證範圍內檢查)"),
                 'now': now, 'ok': far_ok,
-                'verdict': '距離可接受' if far_ok else '太遠 → 空手先別進(已持有者續抱)'})
+                'verdict': '距離可接受' if far_ok else ('太遠 → 空手先別進(只影響新買進)' if mkt == 'us'
+                                                       else '太遠 → 空手先別進(已持有的照信用乘數減碼)')})
     if mkt == 'us' and ext:
-        r3 = '可小額試單' in str(d.get('entry_action', ''))
+        r3 = _r3(d)
         out.append({'id': 'r3', 'name': '⑤ 小額試單(只在追高時檢查)',
                     'cond': '200MA上彎 且 VIX < 自己的20日均(恐慌退燒中)',
                     'now': '成立' if r3 else '不成立', 'ok': r3,
@@ -343,11 +426,60 @@ def _load(name):
         return json.load(f)
 
 
+def _r3(d):
+    """R3(追高但趨勢上彎+恐慌退燒)→ 可照系統曝險買進。core_status 只把結果寫在 entry_action 文字裡。"""
+    return '可小額試單' in str(d.get('entry_action', ''))
+
+
+def _holder(d, mkt, health):
+    """已持有的人今天該怎麼做。和回測一致:每天的曝險 = 目標曝險 × 信用健康比例(已持有的也照乘);
+    跌破 200MA 但還在停損線之上(warning)= 續抱(回測的遲滯 intrend:≥MA 進、<MA×buf 出)。"""
+    st = d.get('state')
+    h = 1.0 if health is None else health
+    cur = '$' if mkt == 'us' else 'NT$'
+    stop = d.get('exit_price')
+    if (d.get('vbottom') or {}).get('active'):   # 救援觸發時系統目標 = 半倉(core_status 已把 suggested_expo 設成 0.5)
+        return 'reduce', f'🚑 V底救援:部位調到半倉,停損改為 {cur}{stop}(−7%)'
+    if st == 'risk_off':
+        return 'sell', f'收盤已跌破停損線 {cur}{stop} → 下一個交易日賣出'
+    if d.get('credit_cut'):
+        return 'sell', '信用哨全部跌破 → 下一個交易日全部賣出,等哨兵站回 200MA 再進'
+    if st == 'panic_watch':
+        return 'hold', '恐慌觀察:維持現倉、別加減,等 3 日確認(別砍在 V 底)'
+    base = (f'跌破 200MA 但還在停損線 {cur}{stop} 之上 → 續抱,收盤跌破停損線才賣'
+            if st == 'warning' else f'續抱,收盤跌破停損線 {cur}{stop} 才賣')
+    if h < 1:
+        return 'reduce', (f'信用部分示警 → 持股減到原本的 {h:.0%},剩下的續抱;'
+                          f'收盤跌破停損線 {cur}{stop} 才全部賣')
+    return 'hold', base
+
+
+def _entry(d):
+    """空手的人今天該怎麼做。V底救援優先(它就是在系統空手/信用全砍時才觸發的進場訊號)。"""
+    st, est = d.get('state'), d.get('entry_state')
+    why = d.get('entry_action', '')
+    if (d.get('vbottom') or {}).get('active'):
+        return 'buy', why
+    if d.get('credit_cut'):
+        return 'cash', '信用哨全部跌破 → 不進場,等哨兵站回 200MA'
+    if st in ('risk_off', 'panic_watch') or est == 'no_entry':
+        return 'cash', why
+    if est == 'can_enter':
+        return 'buy', why
+    if est == 'extended' and _r3(d):
+        return 'buy', why
+    if est in ('extended', 'expensive'):
+        return 'wait', why
+    return 'cash', why
+
+
 def _positions(status, mkt, method, health=None):
     """回傳 [{ticker, name, weight, ...}]:weight = 該檔分到的資金比例(合計 ≤1,其餘現金)。"""
     cores = {tk: d for tk, d in (status.get('cores') or {}).items() if not d.get('watch_only')}
     if not cores:
         return []
+    expected = EXPECTED_CORES[mkt]
+    missing = [tk for tk in expected if tk not in cores]
     held = (status.get('rotation_hold') or {}).get('ticker') or status.get('strongest')
     if method == 'rotation':
         chosen = {held: 1.0} if held in cores else {}
@@ -360,48 +492,62 @@ def _positions(status, mkt, method, health=None):
         anchor = SINGLE_ANCHOR[mkt]
         chosen = {anchor: 1.0} if anchor in cores else {}
     elif method == 'ew3':                   # 台股去重:0050/006208 同一指數(相關0.896)只留 0050
-        keep = [tk for tk in cores if tk != '006208.TW']
+        keep = [tk for tk in expected if tk != '006208.TW']
         chosen = {tk: 1.0 / len(keep) for tk in keep}
-    else:                                   # 'ew':每檔固定 1/N 槽位
-        n = len(cores)
-        chosen = {tk: 1.0 / n for tk in cores}
+    else:                                   # 'ew':每檔固定 1/N 槽位(N = 應有的檔數,不是今天抓到的檔數)
+        n = len(expected)
+        chosen = {tk: 1.0 / n for tk in expected}
     out = []
     for tk, d in cores.items():
         w = chosen.get(tk, 0.0)
         st, est = d.get('state'), d.get('entry_state')
-        if d.get('credit_cut') or st == 'risk_off':
-            act, why = 'cash', '跌破200MA或信用全示警 → 這份放現金'
-        elif st == 'panic_watch':
-            act, why = 'hold_wait', '恐慌觀察:維持現倉,等3日確認(別砍V底)'
-        elif est == 'can_enter':
-            act, why = 'buy', d.get('entry_action', '')
-        elif est in ('extended', 'expensive'):
-            act, why = 'wait', d.get('entry_action', '')
-        else:
-            act, why = 'cash', d.get('entry_action', '')
+        hact, hwhy = _holder(d, mkt, health)
+        act, why = _entry(d)
         # ★規則衝突標記(2026-09-23,Jason 指示「出現時標出來,當下自己決定」):
         #   價格掉到「停損線 ~ 200MA」之間時,單檔規則說「續抱」(還沒跌破停損線),
         #   但輪動的合格條件是「收盤 ≥ 200MA」→ 會判定失格、強制換掉。兩套規則對同一天給相反指示。
         #   回測顯示兩種版本差異 ≈ 0(±0.04),所以沒有「數據上正確」的一方,由人當下決定。
+        #   只對「單押最強」有意義;等權/只持有一檔本身就是續抱到跌破停損線(前端只在 rotation 顯示)。
         conflict = (st == 'warning')
         out.append({
-            'ticker': tk, 'name': d.get('name', ''), 'weight': round(w, 4),
+            'ticker': tk, 'name': d.get('name', ''), 'weight': w,   # 不四捨五入(1/3 存成 0.3333 會讓金額少 10 元)
             'conflict': conflict,
             'conflict_note': ('⚠️ 兩套規則不一致:價格在停損線與200MA之間——單檔規則說「還沒跌破停損線→續抱」,'
                               '輪動規則說「不在200MA之上→失格換掉」。回測上兩種做法差異≈0,你自己決定:'
                               '要嚴格(換掉)還是要少交易(續抱到真的跌破停損線)。') if conflict else '',
             'in_trend': st in ('risk_on', 'warning'), 'state': st, 'entry_state': est,
-            'action': act, 'reason': why,
+            'action': act, 'reason': why,                 # 空手的人
+            'hold_action': hact, 'hold_reason': hwhy,     # 已持有的人
             'close': d.get('close'), 'limit': d.get('entry_cap'), 'stop': d.get('exit_price'),
             'limit_pct': d.get('entry_cap_pct'), 'stop_pct': d.get('exit_pct'),
             'expo': d.get('suggested_expo'), 'dist200_pct': d.get('dist_pct'),
             'dist50_pct': d.get('dist50_pct'), 'stop_risk_pct': d.get('stop_risk_pct'),
             'entry_thr_pct': round((d.get('entry_thr', 1) - 1) * 100, 1), 'rs': d.get('rs_score'),
             'budget': d.get('budget'), 'ma200': d.get('ma200'),
+            'vbottom_active': bool((d.get('vbottom') or {}).get('active')),
             'trace': _trace(d, mkt, health),      # ★每條規則的檢查結果(條件/當下數值/門檻/依據)
         })
+    for tk in missing:                      # 資料缺失的那一份:不給任何指示,叫人先別動
+        out.append({'ticker': tk, 'name': '', 'weight': chosen.get(tk, 0.0), 'missing': True,
+                    'conflict': False, 'conflict_note': '', 'state': None, 'entry_state': None,
+                    'action': 'missing', 'reason': '今天沒抓到這一檔的資料 → 這一份先別動,等下一班更新',
+                    'hold_action': 'missing', 'hold_reason': '今天沒抓到這一檔的資料 → 維持現狀,等下一班更新',
+                    'close': None, 'limit': None, 'stop': None, 'expo': None, 'rs': None, 'trace': []})
     out.sort(key=lambda x: (-x['weight'], -(x['rs'] or 0)))
     return out
+
+
+def _rules_version():
+    """規則版本 = 規則相關檔案最後一次 commit 的日期(之前寫死 2026-09-23,改了規則也沒更新)。"""
+    import subprocess
+    try:
+        out = subprocess.run(['git', 'log', '-1', '--format=%cs', '--', 'core_status.py', 'taiwan_status.py',
+                              'v2_status.py', 'Web_Dashboard/v2_evidence.json'],
+                             capture_output=True, text=True, timeout=10,
+                             cwd=os.path.dirname(os.path.abspath(__file__))).stdout.strip()
+        return out or None
+    except Exception:
+        return None
 
 
 def build():
@@ -421,6 +567,13 @@ def build():
             'positions': methods[DEFAULT_METHOD[mkt]],
             'rotation_hold': status.get('rotation_hold'),
             'daily_verdict': status.get('daily_verdict'),
+            'source_time': status.get('last_updated'),
+            'missing_cores': [tk for tk in EXPECTED_CORES[mkt]
+                              if tk not in {k for k, d in (status.get('cores') or {}).items() if not d.get('watch_only')}],
+            'missing_canary': status.get('missing_canary') or [],
+            'intraday_tentative': bool(status.get('intraday_tentative')),
+            'intraday_note': status.get('intraday_note') or '',
+            'official': OFFICIAL[mkt],
         }
     # ★正2(00631L)衛星:live 只提供資料與規則,配多少由決策清單選(預設 0%)
     twc = (tw.get('cores') or {}).get(LEV_TICKER)
@@ -446,7 +599,10 @@ def build():
     data['decisions'] = [dict(d, verdict=DECISION_VERDICT.get(d['key'], '')) for d in DECISIONS]
     data['findings'] = FINDINGS
     data['research_todo'] = RESEARCH_TODO
-    data['rule_evidence'] = {k: {'rule': v[0], 'evidence': v[1]} for k, v in RULE_EVIDENCE.items()}
+    data['research_pending'] = RESEARCH_PENDING
+    data['rules_version'] = _rules_version()
+    data['rule_evidence'] = {k: {'rule': v[0], 'evidence': v[1], 'plain': v[2], 'grade': v[3]}
+                             for k, v in RULE_EVIDENCE.items()}
     path = os.path.join(DASHBOARD_DIR, 'v2_status.json')
     with open(path, 'w', encoding='utf-8') as f:
         from scanner_base import json_safe
