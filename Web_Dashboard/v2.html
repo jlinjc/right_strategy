@@ -328,7 +328,7 @@ function mktCard(mk, m, title, cur){
     ${creditBlock(mk,m)}
     <details class="ev" style="margin-top:10px"><summary>為什麼預設用這個持有方式 — ${ev.verdict||''}</summary>
       <div class="body">${mk==='us'?'三種方式在現行設定下統計上分不出高下;預設等權是為了分散,不依賴無法證實的挑選能力。'
-        :'等權勝過單押最強;和只持有 0050 打平。預設 4 檔是偏好(分散到 0052/0051),不是數據證明比較好。'}
+        :'四種方式在隔天開盤成交下打平;預設 4 檔是偏好(分散到 0052/0051),不是數據證明比較好。'}
         各選項的數字見 <a href="#" onclick="goTab('dec');return false;">我的設定</a>,驗證細節見 <a href="#" onclick="goSub('ev');return false;">規則與證據</a>。</div></details>
   </div>`;
 }
@@ -448,8 +448,7 @@ function renderDecisions(){
     <div class="note">每一項都附兩邊的實測數字;選了會直接套用到「今天怎麼做」。
     沒有「數據上唯一正確」的答案才會放進這裡,數據能決定的部分已經直接改好了。
     <b>選擇只存在這個瀏覽器</b>,換手機/電腦或清除瀏覽器資料要重選。</div>
-    <div class="warnbox orange" style="margin-top:8px">⚠️ 下面各選項的數字,除了槓桿 ×1.0/×1.25 以外,都還是舊的回測假設「訊號當天收盤就成交」:
-    美股約偏高 0.6pp,<b>台股約偏高 3pp</b>(台股的信用哨用到比台股收盤晚 14 小時的美股收盤)。選項之間的比較待用「隔天開盤成交」重跑。</div></div>`
+    <div class="note">台股各選項和槓桿 ×1.0/×1.25 的數字都是「隔天開盤成交」;美股持有方式和信用哨版本兩題還是舊假設「訊號當天收盤就成交」,約偏高 0.6pp,選項之間的比較不受影響。</div></div>`
     + main.map(card).join('')
     + (conflict ? (anyRot ? card(conflict)
         : `<details class="ev"><summary>停損線~200MA 之間要續抱還是換掉?(只在選「單押最強」時才需要)</summary><div class="body">${card(conflict)}</div></details>`) : '')
